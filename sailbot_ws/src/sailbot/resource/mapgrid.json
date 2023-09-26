@@ -1,0 +1,1912 @@
+{
+  "latitudeLines": [
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98833200038395
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98733200038394
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98733200038394
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98633200038394
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98633200038394
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98533200038393
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98533200038393
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98433200038393
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98433200038393
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98333200038392
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98333200038392
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98233200038392
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98233200038392
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98133200038392
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98133200038392
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98033200038391
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.98033200038391
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.9793320003839
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.9793320003839
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.9783320003839
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.9783320003839
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.9773320003839
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.9773320003839
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.97633200038389
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.97633200038389
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.97533200038389
+      },
+      "end": {
+        "lat": 42.84417554052568,
+        "lng": -70.97533200038389
+      }
+    }
+  ],
+  "longitudeLines": [
+    {
+      "start": {
+        "lat": 42.85414938719151,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.85414938719151,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.853149387191515,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.853149387191515,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85214938719152,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.85214938719152,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85114938719152,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.85114938719152,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.85014938719152,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.85014938719152,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.849149387191524,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.849149387191524,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.848149387191526,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.848149387191526,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.84714938719153,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.84714938719153,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.84614938719153,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.84614938719153,
+        "lng": -70.97532473965633
+      }
+    },
+    {
+      "start": {
+        "lat": 42.84514938719153,
+        "lng": -70.98833200038395
+      },
+      "end": {
+        "lat": 42.84514938719153,
+        "lng": -70.97532473965633
+      }
+    }
+  ],
+  "gridCenters": [
+    [
+      {
+        "index": {
+          "x": 0,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 0,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98783200038395
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 1,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 1,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98683200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 2,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 2,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98583200038394
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 3,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 3,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98483200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 4,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 4,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98383200038393
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 5,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 5,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98283200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 6,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 6,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98183200038392
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 7,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 7,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.98083200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 8,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 8,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.97983200038391
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 9,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 9,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.9788320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 10,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 10,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.9778320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 11,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 11,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.9768320003839
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      }
+    ],
+    [
+      {
+        "index": {
+          "x": 12,
+          "y": 0
+        },
+        "gps": {
+          "lat": 42.85364938719151,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 1
+        },
+        "gps": {
+          "lat": 42.85264938719152,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 2
+        },
+        "gps": {
+          "lat": 42.851649387191515,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 3
+        },
+        "gps": {
+          "lat": 42.850649387191524,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 4
+        },
+        "gps": {
+          "lat": 42.84964938719152,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 5
+        },
+        "gps": {
+          "lat": 42.84864938719153,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 6
+        },
+        "gps": {
+          "lat": 42.847649387191524,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 7
+        },
+        "gps": {
+          "lat": 42.84664938719153,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": false,
+          "partOfPath": false
+        }
+      },
+      {
+        "index": {
+          "x": 12,
+          "y": 8
+        },
+        "gps": {
+          "lat": 42.84564938719153,
+          "lng": -70.97583200038389
+        },
+        "flags": {
+          "blocked": true,
+          "partOfPath": false
+        }
+      }
+    ]
+  ]
+}
