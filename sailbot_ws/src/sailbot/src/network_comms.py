@@ -49,7 +49,8 @@ class NetworkComms(Node):
 
     def __init__(self):
         super().__init__('control_system')
-        self.server_socket.bind(("0.0.0.0", 1111))  # Bind to a specific address and port
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        self.server_socket.bind(("0.0.0.0", 1111))  # Bind to a specific address and port        self.server_socket.listen(1)  # Listen for incoming connections
         self.server_socket.listen(1)  # Listen for incoming connections
         self.get_logger().info("Server is listening for incoming connections...")
         self.create_timer(0.25, self.update_clients)
@@ -57,7 +58,7 @@ class NetworkComms(Node):
         client_registration_thread.start()
 
     def register_clients(self):
-        read_sockets, write_sockets, error_sockets = select.select([self.server_socket] , [], [])
+        read_sockets, write_sockets, error_sockets = select.select([self.server_socket] , [], [], 0.2)
         for sock in read_sockets:
             client_socket, client_address = self.server_socket.accept()
             self.client_addresses.add(client_address[0])
@@ -73,6 +74,7 @@ class NetworkComms(Node):
     def update_single_client(self, address, data):
         self.get_logger().info(address)
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         client_socket.setblocking(0)
         client_socket.settimeout(0.1)
         try:
@@ -85,8 +87,9 @@ class NetworkComms(Node):
     def update_clients(self):
         self.get_logger().info(f"Num clients: {len(self.client_addresses)}")
         data_bytes = pickle.dumps(self.current_boat_state)
+
         for address in self.client_addresses:
-            update_client_thread = threading.Thread(target=self.update_single_client, args=(address, data_bytes))
+            update_client_thread = threading.Thread(target=self.update_single_client, args=(address, data_bytes), daemon=True)
             update_client_thread.start()
         
     def register_clients_loop(self):
