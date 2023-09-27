@@ -32,6 +32,7 @@ install(
     src/debug_interface.py
     src/airmar_reader.py
     src/serial_rc_receiver.py
+    src/network_comms.py
     DESTINATION lib/${PROJECT_NAME}
 )
 
