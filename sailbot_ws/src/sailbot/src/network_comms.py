@@ -43,7 +43,7 @@ class BoatState:
 class NetworkComms(Node):
 
     current_boat_state = BoatState()
-    client_addresses = set()
+    client_sockets = {}
     # Create a socket server
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -61,36 +61,19 @@ class NetworkComms(Node):
         read_sockets, write_sockets, error_sockets = select.select([self.server_socket] , [], [], 0.2)
         for sock in read_sockets:
             client_socket, client_address = self.server_socket.accept()
-            self.client_addresses.add(client_address[0])
+            self.client_sockets[client_address[0]]=client_socket
             self.get_logger().info(f"Accepted connection from {client_address}")
-            # Data to be sent to the client
-            data_to_send = {"registered"}
-            #  Serialize and send the data
-            data_bytes = pickle.dumps(data_to_send)
-            client_socket.send(data_bytes)
-            # Close the client socket
-            client_socket.close()
 
-    def update_single_client(self, address, data):
-        self.get_logger().info(address)
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        client_socket.setblocking(0)
-        client_socket.settimeout(0.1)
-        try:
-            client_socket.connect((address, 1111))
-            client_socket.send(data)
-            client_socket.close()
-        except:
-             self.get_logger().info(f"Lost connection to client: {address}")
 
     def update_clients(self):
-        self.get_logger().info(f"Num clients: {len(self.client_addresses)}")
+        self.get_logger().info(f"Num clients: {len(self.client_sockets)}")
         data_bytes = pickle.dumps(self.current_boat_state)
 
-        for address in self.client_addresses:
-            update_client_thread = threading.Thread(target=self.update_single_client, args=(address, data_bytes), daemon=True)
-            update_client_thread.start()
+        for host in self.client_sockets.keys():
+            try:
+                self.client_sockets[host].send(data_bytes)
+            except:
+                self.get_logger().info(f"Lost connection to client: {str(host)}")
         
     def register_clients_loop(self):
         while True:
