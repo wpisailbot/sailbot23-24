@@ -6,38 +6,7 @@ from time import sleep
 import rclpy
 from rclpy.node import Node
 import threading
-
-
-class Wind:
-    speed = 0
-    direction = 0
-
-    def __init__(self, speed, direction):
-        self.speed = speed
-        self.direction = direction
-
-
-class BoatState:
-    latitude = 0
-    latitude_direction = ""
-    longitude = 0
-    longitude_direction = ""
-    current_heading = 0
-    magnetic_deviation = 0
-    magnetic_deviation_direction = ""
-    magnetic_variation = 0
-    magnetic_variation_direction = 0
-    track_degrees_true = 0
-    track_degrees_magnetic = 0
-    speed_knots = 0
-    speed_kmh = 0
-    rate_of_turn = 0
-    outside_temp = 0
-    atmospheric_pressure = 0
-    true_wind = Wind(0, 0)
-    apparent_wind = Wind(0, 0)
-    pitch = 0
-    roll = 0
+from telemetry_messages.messages import *
 
 
 class NetworkComms(Node):

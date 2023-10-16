@@ -1,0 +1,3 @@
+[submodule "sailbot_ws/src/sailbot/src/telemetry_messages"]
+	path = sailbot_ws/src/sailbot/src/telemetry_messages
+	url = git@github.com:wpisailbot/telemetry_messages.git
