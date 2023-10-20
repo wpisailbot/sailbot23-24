@@ -41,13 +41,10 @@ class NetworkComms(Node):
         self.current_boat_state.apparent_wind.direction = 6
         self.current_boat_state.pitch = 3
         self.current_boat_state.roll = 2
-        self.current_boat_state.node_states.airmar_reader = 1
-        self.current_boat_state.node_states.battery_monitor = 1
-        self.current_boat_state.node_states.control_system = 1
-        self.current_boat_state.node_states.network_comms = 1
-        self.current_boat_state.node_states.pwm_controller = 1
-        self.current_boat_state.node_states.serial_rc_receiver = 1
-        self.current_boat_state.node_states.trim_tab_comms = 1
+        node_names = ["airmar_reader", "battery_monitor", "control_system", "debug_interface", "network_comms", "pwm_controller", "serial_rc_receiver", "trim_tab_comms"]
+        for name in node_names:
+            self.current_boat_state.node_states.node_names.append(name)
+            self.current_boat_state.node_states.node_states.append(True)
 
     def register_clients(self):
         read_sockets, write_sockets, error_sockets = select.select([self.server_socket] , [], [], 0.2)
