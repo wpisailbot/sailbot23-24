@@ -11,13 +11,15 @@ import telemetry_messages.python.boat_state_pb2 as boat_state_pb2
 import telemetry_messages.python.boat_state_pb2_grpc as boat_state_pb2_rpc
 import telemetry_messages.python.control_pb2 as control_pb2
 import telemetry_messages.python.control_pb2_grpc as control_pb2_grpc
+import telemetry_messages.python.connect_pb2 as connect_pb2
+import telemetry_messages.python.connect_pb2_grpc as connect_pb2_grpc
 
 
 
 class NetworkComms(Node):
 
     current_boat_state = boat_state_pb2.BoatState()
-    client_sockets = {}
+    client_stubs = {}
     # Create a socket server
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     control_message_byte_size = 0
@@ -28,7 +30,7 @@ class NetworkComms(Node):
         #self.server_socket.bind(("0.0.0.0", 1111))  # Bind to a specific address and port        self.server_socket.listen(1)  # Listen for incoming connections
         #self.server_socket.listen(1)  # Listen for incoming connections
         #self.get_logger().info("Server is listening for incoming connections...")
-        #self.create_timer(0.25, self.update_clients)
+        self.create_timer(0.25, self.update_clients)
         #client_registration_thread = threading.Thread(target=self.register_clients_loop, daemon=True)
         #client_registration_thread.start()
         
@@ -53,28 +55,33 @@ class NetworkComms(Node):
             node_info.status = boat_state_pb2.NodeStatus.WARN
             node_info.info = ""
             self.current_boat_state.node_states.append(node_info)
-        
-        control_command = control_pb2.ControlCommand()
-        control_command.control_type = control_pb2.ControlType.RUDDER
-        control_command.control_value = 1.0
-        self.control_message_byte_size = control_command.ByteSize()
-        self.get_logger().info("control command is "+str(self.control_message_byte_size)+" bytes")
-        self.get_logger().info("boat state is "+str(self.current_boat_state.ByteSize())+" bytes")
+
+        self.create_grpc_server()
 
     #new server code
-    def create_grpc_server(self):
-        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        control_pb2_grpc.add_ExecuteControlCommandServiceServicer_to_server(self, self.server)
-        self.server.add_insecure_port('[::]:50051')
-        self.server.start()
-        self.server.wait_for_termination()
+    def create_grpc_server(self): 
+        self.get_logger().info("Creating gRPC server")
+        self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        control_pb2_grpc.add_ExecuteControlCommandServiceServicer_to_server(self, self.grpc_server)
+        connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
+        self.grpc_server.add_insecure_port('[::]:50051')
+        self.grpc_server.start()
+
+    def create_boat_status_client_connection(self, address):
+        channel = grpc.insecure_channel(address+':50051')
+        self.client_stubs[address] = boat_state_pb2_rpc.ReceiveBoatStateServiceStub(channel)
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def ExecuteControlCommand(self, command: control_pb2.ControlCommand(), context):
+    def ExecuteControlCommand(self, command: control_pb2.ControlCommand, context):
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         return response
-
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ConnectToBoat(self, command: connect_pb2.ConnectRequest, context):
+        self.create_boat_status_client_connection(context.peer().split(':')[1])
+        response = connect_pb2.ConnectResponse()
+        return response
     
     #old server code
     def register_clients(self):
@@ -92,15 +99,15 @@ class NetworkComms(Node):
         #self.get_logger().info(str(self.current_boat_state))
         #data_bytes = bytes("Hello", "utf-8")
         del_list = []
-        for host in self.client_sockets.keys():
+        for host in self.client_stubs.keys():
             try:
-                self.get_logger().info(f"Sending data")
-                self.client_sockets[host].send(data_bytes)
+                self.client_stubs[host].ReceiveBoatState(self.current_boat_state)
+                self.get_logger().info(f"Sent data")
             except:
                 self.get_logger().info(f"Lost connection to client: {str(host)}")
                 del_list.append(host)
         for host in del_list:
-            del self.client_sockets[host]
+            del self.client_stubs[host]
     
     def receive_commands(self):
         while True:
