@@ -63,13 +63,10 @@ class NetworkComms(Node):
         self.get_logger().info("Creating gRPC server")
         self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         control_pb2_grpc.add_ExecuteControlCommandServiceServicer_to_server(self, self.grpc_server)
-        connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
+        boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
+        #connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
         self.grpc_server.add_insecure_port('[::]:50051')
         self.grpc_server.start()
-
-    def create_boat_status_client_connection(self, address):
-        channel = grpc.insecure_channel(address+':50051')
-        self.client_stubs[address] = boat_state_pb2_rpc.ReceiveBoatStateServiceStub(channel)
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteControlCommand(self, command: control_pb2.ControlCommand, context):
@@ -78,10 +75,14 @@ class NetworkComms(Node):
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def ConnectToBoat(self, command: connect_pb2.ConnectRequest, context):
-        self.create_boat_status_client_connection(context.peer().split(':')[1])
-        response = connect_pb2.ConnectResponse()
-        return response
+    def SendBoatState(self, command: boat_state_pb2.BoatStateRequest(), context):
+        return self.current_boat_state
+    
+    # #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    # def ConnectToBoat(self, command: connect_pb2.ConnectRequest, context):
+    #     self.create_boat_status_client_connection(context.peer().split(':')[1])
+    #     response = connect_pb2.ConnectResponse()
+    #     return response
     
     #old server code
     def register_clients(self):
@@ -101,6 +102,7 @@ class NetworkComms(Node):
         del_list = []
         for host in self.client_stubs.keys():
             try:
+                self.get_logger().info(f"Sending boat state data")
                 self.client_stubs[host].ReceiveBoatState(self.current_boat_state)
                 self.get_logger().info(f"Sent data")
             except:
