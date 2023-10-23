@@ -52,9 +52,18 @@ class NetworkComms(Node):
         for name in node_names:
             node_info = boat_state_pb2.NodeInfo()
             node_info.name = name
-            node_info.status = boat_state_pb2.NodeStatus.WARN
+            node_info.status = boat_state_pb2.NodeStatus.NODE_STATUS_WARN
             node_info.info = ""
             self.current_boat_state.node_states.append(node_info)
+        self.current_boat_state.current_autonomous_mode = boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_NONE
+        a = boat_state_pb2.Point()
+        a.latitude = 5.1
+        a.longitude = 4.1
+        b=boat_state_pb2.Point()
+        b.latitude = 5.2
+        b.longitude = 4.1
+        self.current_boat_state.current_path.points.append(a)
+        self.current_boat_state.current_path.points.append(b)
 
         self.create_grpc_server()
 
@@ -77,28 +86,9 @@ class NetworkComms(Node):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest(), context):
         return self.current_boat_state
-    
-    # #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    # def ConnectToBoat(self, command: connect_pb2.ConnectRequest, context):
-    #     self.create_boat_status_client_connection(context.peer().split(':')[1])
-    #     response = connect_pb2.ConnectResponse()
-    #     return response
-    
-    #old server code
-    def register_clients(self):
-        read_sockets, write_sockets, error_sockets = select.select([self.server_socket] , [], [], 0.2)
-        for sock in read_sockets:
-            client_socket, client_address = self.server_socket.accept()
-            self.client_sockets[client_address[0]]=client_socket
-            self.get_logger().info(f"Accepted connection from {client_address}")
 
 
     def update_clients(self):
-        #self.get_logger().info(f"Num clients: {len(self.client_sockets)}")
-        data_bytes = self.current_boat_state.SerializeToString()
-        #self.get_logger().info("data size: "+str(len(data_bytes)))
-        #self.get_logger().info(str(self.current_boat_state))
-        #data_bytes = bytes("Hello", "utf-8")
         del_list = []
         for host in self.client_stubs.keys():
             try:
@@ -110,45 +100,10 @@ class NetworkComms(Node):
                 del_list.append(host)
         for host in del_list:
             del self.client_stubs[host]
-    
-    def receive_commands(self):
-        while True:
-            rlist, _, _ = select.select(self.client_sockets.values(), [], [], 0.2)
-            for sock in rlist:
-                try:
-                    self.get_logger().info("Trying to receive")
-                    received_bytes = sock.recv(1024)
-                    # if(len(received_bytes)==0):
-                    #     continue #no data
-                    received_data = control_pb2.ControlCommand()
-                    received_data.ParseFromString(received_bytes)
-                    self.get_logger().info("Received command")
-                    #received_data = pickle.loads(received_bytes)
-                except Exception as e:
-                    self.get_logger().info(e)
-                    continue #connection lost, should be re-established by main thread
-                match received_data:
-                    case control_pb2.ControlCommand():
-                        match received_data.control_type:
-                            case control_pb2.ControlType.TRIM_TAB:
-                                self.get_logger().info("Received trimtab control command: "+str(received_data.control_value))
-                            case control_pb2.ControlType.RUDDER:
-                                self.get_logger().info("Received rudder control command: "+str(received_data.control_value))
-                            case _:
-                                self.get_logger().info("Unknown control command received")
-                    case _:
-                        self.get_logger().info("Unknown command received")
-                pass
-        
-    def register_clients_loop(self):
-        while True:
-            self.register_clients()
 
 def main(args=None):
     rclpy.init(args=args)
     network_comms = NetworkComms()
-    #receive_thread = threading.Thread(target=network_comms.receive_commands, daemon=True)
-    #receive_thread.start()
     rclpy.spin(network_comms)
     rclpy.shutdown()
 
