@@ -11,8 +11,8 @@ import telemetry_messages.python.boat_state_pb2 as boat_state_pb2
 import telemetry_messages.python.boat_state_pb2_grpc as boat_state_pb2_rpc
 import telemetry_messages.python.control_pb2 as control_pb2
 import telemetry_messages.python.control_pb2_grpc as control_pb2_grpc
-import telemetry_messages.python.connect_pb2 as connect_pb2
-import telemetry_messages.python.connect_pb2_grpc as connect_pb2_grpc
+import telemetry_messages.python.node_restart_pb2 as node_restart_pb2
+import telemetry_messages.python.node_restart_pb2_grpc as node_restart_pb2_grpc
 
 
 
@@ -85,6 +85,8 @@ class NetworkComms(Node):
         self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         control_pb2_grpc.add_ExecuteControlCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
+        node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
+
         #connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
         self.grpc_server.add_insecure_port('[::]:50051')
         self.grpc_server.start()
@@ -98,6 +100,11 @@ class NetworkComms(Node):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest(), context):
         return self.current_boat_state
+    
+    def RestartNode(self, command: node_restart_pb2.RestartNodeRequest(), context):
+        response = node_restart_pb2.RestartNodeResponse()
+        response.success = False
+        return response
 
 
     def update_clients(self):
