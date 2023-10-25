@@ -64,6 +64,18 @@ class NetworkComms(Node):
         b.longitude = 4.1
         self.current_boat_state.current_path.points.append(a)
         self.current_boat_state.current_path.points.append(b)
+        c = boat_state_pb2.Point()
+        c.latitude = 4.9
+        c.longitude = 3.9
+        d=boat_state_pb2.Point()
+        d.latitude = 4.8
+        d.longitude = 3.9
+        e=boat_state_pb2.Point()
+        e.latitude = 4.7
+        e.longitude = 3.8
+        self.current_boat_state.previous_positions.points.append(c)
+        self.current_boat_state.previous_positions.points.append(d)
+        self.current_boat_state.previous_positions.points.append(e)
 
         self.create_grpc_server()
 
