@@ -19,20 +19,9 @@ import telemetry_messages.python.node_restart_pb2_grpc as node_restart_pb2_grpc
 class NetworkComms(Node):
 
     current_boat_state = boat_state_pb2.BoatState()
-    client_stubs = {}
-    # Create a socket server
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    control_message_byte_size = 0
 
     def __init__(self):
         super().__init__('control_system')
-        #self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        #self.server_socket.bind(("0.0.0.0", 1111))  # Bind to a specific address and port        self.server_socket.listen(1)  # Listen for incoming connections
-        #self.server_socket.listen(1)  # Listen for incoming connections
-        #self.get_logger().info("Server is listening for incoming connections...")
-        self.create_timer(0.25, self.update_clients)
-        #client_registration_thread = threading.Thread(target=self.register_clients_loop, daemon=True)
-        #client_registration_thread.start()
         
         self.current_boat_state.latitude = 5
         self.current_boat_state.longitude = 4
@@ -83,7 +72,11 @@ class NetworkComms(Node):
     def create_grpc_server(self): 
         self.get_logger().info("Creating gRPC server")
         self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        control_pb2_grpc.add_ExecuteControlCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteRudderCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteTrimTabCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteBallastCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteAutonomousModeCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteSetPathCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
 
@@ -92,7 +85,31 @@ class NetworkComms(Node):
         self.grpc_server.start()
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def ExecuteControlCommand(self, command: control_pb2.ControlCommand, context):
+    def ExecuteRudderCommand(self, command: control_pb2.RudderCommand, context):
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        return response
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteTrimTabCommand(self, command: control_pb2.TrimTabCommand, context):
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        return response
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteBallastCommand(self, command: control_pb2.BallastCommand, context):
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        return response
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteAutonomousModeCommand(self, command: control_pb2.AutonomousModeCommand, context):
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        return response
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteSetPathCommand(self, command: control_pb2.SetPathCommand, context):
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         return response
@@ -101,24 +118,11 @@ class NetworkComms(Node):
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest(), context):
         return self.current_boat_state
     
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def RestartNode(self, command: node_restart_pb2.RestartNodeRequest(), context):
         response = node_restart_pb2.RestartNodeResponse()
         response.success = False
         return response
-
-
-    def update_clients(self):
-        del_list = []
-        for host in self.client_stubs.keys():
-            try:
-                self.get_logger().info(f"Sending boat state data")
-                self.client_stubs[host].ReceiveBoatState(self.current_boat_state)
-                self.get_logger().info(f"Sent data")
-            except:
-                self.get_logger().info(f"Lost connection to client: {str(host)}")
-                del_list.append(host)
-        for host in del_list:
-            del self.client_stubs[host]
 
 def main(args=None):
     rclpy.init(args=args)
