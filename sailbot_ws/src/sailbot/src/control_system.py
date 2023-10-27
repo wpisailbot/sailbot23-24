@@ -63,7 +63,7 @@ class ControlSystem(Node):  # Gathers data from some nodes and distributes it to
         
 
     def serial_rc_listener_callback(self, msg):
-        self.get_logger().info('Received msg: "%s"' % msg.data)
+        #self.get_logger().info('Received msg: "%s"' % msg.data)
         msg_dict = json.loads(msg.data)
         for i in msg_dict:
             self.serial_rc[i] = msg_dict[i]
@@ -75,7 +75,7 @@ class ControlSystem(Node):  # Gathers data from some nodes and distributes it to
             self.airmar_data[i] = msg_dict[i]
         
     def trim_tab_telemetry_listener_callback(self, msg):
-        self.get_logger().info('Received msg: "%s"' % msg.data)
+        #self.get_logger().info('Received msg: "%s"' % msg.data)
 
         try:
             self.trim_tab_status['wind_dir'] = msg.data

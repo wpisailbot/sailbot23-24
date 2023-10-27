@@ -4,8 +4,11 @@ import select
 from time import sleep
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import String,  Int8, Int16
 import grpc
 from concurrent import futures
+import json
+import math
 
 import telemetry_messages.python.boat_state_pb2 as boat_state_pb2
 import telemetry_messages.python.boat_state_pb2_grpc as boat_state_pb2_rpc
@@ -14,7 +17,11 @@ import telemetry_messages.python.control_pb2_grpc as control_pb2_grpc
 import telemetry_messages.python.node_restart_pb2 as node_restart_pb2
 import telemetry_messages.python.node_restart_pb2_grpc as node_restart_pb2_grpc
 
-
+def make_json_string(json_msg):
+    json_str = json.dumps(json_msg)
+    message = String()
+    message.data = json_str
+    return message
 
 class NetworkComms(Node):
 
@@ -22,7 +29,11 @@ class NetworkComms(Node):
 
     def __init__(self):
         super().__init__('control_system')
-        
+
+        self.pwm_control_publisher_ = self.create_publisher(String, 'pwm_control', 10)
+        self.trim_tab_control_publisher_ = self.create_publisher(Int8, 'tt_control', 10)
+        self.trim_tab_angle_publisher_ = self.create_publisher(Int16, 'tt_angle', 10)
+
         self.current_boat_state.latitude = 5
         self.current_boat_state.longitude = 4
         self.current_boat_state.current_heading = 12
@@ -88,17 +99,32 @@ class NetworkComms(Node):
     def ExecuteRudderCommand(self, command: control_pb2.RudderCommand, context):
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        #rudder commands are radians, map to degrees
+        rudder_json = {"channel": "8", "angle": int((command.rudder_control_value+math.pi/4)*(180/math.pi))}
+        #self.get_logger().info("Publishing rudder command:")
+        self.pwm_control_publisher_.publish(make_json_string(rudder_json))
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteTrimTabCommand(self, command: control_pb2.TrimTabCommand, context):
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        state_msg = Int8()
+        state_msg.data = 5
+        angle_msg = Int16()
+        angle_msg.data = command.trimtab_control_value+math.pi/2
+        self.trim_tab_control_publisher_.publish(state_msg)
+        self.trim_tab_angle_publisher_.publish(angle_msg)
+        self.get_logger().info("Publishing trimtab command")
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteBallastCommand(self, command: control_pb2.BallastCommand, context):
         response = control_pb2.ControlResponse()
+        self.get_logger().info("Publishing ballast command")
+        value = 80 + ((110 - 80) / (1.0 - -1.0)) * (command.ballast_control_value - -1.0)
+        ballast_json = {"channel": "12", "angle": value}
+        self.pwm_control_publisher_.publish(make_json_string(ballast_json))
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         return response
     

@@ -11,7 +11,7 @@ from enum import Enum
 from std_msgs.msg import Int8, Int16, Float32
 
 
-ble_address = "F0:08:D1:CE:D8:52"  # Trim Tab controller BLE address
+ble_address = "30:c6:f7:02:70:56"  # Trim Tab controller BLE address
 uuid16_dict = {v: k for k, v in uuid16_dict.items()}
 
 # Characteristic UUIDs
@@ -161,15 +161,15 @@ class TrimTabComms(Node):
         loop.run_until_complete(self.ble_write())
     
     def angle_callback(self, msg):
-    	""" Subscription handler for trim tab angle updates (Manual mode) """
-    	self.get_logger().debug("Updating manual trim tab angle")
-    	global angle
-    	angle = msg.data
-    	
-    	# Send new angle to trim tab controller
-    	loop = asyncio.get_event_loop()
-    	asyncio.set_event_loop(loop)
-    	loop.run_until_complete(self.ble_write())
+        """ Subscription handler for trim tab angle updates (Manual mode) """
+        self.get_logger().debug("Updating manual trim tab angle")
+        global angle
+        angle = msg.data
+
+        # Send new angle to trim tab controller
+        loop = asyncio.get_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.ble_write())
 
 
 def main(args=None):
@@ -184,8 +184,10 @@ def main(args=None):
         tt_comms.disconnect()
         tt_comms.destroy_node()
         rclpy.shutdown()
-    except:
+    except Exception as err:
+        print(f"Unexpected {err=}, {type(err)=}")
         tt_comms.disconnect()
+        raise
 
 
 if __name__ == '__main__':
