@@ -112,7 +112,7 @@ class NetworkComms(Node):
         state_msg = Int8()
         state_msg.data = 5
         angle_msg = Int16()
-        angle_msg.data = command.trimtab_control_value+math.pi/2
+        angle_msg.data = int((command.trimtab_control_value+math.pi/2)*180/math.pi)
         self.trim_tab_control_publisher_.publish(state_msg)
         self.trim_tab_angle_publisher_.publish(angle_msg)
         self.get_logger().info("Publishing trimtab command")

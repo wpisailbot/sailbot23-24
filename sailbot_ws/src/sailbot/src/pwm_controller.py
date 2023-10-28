@@ -126,8 +126,15 @@ class PWMController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-
-    pwm_controller = PWMController()
+    up = False
+    setup_node = Node(node_name="pwm_Setup")
+    while not up:
+      try:
+        pwm_controller = PWMController()
+      except:
+        setup_node.get_logger().info("PWM controller error! Is PWM HAT connected?")
+        pwm_controller.destroy_node()
+        time.sleep(1)
 
     rclpy.spin(pwm_controller)
 
