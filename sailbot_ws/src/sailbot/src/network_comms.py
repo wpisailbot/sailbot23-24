@@ -138,6 +138,8 @@ class NetworkComms(Node):
     def ExecuteSetPathCommand(self, command: control_pb2.SetPathCommand, context):
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        self.current_boat_state.current_path.ClearField("points")# = command.new_path
+        self.current_boat_state.current_path.points.extend(command.new_path.points)
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
