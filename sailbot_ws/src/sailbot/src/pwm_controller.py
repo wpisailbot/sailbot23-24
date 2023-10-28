@@ -110,7 +110,14 @@ class PWMController(Node):
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning
-        self.pwm = PCA9685()
+        up = False
+        while not up:
+          try:
+            self.pwm = PCA9685()
+            up = True
+          except:
+            self.get_logger().info("PWM controller error! Is PWM HAT connected?")
+            time.sleep(1)
         self.pwm.setPWMFreq(50)
         
 
@@ -126,15 +133,7 @@ class PWMController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    up = False
-    setup_node = Node(node_name="pwm_Setup")
-    while not up:
-      try:
-        pwm_controller = PWMController()
-      except:
-        setup_node.get_logger().info("PWM controller error! Is PWM HAT connected?")
-        pwm_controller.destroy_node()
-        time.sleep(1)
+    pwm_controller = PWMController()
 
     rclpy.spin(pwm_controller)
 
