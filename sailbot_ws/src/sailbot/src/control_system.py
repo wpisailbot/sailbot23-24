@@ -3,7 +3,7 @@ from time import time
 import rclpy
 from rclpy.node import Node
 import json
-from std_msgs.msg import String, Float32, Int8, Int16
+from std_msgs.msg import String, Float32, Int8, Int16, Empty
 import sailbot.autonomous.p2p as p2p
 from collections import deque
 
@@ -60,6 +60,13 @@ class ControlSystem(Node):  # Gathers data from some nodes and distributes it to
         self.alpha = deque(maxlen=3)
         self.lastRollAngle = deque(maxlen=4)
         # self.p2p_alg = None
+
+        self.timer_pub = self.create_publisher(Empty, '/heartbeat/control_system', 1)
+        self.timer = self.create_timer(0.5, self.heartbeat_timer_callback)
+
+    def heartbeat_timer_callback(self):
+      self.get_logger().info("Publishing timer")
+      self.timer_pub.publish(Empty())
         
 
     def serial_rc_listener_callback(self, msg):
@@ -166,6 +173,7 @@ class ControlSystem(Node):  # Gathers data from some nodes and distributes it to
 
         ballast_json = {"channel": "12", "angle": ballast_angle}
         self.pwm_control_publisher_.publish(self.make_json_string(ballast_json))
+        
 
            
 def main(args=None):

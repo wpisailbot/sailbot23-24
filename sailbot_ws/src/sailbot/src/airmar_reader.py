@@ -22,7 +22,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
         msg = String()
         msg.data = json.dumps(self.readLineToJson())
         self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: "%s"' % msg.data)
+        #self.get_logger().info('Publishing: "%s"' % msg.data)
 
     def readLineToJson(self):
 
@@ -40,7 +40,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                 #dd = d + m/60
                 #lat = math.floor(float(args[1]) / 100) + (float(args[1]) % 100)/60.0
                 #lon = math.floor(float(args[3]) / 100) + (float(args[3]) % 100)/60.0
-                lat_raw = args[1]
+                lat_raw = args[1]3
                 lat = float(lat_raw[:2]) + float(lat_raw[2:])/60.0
                 lon_raw = args[3]
                 lon = float(lon_raw[:3]) + float(lon_raw[3:])/60.0

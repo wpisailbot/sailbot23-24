@@ -7,11 +7,11 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 	return LaunchDescription([
-		Node(
-			package='sailbot',
-			executable='pwm_controller.py',
-			name='pwm'
-		),
+		# Node(
+		# 	package='sailbot',
+		# 	executable='pwm_controller.py',
+		# 	name='pwm'
+		# ),
 		Node(
 			package='sailbot',
 			executable='trim_tab_comms.py',
@@ -21,5 +21,10 @@ def generate_launch_description():
 			package='sailbot',
 			executable='network_comms.py',
 			name='network_comms'
-		)
+		),
+		# 		Node(
+		# 	package='sailbot',
+		# 	executable='airmar_reader.py',
+		# 	name='airmar'
+		# )
 	])

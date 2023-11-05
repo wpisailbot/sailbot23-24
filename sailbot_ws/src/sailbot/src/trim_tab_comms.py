@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import struct
 import asyncio
+import os
 
 from bleak import BleakClient
 from bleak.uuids import uuid16_dict
@@ -8,7 +9,7 @@ import rclpy
 from rclpy.node import Node
 from enum import Enum
 
-from std_msgs.msg import Int8, Int16, Float32
+from std_msgs.msg import Int8, Int16, Float32, Empty
 
 
 ble_address = "30:c6:f7:02:70:56"  # Trim Tab controller BLE address
@@ -54,9 +55,16 @@ class TrimTabComms(Node):
         self.tt_control_subscriber = self.create_subscription(Int8, 'tt_control', self.listener_callback, 10)  # Trim tab state
         self.tt_angle_subscriber = self.create_subscription(Int16, 'tt_angle', self.angle_callback, 10)
 
+        self.timer_pub = self.create_publisher(
+        Empty, '/heartbeat/trim_tab_comms', 1)
+        self.timer = self.create_timer(0.5, self.heartbeat_timer_callback)
+
         # Set up timer for retrieving variables over BLE
         timer_period = 0.5  # Fetch data every 0.5 seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
+
+        os.system("rfkill block bluetooth")
+        os.system("rfkill unblock bluetooth")
 
         # Set up BLE client and attempt to connect
         self.client = BleakClient(ble_address)
@@ -65,6 +73,7 @@ class TrimTabComms(Node):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self._ble_connect())
+
 
     def lost_connection(self, client):
         """ Attempt to reconnect if connection is lost unexpectedly """
@@ -115,7 +124,7 @@ class TrimTabComms(Node):
             battery_data = await self.client.read_gatt_char(BATTERY_UUID)
             battery_level = int(battery_data[0])
         except Exception as e:
-            self.get_logger().error(str(e))
+            self.get_logger().error("read failed: "+str(e))
 
     async def ble_write(self):
         """ Update the state of the trim tab controller [Asynchronous] """
@@ -126,7 +135,7 @@ class TrimTabComms(Node):
             if state == TRIM_STATE.MANUAL:
                 await self.client.write_gatt_char(TAB_ANGLE_UUID, angle.to_bytes(1, 'little'))
         except Exception as e:
-            self.get_logger().error(str(e))
+            self.get_logger().error("Write failed: "+str(e))
 
     def timer_callback(self):
         """
@@ -170,6 +179,10 @@ class TrimTabComms(Node):
         loop = asyncio.get_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self.ble_write())
+    
+    def heartbeat_timer_callback(self):
+      self.get_logger().info("Publishing timer")
+      self.timer_pub.publish(Empty())
 
 
 def main(args=None):
@@ -181,6 +194,7 @@ def main(args=None):
         rclpy.spin(tt_comms)
 
         # Clean up when we are done
+        tt_comms.get_logger().info("Node exiting")
         tt_comms.disconnect()
         tt_comms.destroy_node()
         rclpy.shutdown()

@@ -3,7 +3,7 @@ import json
 import rclpy
 import RPi.GPIO as GPIO
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, Empty
 
 import smbus2 as smbus
 import math
@@ -110,6 +110,8 @@ class PWMController(Node):
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning
+        self.timer_pub = self.create_publisher(Empty, '/heartbeat/pwm_controller', 1)
+        self.timer = self.create_timer(0.5, self.heartbeat_timer_callback)
         up = False
         while not up:
           try:
@@ -120,6 +122,10 @@ class PWMController(Node):
             time.sleep(1)
         self.pwm.setPWMFreq(50)
         
+    def heartbeat_timer_callback(self):
+      #self.get_logger().info("Publishing timer")
+      self.timer_pub.publish(Empty())
+       
 
     def listener_callback(self, msg):
         self.get_logger().info('PWM command received: "%s"' % msg.data)
