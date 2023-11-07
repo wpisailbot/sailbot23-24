@@ -22,9 +22,9 @@ def generate_launch_description():
 			executable='network_comms.py',
 			name='network_comms'
 		),
-		# 		Node(
-		# 	package='sailbot',
-		# 	executable='airmar_reader.py',
-		# 	name='airmar'
-		# )
+		Node(
+			package='sailbot',
+			executable='airmar_reader.py',
+			name='airmar'
+		),
 	])

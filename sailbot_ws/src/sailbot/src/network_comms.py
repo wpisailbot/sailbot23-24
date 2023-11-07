@@ -4,7 +4,9 @@ import select
 from time import sleep
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String,  Int8, Int16, Empty
+from std_msgs.msg import String,  Int8, Int16, Empty, Float64
+from sensor_msgs.msg import NavSatFix
+from sailbot_msgs.msg import Wind
 import grpc
 from concurrent import futures
 import json
@@ -39,6 +41,73 @@ class NetworkComms(Node):
         self.trim_tab_control_publisher_ = self.create_publisher(Int8, 'tt_control', 10)
         self.trim_tab_angle_publisher_ = self.create_publisher(Int16, 'tt_angle', 10)
 
+        self.rot_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/rate_of_turn',
+            self.rate_of_turn_callback,
+            10)
+        
+        self.navsat_subscription = self.create_subscription(
+            NavSatFix,
+            'airmar_data/lat_long',
+            self.lat_long_callback,
+            10)
+        
+        self.track_degrees_true_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/track_degrees_true',
+            self.track_degrees_true_callback,
+            10)
+        
+        self.track_degrees_magnetic_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/track_degrees_magnetic',
+            self.track_degrees_magnetic_callback,
+            10)
+        
+        self.speed_knots_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/speed_knots',
+            self.speed_knots_callback,
+            10)
+        
+        self.speed_knots_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/speed_kmh',
+            self.speed_kmh_callback,
+            10)
+        
+        self.heading_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/heading',
+            self.heading_callback,
+            10)
+        
+        self.true_wind_subscription = self.create_subscription(
+            Wind,
+            'airmar_data/true_wind',
+            self.true_wind_callback,
+            10)
+        
+        self.apparent_wind_subscription = self.create_subscription(
+            Wind,
+            'airmar_data/apparent_wind',
+            self.apparent_wind_callback,
+            10)
+        
+        self.roll_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/roll',
+            self.roll_callback,
+            10)
+        
+        self.pitch_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/pitch',
+            self.pitch_callback,
+            10)
+
+        #initial dummy values, for testing
         self.current_boat_state.latitude = 5
         self.current_boat_state.longitude = 4
         self.current_boat_state.current_heading = 12
@@ -117,6 +186,44 @@ class NetworkComms(Node):
             'heartbeat/trim_tab_comms',
             self.trim_tab_comms_heartbeat,
             1)
+        
+        
+
+    def rate_of_turn_callback(self, msg: Float64):
+        self.current_boat_state.rate_of_turn = msg.data
+
+    def lat_long_callback(self, msg: NavSatFix):
+        self.current_boat_state.latitude = msg.latitude
+        self.current_boat_state.longitude = msg.longitude
+
+    def track_degrees_true_callback(self, msg: Float64):
+        self.current_boat_state.track_degrees_true = msg.data
+
+    def track_degrees_magnetic_callback(self, msg: Float64):
+        self.current_boat_state.track_degrees_magnetic = msg.data
+
+    def speed_knots_callback(self, msg: Float64):
+        self.current_boat_state.speed_knots = msg.data
+
+    def speed_kmh_callback(self, msg: Float64):
+        self.current_boat_state.speed_kmh = msg.data
+    
+    def heading_callback(self, msg: Float64):
+        self.current_boat_state.current_heading = msg.data
+
+    def true_wind_callback(self, msg: Wind):
+        self.current_boat_state.true_wind.speed = msg.speed.data
+        self.current_boat_state.true_wind.direction = msg.direction.data
+
+    def apparent_wind_callback(self, msg: Wind):
+        self.current_boat_state.apparent_wind.speed = msg.speed.data
+        self.current_boat_state.apparent_wind.direction = msg.direction.data
+
+    def roll_callback(self, msg: Float64):
+        self.current_boat_state.roll = msg.data
+    
+    def pitch_callback(self, msg: Float64):
+        self.current_boat_state.pitch = msg.data
 
     #new server code
     def create_grpc_server(self): 

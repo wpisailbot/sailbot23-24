@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(sailbot)
+project(sailbot_msgs)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,6 +7,15 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+
+#required for message generation
+find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Wind.msg"
+  DEPENDENCIES std_msgs
+ )
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -24,18 +33,4 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install (DIRECTORY launch DESTINATION share/${PROJECT_NAME})
-install(
-  PROGRAMS
-    src/pwm_controller.py
-    src/control_system.py
-    src/trim_tab_comms.py
-    src/debug_interface.py
-    src/airmar_reader.py
-    src/serial_rc_receiver.py
-    src/network_comms.py
-    DESTINATION lib/${PROJECT_NAME}
-)
-install (DIRECTORY src/telemetry_messages DESTINATION lib/${PROJECT_NAME})
-install (DIRECTORY src/autonomous DESTINATION lib/${PROJECT_NAME})
 ament_package()

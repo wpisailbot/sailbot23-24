@@ -63,6 +63,7 @@ class TrimTabComms(Node):
         timer_period = 0.5  # Fetch data every 0.5 seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
+        #restart bluetooth- necessary to kill hanging connections if ros node crashes and restarts
         os.system("rfkill block bluetooth")
         os.system("rfkill unblock bluetooth")
 
