@@ -34,6 +34,7 @@ install(
     src/airmar_reader.py
     src/serial_rc_receiver.py
     src/network_comms.py
+    src/ballast_control.py
     DESTINATION lib/${PROJECT_NAME}
 )
 install (DIRECTORY src/telemetry_messages DESTINATION lib/${PROJECT_NAME})

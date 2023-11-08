@@ -182,7 +182,7 @@ class TrimTabComms(Node):
         loop.run_until_complete(self.ble_write())
     
     def heartbeat_timer_callback(self):
-      self.get_logger().info("Publishing timer")
+      #self.get_logger().info("Publishing timer")
       self.timer_pub.publish(Empty())
 
 

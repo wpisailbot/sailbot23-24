@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-import socket
-import select
-from time import sleep
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String,  Int8, Int16, Empty, Float64
@@ -12,10 +9,6 @@ from concurrent import futures
 import json
 import math
 import time
-import board
-import busio
-import adafruit_ads1x15.ads1015 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
 
 import telemetry_messages.python.boat_state_pb2 as boat_state_pb2
 import telemetry_messages.python.boat_state_pb2_grpc as boat_state_pb2_rpc
@@ -37,9 +30,10 @@ class NetworkComms(Node):
     def __init__(self):
         super().__init__('control_system')
 
-        self.pwm_control_publisher_ = self.create_publisher(String, 'pwm_control', 10)
-        self.trim_tab_control_publisher_ = self.create_publisher(Int8, 'tt_control', 10)
-        self.trim_tab_angle_publisher_ = self.create_publisher(Int16, 'tt_angle', 10)
+        self.pwm_control_publisher = self.create_publisher(String, 'pwm_control', 10)
+        self.ballast_position_publisher = self.create_publisher(Float64, 'ballast_position', 10)
+        self.trim_tab_control_publisher = self.create_publisher(Int8, 'tt_control', 10)
+        self.trim_tab_angle_publisher = self.create_publisher(Int16, 'tt_angle', 10)
 
         self.rot_subscription = self.create_subscription(
             Float64,
@@ -252,7 +246,9 @@ class NetworkComms(Node):
         #self.get_logger().info("input angle: {}", degrees)
         rudder_json = {"channel": "8", "angle": degrees_scaled}
         #self.get_logger().info("Publishing rudder command: "+str(degrees))
-        self.pwm_control_publisher_.publish(make_json_string(rudder_json))
+        #self.get_logger().info("Publishing rudder command")
+
+        self.pwm_control_publisher.publish(make_json_string(rudder_json))
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
@@ -263,20 +259,26 @@ class NetworkComms(Node):
         state_msg.data = 5
         angle_msg = Int16()
         angle_msg.data = int((command.trimtab_control_value+math.pi/2)*180/math.pi)
-        self.trim_tab_control_publisher_.publish(state_msg)
-        self.trim_tab_angle_publisher_.publish(angle_msg)
-        self.get_logger().info("Publishing trimtab command")
+        self.trim_tab_control_publisher.publish(state_msg)
+        self.trim_tab_angle_publisher.publish(angle_msg)
+        #self.get_logger().info("Publishing trimtab command")
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteBallastCommand(self, command: control_pb2.BallastCommand, context):
         response = control_pb2.ControlResponse()
-        #self.get_logger().info("Publishing ballast command")
-        value = 80 + ((110 - 80) / (1.0 - -1.0)) * (command.ballast_control_value - -1.0)
-        ballast_json = {"channel": "12", "angle": value}
-        self.pwm_control_publisher_.publish(make_json_string(ballast_json))
+        self.get_logger().info("Publishing ballast command")
+        position_msg = Float64()
+        position_msg.data = command.ballast_control_value
+        self.ballast_position_publisher.publish(position_msg)
+
+        # current_target = 80 + ((110 - 80) / (1.0 - -1.0)) * (command.ballast_control_value - -1.0)
+        # ballast_json = {"channel": "12", "angle": current_target}
+        # self.pwm_control_publisher.publish(make_json_string(ballast_json))
+
+
+
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
-        #self.get_logger.info("ADC read: {:>5}\t{:>5.3f}".format(self.chan.value, self.chan.voltage))
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files

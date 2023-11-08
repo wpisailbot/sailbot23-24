@@ -37,7 +37,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
         msg = String()
         msg.data = json.dumps(self.readLineToJson())
         self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: "%s"' % msg.data)
+        #self.get_logger().info('Publishing: "%s"' % msg.data)
 
     def readLineToJson(self):
 
