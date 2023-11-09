@@ -85,12 +85,12 @@ class BallastControl(LifecycleNode):
         self.destroy_timer(self.timer)
         self.destroy_publisher(self.pwm_control_publisher)
         self.destroy_subscription(self.position_subscription)
-        return Transition.TRANSITION_CALLBACK_SUCCESS
+        return TransitionCallbackReturn.SUCCESS
 
     def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Shutting down...")
         # Perform final cleanup if necessary
-        return Transition.TRANSITION_CALLBACK_SUCCESS
+        return TransitionCallbackReturn.SUCCESS
     
     #end callbacks
     
