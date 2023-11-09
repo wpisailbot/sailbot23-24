@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from rclpy.lifecycle import LifecycleNode
-from rclpy.executors import SingleThreadedExecutor
 from lifecycle_msgs.msg import Transition
 from lifecycle_msgs.srv import ChangeState
 from std_msgs.msg import String, Float64
@@ -11,6 +9,13 @@ import board
 import busio
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
+from typing import Optional
+from rclpy.lifecycle import LifecycleNode
+from rclpy.lifecycle import Publisher
+from rclpy.lifecycle import State
+from rclpy.lifecycle import TransitionCallbackReturn
+from rclpy.timer import Timer
+from rclpy.subscription import Subscription
 
 def make_json_string(json_msg):
     json_str = json.dumps(json_msg)
@@ -37,12 +42,14 @@ class BallastControl(LifecycleNode):
 
     def __init__(self):
         super().__init__('control_system')
-        self.
+        self.pwm_control_publisher: Optional[Publisher]
+        self.position_subscription: Optional[Subscription]
+        self.timer: Optional[Timer]
 
     #lifecycle node callbacks
-    def on_configure(self):
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
-        self.pwm_control_publisher = self.create_publisher(String, 'pwm_control', 10)
+        self.pwm_control_publisher = self.create_lifecycle_publisher(String, 'pwm_control', 10)
 
         self.position_subscription = self.create_subscription(
             Float64,
@@ -50,7 +57,7 @@ class BallastControl(LifecycleNode):
             self.ballast_position_callback,
             10)
         
-        self.create_timer(0.1, self.control_loop_callback)
+        self.timer = self.create_timer(0.1, self.control_loop_callback)
         
         # Create the I2C bus
         i2c = busio.I2C(board.SCL, board.SDA)
@@ -58,28 +65,29 @@ class BallastControl(LifecycleNode):
         ads = ADS.ADS1015(i2c)
         # Create single-ended input on channel 0
         self.ballast_adc_channel = AnalogIn(ads, ADS.P0)
-        self.get_logger().info("ADC initialized")
+        self.get_logger().info("ADC node configured")
+        #super().on_configure(state)
+        return TransitionCallbackReturn.SUCCESS
 
-        return Transition.TRANSITION_CALLBACK_SUCCESS
-
-    def on_activate(self, state):
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")
         # Start publishers or timers
         # (If you're using a managed publisher, this is where you would activate it)
-        return Transition.TRANSITION_CALLBACK_SUCCESS
+        super().on_activate(state)
 
-    def on_deactivate(self, state):
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
-        return Transition.TRANSITION_CALLBACK_SUCCESS
+        super().on_deactivate(state)
 
-    def on_cleanup(self, state):
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Cleaning up...")
         # Destroy subscribers, publishers, and timers
-        self.pwm_control_publisher.destroy()
-        self.position_subscription.destroy()
+        self.destroy_timer(self.timer)
+        self.destroy_publisher(self.pwm_control_publisher)
+        self.destroy_subscription(self.position_subscription)
         return Transition.TRANSITION_CALLBACK_SUCCESS
 
-    def on_shutdown(self, state):
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Shutting down...")
         # Perform final cleanup if necessary
         return Transition.TRANSITION_CALLBACK_SUCCESS
@@ -111,7 +119,7 @@ def main(args=None):
     ballast_control = BallastControl()
 
     # Use the SingleThreadedExecutor to spin the node.
-    executor = SingleThreadedExecutor()
+    executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(ballast_control)
 
     try:
