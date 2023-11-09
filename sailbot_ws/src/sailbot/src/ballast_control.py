@@ -3,8 +3,6 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Float64
 import json
-import math
-import time
 import board
 import busio
 import adafruit_ads1x15.ads1015 as ADS
