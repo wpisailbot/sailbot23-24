@@ -38,5 +38,4 @@ install(
     DESTINATION lib/${PROJECT_NAME}
 )
 install (DIRECTORY src/telemetry_messages DESTINATION lib/${PROJECT_NAME})
-install (DIRECTORY src/autonomous DESTINATION lib/${PROJECT_NAME})
 ament_package()
