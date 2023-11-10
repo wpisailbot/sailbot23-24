@@ -17,7 +17,8 @@ class BoatState(Enum):
     WAYPOINT_FOLLOWING=5
 
 #node_names = ["airmar_reader", "ballast_control", "battery_monitor", "computer_vision", "control_system", "computer_vision", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
-node_names = ["airmar_reader","ballast_control"] 
+#node_names = ["network_comms","airmar_reader","ballast_control"] 
+node_names = ["network_comms", "ballast_control"]
 
 class StateManager(Node):
     current_state = BoatState.INACTIVE
@@ -33,29 +34,39 @@ class StateManager(Node):
             self.client_state_setters[name] = self.create_client(ChangeState, name+"/change_state")
         
         #run async function to move all nodes to configured state
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.configure_all_nodes())
+        self.configure_all_nodes()
         #loop.run_until_complete(self.activate_all_nodes())
         #self.timer = self.create_timer(2, self.timer_callback)
 
     async def transitionAllNodes(self, transition_id: int):
         #assemble and run list of async configure transition calls
-        func_list = [self.changeNodeState(node_name, transition_id) for node_name in node_names]
-        results = await asyncio.gather(*func_list)
-        #retry any which failed because the service was unavailable (timing issue, any other way to resolve?)
-        retry_task_names = [name for name, result in zip(node_names, results) if result is False]
-        while retry_task_names:
-            retry_tasks = [self.changeNodeState(node_name, transition_id) for node_name in retry_task_names]
-            results = await asyncio.gather(*retry_tasks)
-            retry_task_names = [name for name, result in zip(node_names, results) if result is False]
+        failed_names = node_names.copy()
+        while failed_names:
+            self.get_logger().info("Failed names: "+str(failed_names))
+            func_list = [self.changeNodeState(node_name, transition_id) for node_name in failed_names]
+            results = await asyncio.gather(*func_list)
+            zipped = zip(results, failed_names)
+            new_failed_names = []
+            for result, name in zipped:
+                self.get_logger().info(name+", "+str(result))
+                if not result:
+                    new_failed_names.append(name)
+                    self.get_logger().info("Failed: "+name)
+            failed_names = new_failed_names
 
-    async def configure_all_nodes(self):
+        return True
+        #retry any which failed because the service was unavailable (timing issue, any other way to resolve?)
+        
+
+    def configure_all_nodes(self):
         self.get_logger().info("Configuring all nodes")
-        await self.transitionAllNodes(Transition.TRANSITION_CONFIGURE)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.transitionAllNodes(Transition.TRANSITION_CONFIGURE))
     
     async def activate_all_nodes(self):
         self.get_logger().info("activating all nodes")
-        await self.transitionAllNodes(Transition.TRANSITION_ACTIVATE)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.transitionAllNodes(Transition.TRANSITION_ACTIVATE))
 
     async def getNodeState(self, node_name: str, timeout_seconds=3):
         if(not node_name in self.client_state_getters):

@@ -12,7 +12,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, glob('launch/*.py')),
-        ('lib/'+package_name+'/telemetry_messages/', glob('sailbot/telemetry_messages/python/*')),
+        ('lib/'+package_name+'/telemetry_messages/python/', glob('sailbot/telemetry_messages/python/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

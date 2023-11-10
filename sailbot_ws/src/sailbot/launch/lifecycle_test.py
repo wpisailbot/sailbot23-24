@@ -2,6 +2,13 @@ import launch
 from launch_ros.actions import LifecycleNode
 
 def generate_launch_description():
+    network_comms_node = LifecycleNode(
+        package='sailbot', 
+        executable='network_comms', 
+        name='network_comms',
+        namespace='',
+        output='screen'
+    )
     ballast_node = LifecycleNode(
         package='sailbot', 
         executable='ballast_control', 
@@ -26,7 +33,8 @@ def generate_launch_description():
     
     # Launch Description
     ld = launch.LaunchDescription()
+    ld.add_action(network_comms_node)
     ld.add_action(ballast_node) 
-    ld.add_action(airmar_node)
+    # ld.add_action(airmar_node)
     ld.add_action(state_manager_node)
     return ld

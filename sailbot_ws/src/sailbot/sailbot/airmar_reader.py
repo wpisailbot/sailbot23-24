@@ -56,6 +56,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         self.roll_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/roll', 10)
         self.pitch_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/pitch', 10)
         self.timer = self.create_timer(0.01, self.timer_callback)
+        return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")

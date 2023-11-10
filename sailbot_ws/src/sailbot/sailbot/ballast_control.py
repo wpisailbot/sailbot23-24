@@ -39,7 +39,7 @@ class BallastControl(LifecycleNode):
     current_target = (ADC_FULL_STARBOARD-ADC_FULL_PORT)/2+ADC_FULL_PORT
 
     def __init__(self):
-        super().__init__('control_system')
+        super().__init__('ballast_control')
         self.pwm_control_publisher: Optional[Publisher]
         self.position_subscription: Optional[Subscription]
         self.timer: Optional[Timer]
