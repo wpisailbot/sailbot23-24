@@ -32,7 +32,8 @@ setup(
             'battery_monitor = sailbot.batteryMonitor:main',
             'ballast_control = sailbot.ballast_control:main',
             'computer_vision = sailbot.computer_vision:main',
-            'network_comms = sailbot.network_comms:main'
+            'network_comms = sailbot.network_comms:main',
+            'state_manager = sailbot.state_manager:main'
         ],
     },
 )

@@ -11,23 +11,23 @@ from launch.events import matches_action
 import lifecycle_msgs.msg
 
 def generate_launch_description():
-    lifecycle_node = LifecycleNode(
+    ballast_node = LifecycleNode(
         package='sailbot', 
         executable='ballast_control', 
         name='ballast_control',
         namespace='',
         output='screen'
     )
-    
-    emit_event_to_request_that_node_does_configure_transition = launch.actions.EmitEvent(
-        event=launch_ros.events.lifecycle.ChangeState(
-            lifecycle_node_matcher=launch.events.process.matches_name(lifecycle_node.name),
-            transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE,
-        )
+    state_manager_node = LifecycleNode(
+        package='sailbot', 
+        executable='state_manager', 
+        name='state_manager',
+        namespace='',
+        output='screen'
     )
     
     # Launch Description
     ld = launch.LaunchDescription()
-    ld.add_action(lifecycle_node) 
-    ld.add_action(emit_event_to_request_that_node_does_configure_transition)
+    ld.add_action(ballast_node) 
+    ld.add_action(state_manager_node)
     return ld
