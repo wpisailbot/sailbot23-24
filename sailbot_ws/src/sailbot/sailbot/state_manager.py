@@ -5,8 +5,7 @@ from lifecycle_msgs.srv import GetState, ChangeState
 from lifecycle_msgs.msg import State
 from enum import Enum
 import typing
-
-import asyncio
+from functools import partial
 
 class BoatState(Enum):
     INACTIVE=1
@@ -37,22 +36,16 @@ class StateManager(Node):
         request = GetState.Request()
         self.get_logger().info("awaiting service")
         result = self.client_state_getters[node_name].call_async(request)
-        result.add_done_callback(self.node_state_future_callback)
-        # rclpy.spin_until_future_complete(self, result)
-        # self.get_logger().info("done waiting")
+        partial_callback = partial(self.node_state_future_callback, node_name=node_name)
+        result.add_done_callback(partial_callback)
 
-        # if(result):
-        #     self.get_logger().info("Node "+str(node_name)+" is in state: "+str(result.label))
-        # else:
-        #     self.get_logger().info("Request failed for GetState: "+node_name)
-
-    def node_state_future_callback(self, future):
+    def node_state_future_callback(self, future, node_name: str):
         self.get_logger().info("in callback")
         result: GetState.Response = future.result()
         if(result):
-            self.get_logger().info("Node is in state: "+result.current_state.label)
+            self.get_logger().info("Node "+node_name+" is in state: "+result.current_state.label)
         else:
-            self.get_logger().info("Request failed for GetState: ")
+            self.get_logger().info("Request failed for GetState: "+node_name)
 
     async def timer_callback(self):
         self.get_logger().info("Getting state")
