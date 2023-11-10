@@ -18,6 +18,13 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
+    airmar_node = LifecycleNode(
+        package='sailbot', 
+        executable='airmar_reader', 
+        name='airmar_reader',
+        namespace='',
+        output='screen'
+    )
     state_manager_node = LifecycleNode(
         package='sailbot', 
         executable='state_manager', 
@@ -29,5 +36,6 @@ def generate_launch_description():
     # Launch Description
     ld = launch.LaunchDescription()
     ld.add_action(ballast_node) 
+    ld.add_action(airmar_node)
     ld.add_action(state_manager_node)
     return ld

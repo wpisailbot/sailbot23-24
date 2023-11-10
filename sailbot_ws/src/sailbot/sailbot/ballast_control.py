@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 import rclpy
-from rclpy.node import Node
-from lifecycle_msgs.msg import Transition
-from lifecycle_msgs.srv import ChangeState
 from std_msgs.msg import String, Float64
 import json
 import board
 import busio
+import time
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 from typing import Optional
@@ -49,7 +47,7 @@ class BallastControl(LifecycleNode):
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
-
+        time.sleep(3)
         try:
             # Create the I2C bus
             i2c = busio.I2C(board.SCL, board.SDA)
@@ -76,7 +74,6 @@ class BallastControl(LifecycleNode):
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")
         # Start publishers or timers
-        # (If you're using a managed publisher, this is where you would activate it)
         super().on_activate(state)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
