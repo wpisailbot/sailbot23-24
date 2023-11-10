@@ -50,12 +50,15 @@ class BallastControl(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
 
-         # Create the I2C bus
-        i2c = busio.I2C(board.SCL, board.SDA)
-        # Create the ADC object using the I2C bus
-        ads = ADS.ADS1015(i2c)
-        # Create single-ended input on channel 0
-        self.ballast_adc_channel = AnalogIn(ads, ADS.P0)
+        try:
+            # Create the I2C bus
+            i2c = busio.I2C(board.SCL, board.SDA)
+            # Create the ADC object using the I2C bus
+            ads = ADS.ADS1015(i2c)
+            # Create single-ended input on channel 0
+            self.ballast_adc_channel = AnalogIn(ads, ADS.P0)
+        except:
+            return TransitionCallbackReturn.FAILURE
 
         self.pwm_control_publisher = self.create_lifecycle_publisher(String, 'pwm_control', 10)
 
