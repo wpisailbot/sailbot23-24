@@ -5,8 +5,6 @@ from lifecycle_msgs.srv import GetState, ChangeState
 from lifecycle_msgs.msg import State, Transition
 from enum import Enum
 import typing
-import types
-import functools
 from functools import partial
 import asyncio
 from asyncio import Future
@@ -85,7 +83,6 @@ class StateManager(Node):
         rclpy.spin_once(self, timeout_sec=0)
 
     async def changeNodeState(self, node_name: str, transition_id: int, timeout_seconds=3):
-        self.get_logger().info("In change state")
         if(not node_name in self.client_state_setters):
             self.get_logger().error("Incorrect or nonexistant node name provided: "+node_name)
             return None
@@ -94,25 +91,22 @@ class StateManager(Node):
             return False
         request = ChangeState.Request()
         request.transition.id = transition_id
-        self.get_logger().info("awaiting change state service")
         future = self.client_state_setters[node_name].call_async(request)
         #TODO: There has to be a better way of doing truly async service calls
         while(future.done() is False):
             await self.spin_once()
             await asyncio.sleep(0.0)
-        self.get_logger().info("future is done?")
         result = future.result()
         if(result):
             if(result.success):
                 self.get_logger().info("State change "+str(transition_id)+" successful for node: "+node_name)
+                return True
             else:
                 self.get_logger().warn("State change "+str(transition_id)+" unsuccessful for node: "+node_name)
+                return False
         else:
             self.get_logger().error("Request "+str(transition_id)+" failed for ChangeState: "+node_name)
-
-        #partial_callback = partial(self.get_change_node_state_future_callback(), self=self, node_name=node_name, transition_id=transition_id)
-        #future.add_done_callback(partial_callback)
-        return None
+            return False
 
     async def timer_callback(self):
         self.get_logger().info("Getting state")
