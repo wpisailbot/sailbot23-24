@@ -45,27 +45,28 @@ class StateManager(Node):
         
         #run async function to move all nodes to configured state
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.configure())
+        loop.run_until_complete(self.configure_all_nodes())
+        loop.run_until_complete(self.activate_all_nodes())
         #self.timer = self.create_timer(2, self.timer_callback)
 
-    async def configure(self):
-        self.get_logger().info("in configure")
+    async def transitionAllNodes(self, transition_id: int):
         #assemble and run list of async configure transition calls
-        func_list = [self.changeNodeState(node_name, Transition.TRANSITION_CONFIGURE) for node_name in node_names]
+        func_list = [self.changeNodeState(node_name, transition_id) for node_name in node_names]
         results = await asyncio.gather(*func_list)
         #retry any which failed because the service was unavailable (timing issue, any other way to resolve?)
         retry_task_names = [name for name, result in zip(node_names, results) if result is False]
         while retry_task_names:
-            retry_tasks = [self.changeNodeState(node_name, Transition.TRANSITION_CONFIGURE) for node_name in retry_task_names]
+            retry_tasks = [self.changeNodeState(node_name, transition_id) for node_name in retry_task_names]
             results = await asyncio.gather(*retry_tasks)
             retry_task_names = [name for name, result in zip(node_names, results) if result is False]
-        # loop = asyncio.get_event_loop()
-        # func_list = [asyncio.ensure_future(self.get_changeNodeState()(node_name, Transition.TRANSITION_CONFIGURE)) for node_name in node_names]
-        # self.get_logger().info("running as_compelted")
-        # for f in asyncio.as_completed(func_list):
-        #     result = await f
-        #     await self.get_change_node_state_future_callback()(result, "test", -1)
-        # loop.close()
+
+    async def configure_all_nodes(self):
+        self.get_logger().info("Configuring all nodes")
+        await self.transitionAllNodes(Transition.TRANSITION_CONFIGURE)
+    
+    async def activate_all_nodes(self):
+        self.get_logger().info("activating all nodes")
+        await self.transitionAllNodes(Transition.TRANSITION_ACTIVATE)
 
     async def getNodeState(self, node_name: str, timeout_seconds=3):
         if(not node_name in self.client_state_getters):
@@ -100,24 +101,20 @@ class StateManager(Node):
         request = ChangeState.Request()
         request.transition.id = transition_id
         self.get_logger().info("awaiting change state service")
-        future: Future = self.client_state_setters[node_name].call_async(request)
-        partial_callback = partial(self.get_change_node_state_future_callback(), self=self, node_name=node_name, transition_id=transition_id)
-        future.add_done_callback(partial_callback)
-        return None
-
-    def get_change_node_state_future_callback(this):
-        async def change_node_state_future_callback(future: Future, self, node_name: str, transition_id: int):
-            self.get_logger().info("in change state callback")
-            result: ChangeState.Response = future.result()
-            if(result):
-                if(result.success):
-                    self.get_logger().info("State change "+str(transition_id)+" successful for node: "+node_name)
-                else:
-                    self.get_logger().warn("State change "+str(transition_id)+" unsuccessful for node: "+node_name)
+        future = self.client_state_setters[node_name].call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        result = future.result()
+        if(result):
+            if(result.success):
+                self.get_logger().info("State change "+str(transition_id)+" successful for node: "+node_name)
             else:
-                self.get_logger().error("Request "+str(transition_id)+" failed for ChangeState: "+node_name)
-        
-        return change_node_state_future_callback
+                self.get_logger().warn("State change "+str(transition_id)+" unsuccessful for node: "+node_name)
+        else:
+            self.get_logger().error("Request "+str(transition_id)+" failed for ChangeState: "+node_name)
+
+        #partial_callback = partial(self.get_change_node_state_future_callback(), self=self, node_name=node_name, transition_id=transition_id)
+        #future.add_done_callback(partial_callback)
+        return None
 
     async def timer_callback(self):
         self.get_logger().info("Getting state")

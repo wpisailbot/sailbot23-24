@@ -8,7 +8,7 @@ import time
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 from typing import Optional
-from rclpy.lifecycle import LifecycleNode
+from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
 from rclpy.lifecycle import Publisher
 from rclpy.lifecycle import State
 from rclpy.lifecycle import TransitionCallbackReturn
@@ -92,6 +92,10 @@ class BallastControl(LifecycleNode):
         self.get_logger().info("Shutting down...")
         # Perform final cleanup if necessary
         return TransitionCallbackReturn.SUCCESS
+    
+    def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
+        self.get_logger().info("Error caught!")
+        return super().on_error(state)
     
     #end callbacks
     
