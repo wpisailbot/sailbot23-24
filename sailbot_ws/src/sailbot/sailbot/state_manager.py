@@ -18,7 +18,7 @@ class BoatState(Enum):
 
 #node_names = ["airmar_reader", "ballast_control", "battery_monitor", "computer_vision", "control_system", "computer_vision", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
 #node_names = ["network_comms","airmar_reader","ballast_control"] 
-node_names = ["network_comms", "ballast_control"]
+node_names = ["network_comms", "ballast_control", "pwm_controller", "airmar_reader"]
 
 class StateManager(Node):
     current_state = BoatState.INACTIVE
@@ -35,7 +35,7 @@ class StateManager(Node):
         
         #run async function to move all nodes to configured state
         self.configure_all_nodes()
-        #loop.run_until_complete(self.activate_all_nodes())
+        self.activate_all_nodes()
         #self.timer = self.create_timer(2, self.timer_callback)
 
     async def transitionAllNodes(self, transition_id: int):
@@ -54,6 +54,7 @@ class StateManager(Node):
                     self.get_logger().info("Failed: "+name)
             failed_names = new_failed_names
 
+        self.get_logger().info("returning from transition")
         return True
         #retry any which failed because the service was unavailable (timing issue, any other way to resolve?)
         
@@ -62,8 +63,9 @@ class StateManager(Node):
         self.get_logger().info("Configuring all nodes")
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.transitionAllNodes(Transition.TRANSITION_CONFIGURE))
+        self.get_logger().info("returning from configure")
     
-    async def activate_all_nodes(self):
+    def activate_all_nodes(self):
         self.get_logger().info("activating all nodes")
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.transitionAllNodes(Transition.TRANSITION_ACTIVATE))

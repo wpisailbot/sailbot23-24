@@ -205,7 +205,8 @@ class NetworkComms(LifecycleNode):
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")
         # Start publishers or timers
-        super().on_activate(state)
+        #self.ballast_position_publisher.on_activate()
+        return super().on_activate(state)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")

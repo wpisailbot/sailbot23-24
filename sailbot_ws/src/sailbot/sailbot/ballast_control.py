@@ -47,7 +47,6 @@ class BallastControl(LifecycleNode):
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
-        time.sleep(3)
         try:
             # Create the I2C bus
             i2c = busio.I2C(board.SCL, board.SDA)
@@ -74,7 +73,8 @@ class BallastControl(LifecycleNode):
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")
         # Start publishers or timers
-        super().on_activate(state)
+        return super().on_activate(state)
+
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
@@ -106,13 +106,12 @@ class BallastControl(LifecycleNode):
         return  self.MOTOR_FAST_PORT + ((self.MOTOR_FAST_STARBOARD - self.MOTOR_FAST_PORT) / (self.CONTROL_FAST_STARBOARD - self.CONTROL_FAST_PORT)) * (control - self.CONTROL_FAST_PORT)
 
     def ballast_position_callback(self, msg: Float64):
-        #self.get_logger().info("Received ballast position: "+str(msg.data))
+        self.get_logger().info("Received ballast position: "+str(msg.data))
         self.current_target = self.ADC_FULL_PORT + ((self.ADC_FULL_STARBOARD - self.ADC_FULL_PORT) / (1.0 - -1.0)) * (msg.data - -1.0)
 
     def control_loop_callback(self):
         motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.ballast_adc_channel.value-self.current_target)))
-        self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.ballast_adc_channel.value)+" Current motor value: "+str(motor_value))
-        
+        #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.ballast_adc_channel.value)+" Current motor value: "+str(motor_value))
         
         ballast_json = {"channel": "12", "angle": motor_value}
         self.pwm_control_publisher.publish(make_json_string(ballast_json))

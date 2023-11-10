@@ -38,7 +38,6 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
     #lifecycle node callbacks
     def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
-        time.sleep(3)
         try:
             self.ser = serial.Serial('/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1170079-if00')
         except:
@@ -61,7 +60,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")
         # Start publishers or timers
-        super().on_activate(state)
+        return super().on_activate(state)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
