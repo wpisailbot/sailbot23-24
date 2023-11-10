@@ -25,10 +25,8 @@ setup(
         'console_scripts': [
             'airmar_reader = sailbot.airmar_reader:main',
             'pwm_controller = sailbot.pwm_controller:main',
-            'serial_rc_receiver = sailbot.serial_rc_receiver:main',
             'control_system = sailbot.control_system:main',
             'trim_tab_comms = sailbot.trim_tab_comms:main',
-            'debug_interface = sailbot.debug_interface:main',
             'battery_monitor = sailbot.batteryMonitor:main',
             'ballast_control = sailbot.ballast_control:main',
             'computer_vision = sailbot.computer_vision:main',
