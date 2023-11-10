@@ -11,15 +11,6 @@ from functools import partial
 import asyncio
 from asyncio import Future
 
-def copy_func(f):
-    """Based on http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)"""
-    g = types.FunctionType(f.__code__, f.__globals__, name=f.__name__,
-                           argdefs=f.__defaults__,
-                           closure=f.__closure__)
-    g = functools.update_wrapper(g, f)
-    g.__kwdefaults__ = f.__kwdefaults__
-    return g
-
 class BoatState(Enum):
     INACTIVE=1
     INITIALIZING = 2
@@ -46,7 +37,7 @@ class StateManager(Node):
         #run async function to move all nodes to configured state
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.configure_all_nodes())
-        loop.run_until_complete(self.activate_all_nodes())
+        #loop.run_until_complete(self.activate_all_nodes())
         #self.timer = self.create_timer(2, self.timer_callback)
 
     async def transitionAllNodes(self, transition_id: int):
@@ -90,6 +81,9 @@ class StateManager(Node):
         else:
             self.get_logger().info("Request failed for GetState: "+node_name)
 
+    async def spin_once(self):
+        rclpy.spin_once(self, timeout_sec=0)
+
     async def changeNodeState(self, node_name: str, transition_id: int, timeout_seconds=3):
         self.get_logger().info("In change state")
         if(not node_name in self.client_state_setters):
@@ -102,7 +96,11 @@ class StateManager(Node):
         request.transition.id = transition_id
         self.get_logger().info("awaiting change state service")
         future = self.client_state_setters[node_name].call_async(request)
-        rclpy.spin_until_future_complete(self, future)
+        #TODO: There has to be a better way of doing truly async service calls
+        while(future.done() is False):
+            await self.spin_once()
+            await asyncio.sleep(0.0)
+        self.get_logger().info("future is done?")
         result = future.result()
         if(result):
             if(result.success):
