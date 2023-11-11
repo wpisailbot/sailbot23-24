@@ -180,18 +180,25 @@ def main(args=None):
     rclpy.init(args=args)
     pwm_controller = PWMController()
 
-    rclpy.spin(pwm_controller)
+    # Use the SingleThreadedExecutor to spin the node.
+    executor = rclpy.executors.SingleThreadedExecutor()
+    executor.add_node(pwm_controller)
 
-    # exit pwm
-    pwm_controller.pwm.exit_PCA9685()
-    GPIO.cleanup()
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    pwm_controller.destroy_node()
-    rclpy.shutdown()
-    
+    try:
+        # Spin the node to execute callbacks
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        pwm_controller.get_logger().fatal(f'Unhandled exception: {e}')
+    finally:
+        # exit pwm
+        pwm_controller.pwm.exit_PCA9685()
+        GPIO.cleanup()
+        # Shutdown and cleanup the node
+        executor.shutdown()
+        pwm_controller.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

@@ -84,7 +84,7 @@ class BallastControl(LifecycleNode):
         self.get_logger().info("Cleaning up...")
         # Destroy subscribers, publishers, and timers
         self.destroy_timer(self.timer)
-        self.destroy_publisher(self.pwm_control_publisher)
+        self.destroy_lifecycle_publisher(self.pwm_control_publisher)
         self.destroy_subscription(self.position_subscription)
         return TransitionCallbackReturn.SUCCESS
 

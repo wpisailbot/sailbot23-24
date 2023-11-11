@@ -247,18 +247,24 @@ def main(args=None):
 
     tt_comms = TrimTabComms()
 
-    try:
-        rclpy.spin(tt_comms)
+    # Use the SingleThreadedExecutor to spin the node.
+    executor = rclpy.executors.SingleThreadedExecutor()
+    executor.add_node(tt_comms)
 
-        # Clean up when we are done
-        tt_comms.get_logger().info("Node exiting")
+    try:
+        # Spin the node to execute callbacks
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        tt_comms.get_logger().fatal(f'Unhandled exception: {e}')
+    finally:
+        # Shutdown and cleanup the node
         tt_comms.disconnect()
         tt_comms.destroy_node()
+        executor.shutdown()
+        tt_comms.destroy_node()
         rclpy.shutdown()
-    except Exception as err:
-        print(f"Unexpected {err=}, {type(err)=}")
-        tt_comms.disconnect()
-        raise
 
 
 if __name__ == '__main__':
