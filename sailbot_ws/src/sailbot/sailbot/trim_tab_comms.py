@@ -6,7 +6,13 @@ import os
 from bleak import BleakClient
 from bleak.uuids import uuid16_dict
 import rclpy
-from rclpy.node import Node
+from typing import Optional
+from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
+from rclpy.lifecycle import Publisher
+from rclpy.lifecycle import State
+from rclpy.lifecycle import TransitionCallbackReturn
+from rclpy.timer import Timer
+from rclpy.subscription import Subscription
 from enum import Enum
 
 from std_msgs.msg import Int8, Int16, Float32, Empty
@@ -46,18 +52,30 @@ wind_dir = 0.0
 battery_level = 100
 
 
-class TrimTabComms(Node):
+class TrimTabComms(LifecycleNode):
     def __init__(self):
-        super(TrimTabComms, self).__init__('tt_comms')
+        super(TrimTabComms, self).__init__('trim_tab_comms')
 
-        self.tt_telemetry_publisher = self.create_publisher(Float32, 'tt_telemetry', 10)  # Wind direction
-        self.tt_battery_publisher = self.create_publisher(Int8, 'tt_battery', 10)  # Battery level
+        self.tt_telemetry_publisher: Optional[Publisher]
+        self.tt_battery_publisher: Optional[Publisher]
+        self.tt_control_subscriber: Optional[Subscription]
+        self.tt_angle_subscriber: Optional[Subscription]
+        self.timer_pub: Optional[Publisher]
+
+        self.heartbeat_timer: Optional[Timer]
+        self.timer: Optional[Timer]
+
+    #lifecycle node callbacks
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("In configure")
+        self.tt_telemetry_publisher = self.create_lifecycle_publisher(Float32, 'tt_telemetry', 10)  # Wind direction
+        self.tt_battery_publisher = self.create_lifecycle_publisher(Int8, 'tt_battery', 10)  # Battery level
         self.tt_control_subscriber = self.create_subscription(Int8, 'tt_control', self.listener_callback, 10)  # Trim tab state
         self.tt_angle_subscriber = self.create_subscription(Int16, 'tt_angle', self.angle_callback, 10)
 
-        self.timer_pub = self.create_publisher(
+        self.timer_pub = self.create_lifecycle_publisher(
         Empty, '/heartbeat/trim_tab_comms', 1)
-        self.timer = self.create_timer(0.5, self.heartbeat_timer_callback)
+        self.heartbeat_timer = self.create_timer(0.5, self.heartbeat_timer_callback)
 
         # Set up timer for retrieving variables over BLE
         timer_period = 0.5  # Fetch data every 0.5 seconds
@@ -74,7 +92,45 @@ class TrimTabComms(Node):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self._ble_connect())
+        return TransitionCallbackReturn.SUCCESS
 
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Activating...")
+        # Start publishers or timers
+        return super().on_activate(state)
+
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Deactivating...")
+        super().on_deactivate(state)
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Cleaning up...")
+        #disconnect from and reset bluetooth
+        self.disconnect()
+        os.system("rfkill block bluetooth")
+        os.system("rfkill unblock bluetooth")
+        # Destroy subscribers, publishers, and timers
+        self.destroy_lifecycle_publisher(self.tt_telemetry_publisher)
+        self.destroy_lifecycle_publisher(self.tt_battery_publisher)
+        self.destroy_lifecycle_publisher(self.timer_pub)
+        self.destroy_subscription(self.tt_control_subscriber)
+        self.destroy_subscription(self.tt_angle_subscriber)
+        self.destroy_timer(self.heartbeat_timer)
+        self.destroy_timer(self.timer)
+
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Shutting down...")
+        # Perform final cleanup if necessary
+        return TransitionCallbackReturn.SUCCESS
+    
+    def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
+        self.get_logger().info("Error caught!")
+        return super().on_error(state)
+    
+    #end callbacks
 
     def lost_connection(self, client):
         """ Attempt to reconnect if connection is lost unexpectedly """

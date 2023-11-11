@@ -215,10 +215,10 @@ class NetworkComms(LifecycleNode):
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Cleaning up...")
         # Destroy subscribers, publishers, and timers
-        self.destroy_publisher(self.pwm_control_publisher)
-        self.destroy_publisher(self.ballast_position_publisher)
-        self.destroy_publisher(self.trim_tab_control_publisher)
-        self.destroy_publisher(self.trim_tab_angle_publisher)
+        self.destroy_lifecycle_publisher(self.pwm_control_publisher)
+        self.destroy_lifecycle_publisher(self.ballast_position_publisher)
+        self.destroy_lifecycle_publisher(self.trim_tab_control_publisher)
+        self.destroy_lifecycle_publisher(self.trim_tab_angle_publisher)
 
         self.destroy_subscription(self.rot_subscription)
         self.destroy_subscription(self.navsat_subscription)

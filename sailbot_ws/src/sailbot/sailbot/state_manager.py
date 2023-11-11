@@ -18,7 +18,7 @@ class BoatState(Enum):
 
 #node_names = ["airmar_reader", "ballast_control", "battery_monitor", "computer_vision", "control_system", "computer_vision", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
 #node_names = ["network_comms","airmar_reader","ballast_control"] 
-node_names = ["network_comms", "ballast_control", "pwm_controller", "airmar_reader"]
+node_names = ["network_comms", "ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
 
 class StateManager(Node):
     current_state = BoatState.INACTIVE

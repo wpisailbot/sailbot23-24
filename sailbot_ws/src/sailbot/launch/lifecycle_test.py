@@ -30,6 +30,13 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
+    tt_node = LifecycleNode(
+        package='sailbot', 
+        executable='trim_tab_comms', 
+        name='trim_tab_comms',
+        namespace='',
+        output='screen'
+    )
     state_manager_node = LifecycleNode(
         package='sailbot', 
         executable='state_manager', 
@@ -44,5 +51,6 @@ def generate_launch_description():
     ld.add_action(ballast_node) 
     ld.add_action(pwm_node)
     ld.add_action(airmar_node)
+    ld.add_action(tt_node)
     ld.add_action(state_manager_node)
     return ld

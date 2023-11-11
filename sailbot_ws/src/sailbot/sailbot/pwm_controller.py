@@ -146,7 +146,7 @@ class PWMController(LifecycleNode):
         self.get_logger().info("Cleaning up...")
         # Destroy subscribers, publishers, and timers
         self.destroy_timer(self.timer)
-        self.destroy_publisher(self.timer_pub)
+        self.destroy_lifecycle_publisher(self.timer_pub)
         self.destroy_subscription(self.subscription)
         return TransitionCallbackReturn.SUCCESS
 
