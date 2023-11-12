@@ -165,6 +165,23 @@ class NetworkComms(LifecycleNode):
             self.airmar_lifecycle_callback,
             10)
 
+        self.ballast_control_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/ballast_control/transition_event',
+            self.ballast_lifecycle_callback,
+            10)
+        
+        self.pwm_controller_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/pwm_controller/transition_event',
+            self.pwm_lifecycle_callback,
+            10)
+        
+        self.tt_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/trim_tab_comms/transition_event',
+            self.tt_lifecycle_callback,
+            10)
         #initial dummy values, for testing
         self.current_boat_state.latitude = 5
         self.current_boat_state.longitude = 4
@@ -181,12 +198,12 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.pitch = 3
         self.current_boat_state.roll = 2
         self.node_indices = {}
-        node_names = ["airmar_reader", "battery_monitor", "control_system", "debug_interface", "network_comms", "pwm_controller", "serial_rc_receiver", "trim_tab_comms"]
+        node_names = ["airmar_reader", "ballast_control", "battery_monitor", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
         i=0
         for name in node_names:
             node_info = boat_state_pb2.NodeInfo()
             node_info.name = name
-            node_info.status = boat_state_pb2.NodeStatus.NODE_STATUS_WARN
+            node_info.status = boat_state_pb2.NodeStatus.NODE_STATUS_OK
             node_info.info = ""
             self.current_boat_state.node_states.append(node_info)
             self.node_indices[name]=i
@@ -285,8 +302,20 @@ class NetworkComms(LifecycleNode):
     #end lifecycle callbacks
 
     def airmar_lifecycle_callback(self, msg: TransitionEvent):
-        self.get_logger().info("Received state update!")
+        self.get_logger().info("Received airmar update!")
         self.current_boat_state.node_states[self.node_indices["airmar_reader"]].lifecycle_state = get_state(msg.goal_state.id)
+
+    def ballast_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received ballast update!")
+        self.current_boat_state.node_states[self.node_indices["ballast_control"]].lifecycle_state = get_state(msg.goal_state.id)
+    
+    def pwm_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received pwm update!")
+        self.current_boat_state.node_states[self.node_indices["pwm_controller"]].lifecycle_state = get_state(msg.goal_state.id)
+    
+    def tt_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received trimtab update!")
+        self.current_boat_state.node_states[self.node_indices["trim_tab_comms"]].lifecycle_state = get_state(msg.goal_state.id)
 
     def rate_of_turn_callback(self, msg: Float64):
         self.current_boat_state.rate_of_turn = msg.data
@@ -380,8 +409,6 @@ class NetworkComms(LifecycleNode):
         # current_target = 80 + ((110 - 80) / (1.0 - -1.0)) * (command.ballast_control_value - -1.0)
         # ballast_json = {"channel": "12", "angle": current_target}
         # self.pwm_control_publisher.publish(make_json_string(ballast_json))
-
-
 
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         return response

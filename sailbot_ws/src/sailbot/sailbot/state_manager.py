@@ -19,32 +19,6 @@ class BoatState(Enum):
 #node_names = ["airmar_reader", "ballast_control", "battery_monitor", "computer_vision", "control_system", "computer_vision", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
 #node_names = ["network_comms","airmar_reader","ballast_control"] 
 
-def makeStateMsg(id: int):
-    msg = State()
-    msg.id = id
-    if msg.id == State.PRIMARY_STATE_ACTIVE:
-        msg.label = "active"
-    if msg.id == State.PRIMARY_STATE_INACTIVE:
-        msg.label = "inactive"
-    if msg.id == State.PRIMARY_STATE_FINALIZED:
-        msg.label = "finalized"
-    if msg.id == State.PRIMARY_STATE_UNCONFIGURED:
-        msg.label = "unconfigured"
-    if msg.id == State.PRIMARY_STATE_UNKNOWN:
-        msg.label = "unknown"
-    if msg.id == State.TRANSITION_STATE_ACTIVATING:
-        msg.label = "activating"
-    if msg.id == State.TRANSITION_STATE_CLEANINGUP:
-        msg.label = "cleaning up"
-    if msg.id == State.TRANSITION_STATE_CONFIGURING:
-        msg.label = "configuring"
-    if msg.id == State.TRANSITION_STATE_DEACTIVATING:
-        msg.label = "deactivating"
-    if msg.id == State.TRANSITION_STATE_ERRORPROCESSING:
-        msg.label = "error processing"
-    if msg.id == State.TRANSITION_STATE_SHUTTINGDOWN:
-        msg.label = "shutting down"
-
 class StateManager(Node):
     early_node_names = ["network_comms"]
     node_names = ["ballast_control", "pwm_controller", "airmar_reader"]
