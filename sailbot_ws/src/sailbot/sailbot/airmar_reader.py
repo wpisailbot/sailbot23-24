@@ -38,6 +38,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
     #lifecycle node callbacks
     def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
+
         try:
             self.ser = serial.Serial('/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1170079-if00')
         except:

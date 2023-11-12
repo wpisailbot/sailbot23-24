@@ -9,6 +9,8 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 from std_msgs.msg import String,  Int8, Int16, Empty, Float64
+from lifecycle_msgs.msg import TransitionEvent
+from lifecycle_msgs.msg import State as StateMsg
 from sensor_msgs.msg import NavSatFix
 from sailbot_msgs.msg import Wind
 import grpc
@@ -29,6 +31,31 @@ def make_json_string(json_msg):
     message = String()
     message.data = json_str
     return message
+
+def get_state(state_id: int):
+    if state_id == StateMsg.PRIMARY_STATE_ACTIVE:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ACTIVE
+    if state_id == StateMsg.PRIMARY_STATE_INACTIVE:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_INACTIVE
+    if state_id == StateMsg.PRIMARY_STATE_FINALIZED:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_FINALIZED
+    if state_id == StateMsg.PRIMARY_STATE_UNCONFIGURED:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNCONFIGURED
+    if state_id == StateMsg.PRIMARY_STATE_UNKNOWN:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNKNOWN
+    if state_id == StateMsg.TRANSITION_STATE_ACTIVATING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ACTIVATING
+    if state_id == StateMsg.TRANSITION_STATE_CLEANINGUP:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_CLEANINGUP
+    if state_id == StateMsg.TRANSITION_STATE_CONFIGURING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_CONFIGURING
+    if state_id == StateMsg.TRANSITION_STATE_DEACTIVATING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_DEACTIVATING
+    if state_id == StateMsg.TRANSITION_STATE_ERRORPROCESSING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ERRORPROCESSING
+    if state_id == StateMsg.TRANSITION_STATE_SHUTTINGDOWN:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_SHUTTINGDOWN
+    return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNKNOWN
 
 class NetworkComms(LifecycleNode):
 
@@ -54,6 +81,9 @@ class NetworkComms(LifecycleNode):
         self.pitch_subscription: Optional[Subscription]
         self.pwm_heartbeat_subscription: Optional[Subscription]
         self.control_system_subscription: Optional[Subscription]
+
+        #receives state updates from other nodes
+        self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -127,6 +157,12 @@ class NetworkComms(LifecycleNode):
             Float64,
             'airmar_data/pitch',
             self.pitch_callback,
+            10)
+
+        self.airmar_reader_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/airmar_reader/transition_event',
+            self.airmar_lifecycle_callback,
             10)
 
         #initial dummy values, for testing
@@ -245,6 +281,12 @@ class NetworkComms(LifecycleNode):
     def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
         self.get_logger().info("Error caught!")
         return super().on_error(state)
+     
+    #end lifecycle callbacks
+
+    def airmar_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received state update!")
+        self.current_boat_state.node_states[self.node_indices["airmar_reader"]].lifecycle_state = get_state(msg.goal_state.id)
 
     def rate_of_turn_callback(self, msg: Float64):
         self.current_boat_state.rate_of_turn = msg.data

@@ -18,9 +18,36 @@ class BoatState(Enum):
 
 #node_names = ["airmar_reader", "ballast_control", "battery_monitor", "computer_vision", "control_system", "computer_vision", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
 #node_names = ["network_comms","airmar_reader","ballast_control"] 
-node_names = ["network_comms", "ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
+
+def makeStateMsg(id: int):
+    msg = State()
+    msg.id = id
+    if msg.id == State.PRIMARY_STATE_ACTIVE:
+        msg.label = "active"
+    if msg.id == State.PRIMARY_STATE_INACTIVE:
+        msg.label = "inactive"
+    if msg.id == State.PRIMARY_STATE_FINALIZED:
+        msg.label = "finalized"
+    if msg.id == State.PRIMARY_STATE_UNCONFIGURED:
+        msg.label = "unconfigured"
+    if msg.id == State.PRIMARY_STATE_UNKNOWN:
+        msg.label = "unknown"
+    if msg.id == State.TRANSITION_STATE_ACTIVATING:
+        msg.label = "activating"
+    if msg.id == State.TRANSITION_STATE_CLEANINGUP:
+        msg.label = "cleaning up"
+    if msg.id == State.TRANSITION_STATE_CONFIGURING:
+        msg.label = "configuring"
+    if msg.id == State.TRANSITION_STATE_DEACTIVATING:
+        msg.label = "deactivating"
+    if msg.id == State.TRANSITION_STATE_ERRORPROCESSING:
+        msg.label = "error processing"
+    if msg.id == State.TRANSITION_STATE_SHUTTINGDOWN:
+        msg.label = "shutting down"
 
 class StateManager(Node):
+    early_node_names = ["network_comms"]
+    node_names = ["ballast_control", "pwm_controller", "airmar_reader"]
     current_state = BoatState.INACTIVE
     client_state_getters: typing.Dict[str, Client] = {}
     client_state_setters: typing.Dict[str, Client] = {}
@@ -29,18 +56,24 @@ class StateManager(Node):
         self.get_logger().info("starting manager")
 
         #create service clients for each node
-        for name in node_names:
+        for name in self.early_node_names:
+            self.client_state_getters[name] = self.create_client(GetState, name+"/get_state")
+            self.client_state_setters[name] = self.create_client(ChangeState, name+"/change_state")
+        for name in self.node_names:
             self.client_state_getters[name] = self.create_client(GetState, name+"/get_state")
             self.client_state_setters[name] = self.create_client(ChangeState, name+"/change_state")
         
-        #run async function to move all nodes to configured state
-        self.configure_all_nodes()
-        self.activate_all_nodes()
+        #run async function to move nodes to configured state
+        self.configure_nodes(self.early_node_names)
+        self.activate_nodes(self.early_node_names)
+        self.configure_nodes(self.node_names)
+        self.activate_nodes(self.node_names)
         #self.timer = self.create_timer(2, self.timer_callback)
 
-    async def transitionAllNodes(self, transition_id: int):
+    async def transitionNodes(self, node_names: list, transition_id: int):
         #assemble and run list of async configure transition calls
         failed_names = node_names.copy()
+        #retry any which failed because the service was unavailable (timing issue, any other way to resolve?)
         while failed_names:
             self.get_logger().info("Failed names: "+str(failed_names))
             func_list = [self.changeNodeState(node_name, transition_id) for node_name in failed_names]
@@ -54,21 +87,18 @@ class StateManager(Node):
                     self.get_logger().info("Failed: "+name)
             failed_names = new_failed_names
 
-        self.get_logger().info("returning from transition")
         return True
-        #retry any which failed because the service was unavailable (timing issue, any other way to resolve?)
         
 
-    def configure_all_nodes(self):
-        self.get_logger().info("Configuring all nodes")
+    def configure_nodes(self, node_names: list):
+        self.get_logger().info("Configuring nodes")
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.transitionAllNodes(Transition.TRANSITION_CONFIGURE))
-        self.get_logger().info("returning from configure")
+        loop.run_until_complete(self.transitionNodes(node_names, Transition.TRANSITION_CONFIGURE))
     
-    def activate_all_nodes(self):
-        self.get_logger().info("activating all nodes")
+    def activate_nodes(self, node_names: list):
+        self.get_logger().info("activating nodes")
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.transitionAllNodes(Transition.TRANSITION_ACTIVATE))
+        loop.run_until_complete(self.transitionNodes(node_names, Transition.TRANSITION_ACTIVATE))
 
     async def getNodeState(self, node_name: str, timeout_seconds=3):
         if(not node_name in self.client_state_getters):
