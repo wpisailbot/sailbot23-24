@@ -134,11 +134,13 @@ class TrimTabComms(LifecycleNode):
                 self.get_logger().info("Error processing message:", e)
                 raise(e)
 
-async def spin(executor: rclpy.executors.SingleThreadedExecutor):
+#TODO: Horrible hack to allow perpetual async alongside ROS. This creates a bunch of unnecessary looping
+#Find some way to replace this. Move server to esp32? Need to put mDNS there as well.
+async def spin(executor: rclpy.executors.SingleThreadedExecutor, logger):
     while rclpy.ok():
-        executor.spin_once(timeout_sec=0)
-        # Setting the delay to 0 provides an optimized path to allow other tasks to run.
+        executor.spin_once(timeout_sec=0.1)
         await asyncio.sleep(0)
+        logger.info("looping")
 
 def main(args=None):
     rclpy.init(args=args)
@@ -153,7 +155,7 @@ def main(args=None):
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(tt_comms)
 
-    loop.run_until_complete(spin(executor))
+    loop.run_until_complete(spin(executor, tt_comms.get_logger()))
     tt_comms.destroy_node()
     executor.shutdown()
     tt_comms.destroy_node()
