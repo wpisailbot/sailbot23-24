@@ -56,8 +56,9 @@ class TrimTabComms(LifecycleNode):
         self.get_data_timer = self.create_timer(0.5, self.data_timer_callback)
         self.ws = websocket.WebSocket()
         try:
-            self.ws.connect("ws:sailbot-trimtab.local/")
+            self.ws.connect("ws://sailbot-trimtab.local:8080/")
         except Exception as e:
+            self.get_logger().info(e)
             self.get_logger().info("Failed to connect to trimtab! Is it on, and connected to a Jetson hotspot?")
             raise(e)
         self.ws.settimeout(1)
@@ -97,10 +98,13 @@ class TrimTabComms(LifecycleNode):
     #end callbacks
 
     def data_timer_callback(self):
-        self.ws.send("")
+        self.ws.send("test")
         try:
             response = self.ws.recv()
-            print(f"Received back: {response}")
+            data = message_pb2.DataMessage()
+            data.ParseFromString(response)
+            self.get_logger().info("windAngle: "+str(data.windAngle))
+            self.get_logger().info("batteryLevel: "+str(data.batteryLevel))
         except websocket.WebSocketTimeoutException:
             print("No message received within the timeout period.")
 
@@ -112,60 +116,45 @@ class TrimTabComms(LifecycleNode):
         protomsg.control_type = message_pb2.CONTROL_MESSAGE_CONTROL_TYPE.CONTROL_MESSAGE_CONTROL_TYPE_STATE
         protomsg.state = msg.data
         serialized_message = protomsg.SerializeToString()
-        if(self.last_websocket is not None):
-            self.schedule_async_function(self.last_websocket.send(serialized_message))
-
+        if(self.ws is not None):
+            try:
+                self.ws.send_binary(serialized_message)
+            except Exception as e:
+                self.get_logger().info(e)
+                self.get_logger().info("Faild to send message")
     def tt_angle_callback(self, msg: Int16):
         protomsg = message_pb2.ControlMessage()
         protomsg.control_type = message_pb2.CONTROL_MESSAGE_CONTROL_TYPE.CONTROL_MESSAGE_CONTROL_TYPE_ANGLE
         protomsg.control_angle = msg.data
         serialized_message = protomsg.SerializeToString()
-        if(self.last_websocket is not None):
-            self.schedule_async_function(self.last_websocket.send(serialized_message))
-
-    async def echo(self, websocket, path):
-        self.last_websocket = websocket
-        async for message in websocket:
+        if(self.ws is not None):
             try:
-                # Deserialize the protobuf message
-                protobuf_message = message_pb2.DataMessage()
-                protobuf_message.ParseFromString(message)
-
-                self.get_logger().info("Received message:"+ str(protobuf_message.windAngle)+": "+str(protobuf_message.batteryLevel))
-
-                # Optionally, send a response back (as a string or protobuf)
-                await websocket.send("Message received")
-                
+                self.ws.send_binary(serialized_message)
             except Exception as e:
-                self.get_logger().info("Error processing message:", e)
-                raise(e)
-
-#TODO: Horrible hack to allow perpetual async alongside ROS. This creates a bunch of unnecessary looping
-#Find some way to replace this. Move server to esp32? Need to put mDNS there as well.
-async def spin(executor: rclpy.executors.SingleThreadedExecutor, logger):
-    while rclpy.ok():
-        executor.spin_once(timeout_sec=0.1)
-        await asyncio.sleep(0)
-        logger.info("looping")
-
+                self.get_logger().info(e)
+                self.get_logger().info("Faild to send message")
 def main(args=None):
     rclpy.init(args=args)
-
     tt_comms = TrimTabComms()
-    ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-    tt_comms.get_logger().info(ip)
-    start_server = websockets.serve(tt_comms.echo, ip, 8080)
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_server)
+
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(tt_comms)
 
-    loop.run_until_complete(spin(executor, tt_comms.get_logger()))
-    tt_comms.destroy_node()
-    executor.shutdown()
-    tt_comms.destroy_node()
-    rclpy.shutdown()
+    try:
+        # Spin the node to execute callbacks
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        tt_comms.get_logger().fatal(f'Unhandled exception: {e}')
+        raise(e)
+    finally:
+        tt_comms.ws.close()
+        # Shutdown and cleanup the node
+        executor.shutdown()
+        tt_comms.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
