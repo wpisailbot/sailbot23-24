@@ -13,7 +13,7 @@ from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 from enum import Enum
 import asyncio
-import websockets
+import websocket
 import netifaces as ni
 import threading
 
@@ -53,16 +53,14 @@ class TrimTabComms(LifecycleNode):
         self.timer_pub = self.create_lifecycle_publisher(
         Empty, '/heartbeat/trim_tab_comms', 1)
         #self.heartbeat_timer = self.create_timer(0.5, self.heartbeat_timer_callback)
-        # try:
-        #     ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-        #     self.get_logger().info(ip)
-        #     start_server = websockets.serve(self.echo, ip, 8080)
-        #     self.schedule_async_function(start_server)
-        #     #tt_comms_thread = threading.Thread(asyncio.get_event_loop().run_forever(), daemon=True)
-        #     #tt_comms_thread.start()
-        # except Exception as e:
-        #     self.get_logger().error()
-        
+        self.get_data_timer = self.create_timer(0.5, self.data_timer_callback)
+        self.ws = websocket.WebSocket()
+        try:
+            self.ws.connect("ws:sailbot-trimtab.local/")
+        except Exception as e:
+            self.get_logger().info("Failed to connect to trimtab! Is it on, and connected to a Jetson hotspot?")
+            raise(e)
+        self.ws.settimeout(1)
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
@@ -97,6 +95,14 @@ class TrimTabComms(LifecycleNode):
         return super().on_error(state)
     
     #end callbacks
+
+    def data_timer_callback(self):
+        self.ws.send("")
+        try:
+            response = self.ws.recv()
+            print(f"Received back: {response}")
+        except websocket.WebSocketTimeoutException:
+            print("No message received within the timeout period.")
 
     def schedule_async_function(self, coroutine):
         asyncio.run_coroutine_threadsafe(coroutine, asyncio.get_event_loop())
