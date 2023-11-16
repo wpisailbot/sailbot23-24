@@ -52,7 +52,7 @@ def get_state(state_id: int):
     if state_id == StateMsg.TRANSITION_STATE_DEACTIVATING:
         return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_DEACTIVATING
     if state_id == StateMsg.TRANSITION_STATE_ERRORPROCESSING:
-        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ERRORPROCESSING
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ERROR_PROCESSING
     if state_id == StateMsg.TRANSITION_STATE_SHUTTINGDOWN:
         return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_SHUTTINGDOWN
     return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNKNOWN

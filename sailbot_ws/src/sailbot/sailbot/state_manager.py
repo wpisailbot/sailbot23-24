@@ -17,11 +17,11 @@ class BoatState(Enum):
     WAYPOINT_FOLLOWING=5
 
 #node_names = ["airmar_reader", "ballast_control", "battery_monitor", "computer_vision", "control_system", "computer_vision", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
-#node_names = ["network_comms","airmar_reader","ballast_control"] 
 
 class StateManager(Node):
     early_node_names = ["network_comms"]
-    node_names = ["ballast_control", "pwm_controller", "airmar_reader"]
+    # node_names = ["ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
+    node_names = ["trim_tab_comms"]
     current_state = BoatState.INACTIVE
     client_state_getters: typing.Dict[str, Client] = {}
     client_state_setters: typing.Dict[str, Client] = {}
