@@ -22,13 +22,14 @@ from std_msgs.msg import Int8, Int16, Float32, Empty
 import trim_tab_messages.python.messages_pb2 as message_pb2
 
 # Local variables
-state = message_pb2._TrimState_TRIM_STATE.TrimState_TRIM_STATE_MIN_LIFT
+state = message_pb2.TRIM_STATE.TRIM_STATE_MIN_LIFT
 angle = 0
 wind_dir = 0.0
 battery_level = 100
 
 
 class TrimTabComms(LifecycleNode):
+    last_websocket = None
     def __init__(self):
         super(TrimTabComms, self).__init__('trim_tab_comms')
 
@@ -46,21 +47,21 @@ class TrimTabComms(LifecycleNode):
         self.get_logger().info("In configure")
         self.tt_telemetry_publisher = self.create_lifecycle_publisher(Float32, 'tt_telemetry', 10)  # Wind direction
         self.tt_battery_publisher = self.create_lifecycle_publisher(Int8, 'tt_battery', 10)  # Battery level
-        #self.tt_control_subscriber = self.create_subscription(Int8, 'tt_control', self.listener_callback, 10)  # Trim tab state
-        #self.tt_angle_subscriber = self.create_subscription(Int16, 'tt_angle', self.angle_callback, 10)
+        self.tt_control_subscriber = self.create_subscription(Int8, 'tt_control', self.tt_state_callback, 10)  # Trim tab state
+        self.tt_angle_subscriber = self.create_subscription(Int16, 'tt_angle', self.tt_angle_callback, 10)
 
         self.timer_pub = self.create_lifecycle_publisher(
         Empty, '/heartbeat/trim_tab_comms', 1)
         #self.heartbeat_timer = self.create_timer(0.5, self.heartbeat_timer_callback)
-        try:
-            ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-            self.get_logger().info(ip)
-            start_server = websockets.serve(self.echo, ip, 8080)
-            asyncio.get_event_loop().run_until_complete(start_server)
-            tt_comms_thread = threading.Thread(asyncio.get_event_loop().run_forever(), daemon=True)
-            tt_comms_thread.start()
-        except Exception as e:
-            self.get_logger().error()
+        # try:
+        #     ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
+        #     self.get_logger().info(ip)
+        #     start_server = websockets.serve(self.echo, ip, 8080)
+        #     self.schedule_async_function(start_server)
+        #     #tt_comms_thread = threading.Thread(asyncio.get_event_loop().run_forever(), daemon=True)
+        #     #tt_comms_thread.start()
+        # except Exception as e:
+        #     self.get_logger().error()
         
         return TransitionCallbackReturn.SUCCESS
 
@@ -97,7 +98,27 @@ class TrimTabComms(LifecycleNode):
     
     #end callbacks
 
+    def schedule_async_function(self, coroutine):
+        asyncio.run_coroutine_threadsafe(coroutine, asyncio.get_event_loop())
+
+    def tt_state_callback(self, msg: Int8):
+        protomsg = message_pb2.ControlMessage()
+        protomsg.control_type = message_pb2.CONTROL_MESSAGE_CONTROL_TYPE.CONTROL_MESSAGE_CONTROL_TYPE_STATE
+        protomsg.state = msg.data
+        serialized_message = protomsg.SerializeToString()
+        if(self.last_websocket is not None):
+            self.schedule_async_function(self.last_websocket.send(serialized_message))
+
+    def tt_angle_callback(self, msg: Int16):
+        protomsg = message_pb2.ControlMessage()
+        protomsg.control_type = message_pb2.CONTROL_MESSAGE_CONTROL_TYPE.CONTROL_MESSAGE_CONTROL_TYPE_ANGLE
+        protomsg.control_angle = msg.data
+        serialized_message = protomsg.SerializeToString()
+        if(self.last_websocket is not None):
+            self.schedule_async_function(self.last_websocket.send(serialized_message))
+
     async def echo(self, websocket, path):
+        self.last_websocket = websocket
         async for message in websocket:
             try:
                 # Deserialize the protobuf message
@@ -108,35 +129,35 @@ class TrimTabComms(LifecycleNode):
 
                 # Optionally, send a response back (as a string or protobuf)
                 await websocket.send("Message received")
+                
             except Exception as e:
                 self.get_logger().info("Error processing message:", e)
                 raise(e)
+
+async def spin(executor: rclpy.executors.SingleThreadedExecutor):
+    while rclpy.ok():
+        executor.spin_once(timeout_sec=0)
+        # Setting the delay to 0 provides an optimized path to allow other tasks to run.
+        await asyncio.sleep(0)
 
 def main(args=None):
     rclpy.init(args=args)
 
     tt_comms = TrimTabComms()
-
+    ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
+    tt_comms.get_logger().info(ip)
+    start_server = websockets.serve(tt_comms.echo, ip, 8080)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_server)
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(tt_comms)
 
-    try:
-        # Spin the node to execute callbacks
-        while rclpy.ok():
-            executor.spin()
-    except KeyboardInterrupt:
-        pass
-    except Exception as e:
-        tt_comms.get_logger().fatal(f'Unhandled exception: {e}')
-        raise(e)
-    finally:
-        # Shutdown and cleanup the node
-        #tt_comms.disconnect()
-        tt_comms.destroy_node()
-        executor.shutdown()
-        tt_comms.destroy_node()
-        rclpy.shutdown()
+    loop.run_until_complete(spin(executor))
+    tt_comms.destroy_node()
+    executor.shutdown()
+    tt_comms.destroy_node()
+    rclpy.shutdown()
 
 
 if __name__ == '__main__':
