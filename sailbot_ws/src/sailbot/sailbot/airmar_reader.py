@@ -1,43 +1,125 @@
 #!/usr/bin/env python3
 import serial
 import json
+import time
+from typing import Optional
 
 import rclpy
-from rclpy.node import Node
+from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
+from rclpy.lifecycle import Publisher
+from rclpy.lifecycle import State
+from rclpy.lifecycle import TransitionCallbackReturn
+from rclpy.timer import Timer
+from rclpy.subscription import Subscription
 
 from std_msgs.msg import String, Float64
 from sensor_msgs.msg import NavSatFix
 from sailbot_msgs.msg import Wind
 
 
-class AirmarReader(Node): #translates airmar data into json and publishes on 'airmar_data' ROS2 topic
+class AirmarReader(LifecycleNode): #translates airmar data into json and publishes on 'airmar_data' ROS2 topic
 
     def __init__(self):
         super().__init__('airmar_reader')
-        self.ser = serial.Serial('/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1170079-if00')
-        self.publisher_ = self.create_publisher(String, 'airmar_data', 10)
-        self.rot_publisher = self.create_publisher(Float64, 'airmar_data/rate_of_turn', 10)
-        self.navsat_publisher = self.create_publisher(NavSatFix, 'airmar_data/lat_long', 10)
-        self.track_degrees_true_publisher = self.create_publisher(Float64, 'airmar_data/track_degrees_true', 10)
-        self.track_degrees_magnetic_publisher = self.create_publisher(Float64, 'airmar_data/track_degrees_magnetic', 10)
-        self.speek_knots_publisher = self.create_publisher(Float64, 'airmar_data/speed_knots', 10)
-        self.speek_kmh_publisher = self.create_publisher(Float64, 'airmar_data/speed_kmh', 10)
-        self.heading_publisher = self.create_publisher(Float64, 'airmar_data/heading', 10)
-        self.true_wind_publisher = self.create_publisher(Float64, 'airmar_data/true_wind', 10)
-        self.apparent_wind_publisher = self.create_publisher(Float64, 'airmar_data/apparent_wind', 10)
-        self.roll_publisher = self.create_publisher(Float64, 'airmar_data/roll', 10)
-        self.pitch_publisher = self.create_publisher(Float64, 'airmar_data/pitch', 10)
+        self.publisher_: Optional[Publisher]
+        self.rot_publisher: Optional[Publisher]
+        self.navsat_publisher: Optional[Publisher]
+        self.track_degrees_true_publisher: Optional[Publisher]
+        self.track_degrees_magnetic_publisher: Optional[Publisher]
+        self.speed_knots_publisher: Optional[Publisher]
+        self.speed_kmh_publisher: Optional[Publisher]
+        self.heading_publisher: Optional[Publisher]
+        self.true_wind_publisher: Optional[Publisher]
+        self.apparent_wind_publisher: Optional[Publisher]
+        self.roll_publisher: Optional[Publisher]
+        self.pitch_publisher: Optional[Publisher]
 
 
-        #timer_period = 0.01  # seconds
-        #self.timer = self.create_timer(timer_period, self.timer_callback)
+    #lifecycle node callbacks
+    def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
+        self.get_logger().info("In configure")
 
+        try:
+            self.ser = serial.Serial('/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1170079-if00')
+        except:
+            return TransitionCallbackReturn.FAILURE
+        self.publisher_ = self.create_lifecycle_publisher(String, 'airmar_data', 10)
+        self.rot_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/rate_of_turn', 10)
+        self.navsat_publisher = self.create_lifecycle_publisher(NavSatFix, 'airmar_data/lat_long', 10)
+        self.track_degrees_true_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/track_degrees_true', 10)
+        self.track_degrees_magnetic_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/track_degrees_magnetic', 10)
+        self.speed_knots_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/speed_knots', 10)
+        self.speed_kmh_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/speed_kmh', 10)
+        self.heading_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/heading', 10)
+        self.true_wind_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/true_wind', 10)
+        self.apparent_wind_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/apparent_wind', 10)
+        self.roll_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/roll', 10)
+        self.pitch_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/pitch', 10)
+        self.timer = self.create_timer(0.01, self.timer_callback)
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Activating...")
+        # Start publishers or timers
+        return super().on_activate(state)
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Deactivating...")
+        super().on_deactivate(state)
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Cleaning up...")
+        # Destroy subscribers, publishers, and timers
+        self.ser.close()
+        self.destroy_lifecycle_publisher(self.publisher_)
+        self.destroy_lifecycle_publisher(self.rot_publisher)
+        self.destroy_lifecycle_publisher(self.navsat_publisher)
+        self.destroy_lifecycle_publisher(self.track_degrees_true_publisher)
+        self.destroy_lifecycle_publisher(self.track_degrees_magnetic_publisher)
+        self.destroy_lifecycle_publisher(self.speed_knots_publisher)
+        self.destroy_lifecycle_publisher(self.speed_kmh_publisher)
+        self.destroy_lifecycle_publisher(self.heading_publisher)
+        self.destroy_lifecycle_publisher(self.true_wind_publisher)
+        self.destroy_lifecycle_publisher(self.apparent_wind_publisher)
+        self.destroy_lifecycle_publisher(self.roll_publisher)
+        self.destroy_lifecycle_publisher(self.pitch_publisher)
+        return TransitionCallbackReturn.SUCCESS
 
     def timer_callback(self):
         msg = String()
         msg.data = json.dumps(self.readLineToJson())
+        if msg.data == {}:
+            return
         self.publisher_.publish(msg)
         #self.get_logger().info('Publishing: "%s"' % msg.data)
+
+    def publishIfValid(self, value, publisher: Publisher, type: type):
+        if type == Float64:
+            msg = Float64()
+            try:
+                msg.data = value
+            except:
+                return
+        elif type == Wind:
+            msg = Wind()
+            try:
+                msg.direction = float(value[0])
+                msg.speed = float(value[1])
+            except:
+                return
+        elif type == NavSatFix:
+            msg = NavSatFix()
+            try:
+                msg.latitude = float(value[0])
+                msg.longitude = float(value[1])
+                msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
+            except:
+                return
+        else:
+            self.get_logger().info("publishIfValid: unimplemented type")
+            
+        publisher.publish(msg)
+        
 
     def readLineToJson(self):
 
@@ -49,9 +131,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
             args[len(args) - 1] = args[len(args) - 1].split('*')[0] #get rid of checksum
 
             if(type_code == 'ROT'): #rate of turn degrees per minute. negative is to port
-                rot_msg = Float64()
-                rot_msg.data = args[1]
-                self.rot_publisher.publish(rot_msg)
+                self.publishIfValid(args[1], self.rot_publisher, Float64)
                 return {"rate-of-turn":args[1]}
             elif(type_code == 'GLL'):
                 #convert from degree decimal minutes to decimal degrees
@@ -59,18 +139,16 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                 #lat = math.floor(float(args[1]) / 100) + (float(args[1]) % 100)/60.0
                 #lon = math.floor(float(args[3]) / 100) + (float(args[3]) % 100)/60.0
                 lat_raw = args[1]
-                lat = float(lat_raw[:2]) + float(lat_raw[2:])/60.0
                 lon_raw = args[3]
+                if(lat_raw=="" or lon_raw==""):
+                    return {}
+                lat = float(lat_raw[:2]) + float(lat_raw[2:])/60.0
                 lon = float(lon_raw[:3]) + float(lon_raw[3:])/60.0
                 if(args[2] == 'S'):
                     lat *= -1
                 if(args[4] == 'W'):
                     lon *= -1
-                nav_sat_msg = NavSatFix()
-                nav_sat_msg.latitude = lat
-                nav_sat_msg.longitude = lon
-                nav_sat_msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
-                self.navsat_publisher.publish(nav_sat_msg)
+                self.publishIfValid([lat, lon], self.navsat_publisher, NavSatFix)
                 self.get_logger().info("Publishing latlong")
 
                 return {"Latitude":lat,
@@ -78,18 +156,10 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                         "Longitude":lon,
                         "Longitude-direction":args[4]}
             elif(type_code == 'VTG'):
-                track_true_msg = Float64()
-                track_true_msg.data = args[1]
-                self.track_degrees_true_publisher.publish(track_true_msg)
-                track_mag_msg = Float64()
-                track_mag_msg.data = args[3]
-                self.track_degrees_magnetic_publisher.publish(track_mag_msg)
-                speed_knots_msg = Float64()
-                speed_knots_msg = args[5]
-                self.speek_knots_publisher.publish(speed_knots_msg)
-                speed_kmh_msg = Float64()
-                speed_kmh_msg = args[7]
-                self.speek_kmh_publisher.publish(speed_kmh_msg)
+                self.publishIfValid(args[1], self.track_degrees_true_publisher, Float64)
+                self.publishIfValid(args[3], self.track_degrees_magnetic_publisher, Float64)
+                self.publishIfValid(args[5], self.speed_knots_publisher, Float64)
+                self.publishIfValid(args[7], self.speed_kmh_publisher, Float64)
                 return {"track-degrees-true":args[1],
                         "track-degrees-magnetic":args[3],
                         "speed-knots":args[5],
@@ -109,9 +179,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                 return ret
 
             elif(type_code == 'HDG'):
-                heading_msg = Float64()
-                heading_msg.data = args[1]
-                self.heading_publisher.publish(heading_msg)
+                self.publishIfValid(args[1], self.heading_publisher, Float64)
                 return {"currentHeading":args[1], #degrees
                         "magnetic-deviation":args[2], #degrees
                         "magnetic-deviation-direction":args[3],
@@ -131,10 +199,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
             elif(type_code == 'GRS'): #"The GRS message is used to support the Receiver Autonomous Integrity Monitoring (RAIM)." -- unneeded
                 return {}
             elif(type_code == 'MWD'):
-                true_wind_msg = Wind()
-                true_wind_msg.speed.data = args[5]
-                true_wind_msg.direction.data = args[1]
-                self.true_wind_publisher.publish(true_wind_msg)
+                self.publishIfValid([args[5], args[1]], self.true_wind_publisher, Wind)
                 return {"trueWind":
                     {"speed": args[5],      #in knots
                      #"speed": args[7]      for reporting in m/s
@@ -142,10 +207,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                     }
                 }
             elif(type_code == 'MWV'):
-                apparent_wind_msg = Wind()
-                apparent_wind_msg.speed.data = args[3]
-                apparent_wind_msg.direction.data = args[1]
-                self.apparent_wind_publisher.publish(apparent_wind_msg)
+                self.publishIfValid([args[5], args[1]], self.true_wind_publisher, Wind)
                 return {"apparentWind":
                     {"speed": args[3],       #in knots 
                     "direction": args[1]   #in deg
@@ -155,12 +217,8 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                 return {} # unneeded
             elif(type_code == 'OUT'): #real key is 'PMAROUT', shortened to OUT, since all others are 3 letters
                 #"PGN is translated to a Maretron proprietary NMEA 0183 sentence " -- used for pitch and roll
-                pitch_msg = Float64()
-                pitch_msg.data = args[3]
-                self.pitch_publisher.publish(pitch_msg)
-                roll_msg = Float64()
-                roll_msg.data = args[2]
-                self.roll_publisher.publish(roll_msg)
+                self.publishIfValid(args[3], self.pitch_publisher, Float64)
+                self.publishIfValid(args[2], self.roll_publisher, Float64)
                 return { "pitchroll":
                         {"roll":args[2],
                         "pitch":args[3]}
@@ -174,18 +232,24 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
 
 def main(args=None):
     rclpy.init(args=args)
-
     airmar_reader = AirmarReader()
-    while( rclpy.ok() ):
-        rclpy.spin_once(airmar_reader, timeout_sec=.001)
-        airmar_reader.timer_callback()
-    #rclpy.spin(airmar_reader)
 
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    airmar_reader.destroy_node()
-    rclpy.shutdown()
+    # Use the SingleThreadedExecutor to spin the node.
+    executor = rclpy.executors.SingleThreadedExecutor()
+    executor.add_node(airmar_reader)
+
+    try:
+        # Spin the node to execute callbacks
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        airmar_reader.get_logger().fatal(f'Unhandled exception: {e}')
+    finally:
+        # Shutdown and cleanup the node
+        executor.shutdown()
+        airmar_reader.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

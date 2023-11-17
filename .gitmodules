@@ -4,3 +4,6 @@
 [submodule "sailbot_ws/src/sailbot/sailbot/telemetry_messages"]
 	path = sailbot_ws/src/sailbot/sailbot/telemetry_messages
 	url = git@github.com:wpisailbot/telemetry_messages.git
+[submodule "sailbot_ws/src/sailbot/sailbot/trim_tab_messages"]
+	path = sailbot_ws/src/sailbot/sailbot/trim_tab_messages
+	url = https://github.com/wpisailbot/trim_tab_messages

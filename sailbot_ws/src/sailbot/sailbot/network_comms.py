@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
+import sys
 import rclpy
-from rclpy.node import Node
+from typing import Optional
+from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
+from rclpy.lifecycle import Publisher
+from rclpy.lifecycle import State
+from rclpy.lifecycle import TransitionCallbackReturn
+from rclpy.timer import Timer
+from rclpy.subscription import Subscription
 from std_msgs.msg import String,  Int8, Int16, Empty, Float64
+from lifecycle_msgs.msg import TransitionEvent
+from lifecycle_msgs.msg import State as StateMsg
 from sensor_msgs.msg import NavSatFix
 from sailbot_msgs.msg import Wind
 import grpc
@@ -23,17 +32,66 @@ def make_json_string(json_msg):
     message.data = json_str
     return message
 
-class NetworkComms(Node):
+def get_state(state_id: int):
+    if state_id == StateMsg.PRIMARY_STATE_ACTIVE:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ACTIVE
+    if state_id == StateMsg.PRIMARY_STATE_INACTIVE:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_INACTIVE
+    if state_id == StateMsg.PRIMARY_STATE_FINALIZED:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_FINALIZED
+    if state_id == StateMsg.PRIMARY_STATE_UNCONFIGURED:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNCONFIGURED
+    if state_id == StateMsg.PRIMARY_STATE_UNKNOWN:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNKNOWN
+    if state_id == StateMsg.TRANSITION_STATE_ACTIVATING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ACTIVATING
+    if state_id == StateMsg.TRANSITION_STATE_CLEANINGUP:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_CLEANINGUP
+    if state_id == StateMsg.TRANSITION_STATE_CONFIGURING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_CONFIGURING
+    if state_id == StateMsg.TRANSITION_STATE_DEACTIVATING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_DEACTIVATING
+    if state_id == StateMsg.TRANSITION_STATE_ERRORPROCESSING:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ERROR_PROCESSING
+    if state_id == StateMsg.TRANSITION_STATE_SHUTTINGDOWN:
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_SHUTTINGDOWN
+    return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNKNOWN
+
+class NetworkComms(LifecycleNode):
 
     current_boat_state = boat_state_pb2.BoatState()
 
     def __init__(self):
-        super().__init__('control_system')
+        super().__init__('network_comms')
+        self.pwm_control_publisher: Optional[Publisher]
+        self.ballast_position_publisher: Optional[Publisher]
+        self.trim_tab_control_publisher: Optional[Publisher]
+        self.trim_tab_angle_publisher: Optional[Publisher]
 
-        self.pwm_control_publisher = self.create_publisher(String, 'pwm_control', 10)
-        self.ballast_position_publisher = self.create_publisher(Float64, 'ballast_position', 10)
-        self.trim_tab_control_publisher = self.create_publisher(Int8, 'tt_control', 10)
-        self.trim_tab_angle_publisher = self.create_publisher(Int16, 'tt_angle', 10)
+        self.rot_subscription: Optional[Subscription]
+        self.navsat_subscription: Optional[Subscription]
+        self.track_degrees_true_subscription: Optional[Subscription]
+        self.track_degrees_magnetic_subscription: Optional[Subscription]
+        self.speed_knots_subscription: Optional[Subscription]
+        self.speed_kmh_subscription: Optional[Subscription]
+        self.heading_subscription: Optional[Subscription]
+        self.true_wind_subscription: Optional[Subscription]
+        self.apparent_wind_subscription: Optional[Subscription]
+        self.roll_subscription: Optional[Subscription]
+        self.pitch_subscription: Optional[Subscription]
+        self.pwm_heartbeat_subscription: Optional[Subscription]
+        self.control_system_subscription: Optional[Subscription]
+
+        #receives state updates from other nodes
+        self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
+        
+    #lifecycle node callbacks
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("In configure")
+        self.pwm_control_publisher = self.create_lifecycle_publisher(String, 'pwm_control', 10)
+        self.ballast_position_publisher = self.create_lifecycle_publisher(Float64, 'ballast_position', 10)
+        self.trim_tab_control_publisher = self.create_lifecycle_publisher(Int8, 'tt_control', 10)
+        self.trim_tab_angle_publisher = self.create_lifecycle_publisher(Int16, 'tt_angle', 10)
 
         self.rot_subscription = self.create_subscription(
             Float64,
@@ -65,7 +123,7 @@ class NetworkComms(Node):
             self.speed_knots_callback,
             10)
         
-        self.speed_knots_subscription = self.create_subscription(
+        self.speed_kmh_subscription = self.create_subscription(
             Float64,
             'airmar_data/speed_kmh',
             self.speed_kmh_callback,
@@ -101,6 +159,29 @@ class NetworkComms(Node):
             self.pitch_callback,
             10)
 
+        self.airmar_reader_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/airmar_reader/transition_event',
+            self.airmar_lifecycle_callback,
+            10)
+
+        self.ballast_control_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/ballast_control/transition_event',
+            self.ballast_lifecycle_callback,
+            10)
+        
+        self.pwm_controller_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/pwm_controller/transition_event',
+            self.pwm_lifecycle_callback,
+            10)
+        
+        self.tt_lifecycle_subscription = self.create_subscription(
+            TransitionEvent,
+            '/trim_tab_comms/transition_event',
+            self.tt_lifecycle_callback,
+            10)
         #initial dummy values, for testing
         self.current_boat_state.latitude = 5
         self.current_boat_state.longitude = 4
@@ -117,12 +198,12 @@ class NetworkComms(Node):
         self.current_boat_state.pitch = 3
         self.current_boat_state.roll = 2
         self.node_indices = {}
-        node_names = ["airmar_reader", "battery_monitor", "control_system", "debug_interface", "network_comms", "pwm_controller", "serial_rc_receiver", "trim_tab_comms"]
+        node_names = ["airmar_reader", "ballast_control", "battery_monitor", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
         i=0
         for name in node_names:
             node_info = boat_state_pb2.NodeInfo()
             node_info.name = name
-            node_info.status = boat_state_pb2.NodeStatus.NODE_STATUS_WARN
+            node_info.status = boat_state_pb2.NodeStatus.NODE_STATUS_OK
             node_info.info = ""
             self.current_boat_state.node_states.append(node_info)
             self.node_indices[name]=i
@@ -154,34 +235,87 @@ class NetworkComms(Node):
         self.last_tt_heartbeat = -1
         self.create_grpc_server()
 
-        # # Create the I2C bus
-        # self.i2c = busio.I2C(board.SCL, board.SDA)
-
-        # # Create the ADC object using the I2C bus
-        # self.ads = ADS.ADS1015(self.i2c)
-
-        # # Create single-ended input on channel 0
-        # self.chan = AnalogIn(self.ads, ADS.P0)
-
         self.pwm_heartbeat_subscription = self.create_subscription(
             Empty,
             'heartbeat/pwm_controler',
             self.pwm_controller_heartbeat,
             1)
         
-        self.control_system_subscription = self.create_subscription(
+        self.control_system_heartbeat_subscription = self.create_subscription(
             Empty,
             'heartbeat/control_system',
             self.control_system_heartbeat,
             1)
         
-        self.control_system_subscription = self.create_subscription(
+        self.trim_tab_heartbeat_subscription = self.create_subscription(
             Empty,
             'heartbeat/trim_tab_comms',
             self.trim_tab_comms_heartbeat,
             1)
-        
-        
+        #super().on_configure()
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Activating...")
+        # Start publishers or timers
+        #self.ballast_position_publisher.on_activate()
+        return super().on_activate(state)
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Deactivating...")
+        super().on_deactivate(state)
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Cleaning up...")
+        # Destroy subscribers, publishers, and timers
+        self.destroy_lifecycle_publisher(self.pwm_control_publisher)
+        self.destroy_lifecycle_publisher(self.ballast_position_publisher)
+        self.destroy_lifecycle_publisher(self.trim_tab_control_publisher)
+        self.destroy_lifecycle_publisher(self.trim_tab_angle_publisher)
+
+        self.destroy_subscription(self.rot_subscription)
+        self.destroy_subscription(self.navsat_subscription)
+        self.destroy_subscription(self.track_degrees_true_subscription)
+        self.destroy_subscription(self.track_degrees_magnetic_subscription)
+        self.destroy_subscription(self.speed_knots_subscription)
+        self.destroy_subscription(self.speed_kmh_subscription)
+        self.destroy_subscription(self.heading_subscription)
+        self.destroy_subscription(self.true_wind_subscription)
+        self.destroy_subscription(self.apparent_wind_subscription)
+        self.destroy_subscription(self.roll_subscription)
+        self.destroy_subscription(self.pitch_subscription)
+        self.destroy_subscription(self.pwm_heartbeat_subscription)
+        self.destroy_subscription(self.control_system_heartbeat_subscription)
+        self.destroy_subscription(self.trim_tab_heartbeat_subscription)
+
+        #return TransitionCallbackReturn.SUCCESS
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Shutting down...")
+        # Perform final cleanup if necessary
+        return TransitionCallbackReturn.SUCCESS
+    
+    def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
+        self.get_logger().info("Error caught!")
+        return super().on_error(state)
+     
+    #end lifecycle callbacks
+
+    def airmar_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received airmar update!")
+        self.current_boat_state.node_states[self.node_indices["airmar_reader"]].lifecycle_state = get_state(msg.goal_state.id)
+
+    def ballast_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received ballast update!")
+        self.current_boat_state.node_states[self.node_indices["ballast_control"]].lifecycle_state = get_state(msg.goal_state.id)
+    
+    def pwm_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received pwm update!")
+        self.current_boat_state.node_states[self.node_indices["pwm_controller"]].lifecycle_state = get_state(msg.goal_state.id)
+    
+    def tt_lifecycle_callback(self, msg: TransitionEvent):
+        self.get_logger().info("Received trimtab update!")
+        self.current_boat_state.node_states[self.node_indices["trim_tab_comms"]].lifecycle_state = get_state(msg.goal_state.id)
 
     def rate_of_turn_callback(self, msg: Float64):
         self.current_boat_state.rate_of_turn = msg.data
@@ -276,8 +410,6 @@ class NetworkComms(Node):
         # ballast_json = {"channel": "12", "angle": current_target}
         # self.pwm_control_publisher.publish(make_json_string(ballast_json))
 
-
-
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         return response
     
@@ -333,8 +465,23 @@ class NetworkComms(Node):
 def main(args=None):
     rclpy.init(args=args)
     network_comms = NetworkComms()
-    rclpy.spin(network_comms)
-    rclpy.shutdown()
+
+    # Use the SingleThreadedExecutor to spin the node.
+    executor = rclpy.executors.SingleThreadedExecutor()
+    executor.add_node(network_comms)
+
+    try:
+        # Spin the node to execute callbacks
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        network_comms.get_logger().fatal(f'Unhandled exception: {e.with_traceback(e.__traceback__)}')
+    finally:
+        # Shutdown and cleanup the node
+        executor.shutdown()
+        network_comms.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

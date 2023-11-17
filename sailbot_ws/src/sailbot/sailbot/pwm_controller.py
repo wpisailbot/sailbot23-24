@@ -2,7 +2,13 @@
 import json
 import rclpy
 import RPi.GPIO as GPIO
-from rclpy.node import Node
+from typing import Optional
+from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
+from rclpy.lifecycle import Publisher
+from rclpy.lifecycle import State
+from rclpy.lifecycle import TransitionCallbackReturn
+from rclpy.timer import Timer
+from rclpy.subscription import Subscription
 from std_msgs.msg import String, Empty
 
 import smbus2 as smbus
@@ -100,17 +106,21 @@ class PCA9685:
   def exit_PCA9685(self):
     self.write(self.__MODE2, 0x00)
 
-class PWMController(Node):
+class PWMController(LifecycleNode):
 
     def __init__(self):
         super().__init__('pwm_controller')
+
+    #lifecycle node callbacks
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("In configure")
         self.subscription = self.create_subscription(
             String,
             'pwm_control',
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning
-        self.timer_pub = self.create_publisher(Empty, '/heartbeat/pwm_controller', 1)
+        self.timer_pub = self.create_lifecycle_publisher(Empty, '/heartbeat/pwm_controller', 1)
         self.timer = self.create_timer(0.5, self.heartbeat_timer_callback)
         up = False
         while not up:
@@ -121,6 +131,35 @@ class PWMController(Node):
             self.get_logger().info("PWM controller error! Is PWM HAT connected?")
             time.sleep(1)
         self.pwm.setPWMFreq(50)
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Activating...")
+        # Start publishers or timers
+        return super().on_activate(state)
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Deactivating...")
+        super().on_deactivate(state)
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Cleaning up...")
+        # Destroy subscribers, publishers, and timers
+        self.destroy_timer(self.timer)
+        self.destroy_lifecycle_publisher(self.timer_pub)
+        self.destroy_subscription(self.subscription)
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info("Shutting down...")
+        # Perform final cleanup if necessary
+        return TransitionCallbackReturn.SUCCESS
+    
+    def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
+        self.get_logger().info("Error caught!")
+        return super().on_error(state)
+    
+    #end callbacks
         
     def heartbeat_timer_callback(self):
       #self.get_logger().info("Publishing timer")
@@ -128,7 +167,7 @@ class PWMController(Node):
        
 
     def listener_callback(self, msg):
-        self.get_logger().info('PWM command received: "%s"' % msg.data)
+        #self.get_logger().info('PWM command received: "%s"' % msg.data)
         self.execute_pwm(msg)
 
     def execute_pwm(self, msg):
@@ -141,18 +180,25 @@ def main(args=None):
     rclpy.init(args=args)
     pwm_controller = PWMController()
 
-    rclpy.spin(pwm_controller)
+    # Use the SingleThreadedExecutor to spin the node.
+    executor = rclpy.executors.SingleThreadedExecutor()
+    executor.add_node(pwm_controller)
 
-    # exit pwm
-    pwm_controller.pwm.exit_PCA9685()
-    GPIO.cleanup()
-
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    pwm_controller.destroy_node()
-    rclpy.shutdown()
-    
+    try:
+        # Spin the node to execute callbacks
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        pwm_controller.get_logger().fatal(f'Unhandled exception: {e}')
+    finally:
+        # exit pwm
+        pwm_controller.pwm.exit_PCA9685()
+        GPIO.cleanup()
+        # Shutdown and cleanup the node
+        executor.shutdown()
+        pwm_controller.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
