@@ -11,6 +11,10 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(sailbot_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+
 find_package(OpenCV REQUIRED)
 
 include_directories(include ${OpenCV_INCLUDE_DIRS})
@@ -28,7 +32,7 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(pathfinder_node src/pathfinder_node.cpp)
-ament_target_dependencies(pathfinder_node rclcpp OpenCV)
+ament_target_dependencies(pathfinder_node rclcpp OpenCV geometry_msgs nav_msgs sailbot_msgs)
 
 install(TARGETS
   pathfinder_node

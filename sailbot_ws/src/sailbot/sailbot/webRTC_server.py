@@ -56,6 +56,7 @@ class WebRTCServer(LifecycleNode):
     #end callbacks
 
     def zed_image_callback(self, image: Image):
+        pass
         
 
 

@@ -1,4 +1,8 @@
 #include <rclcpp/rclcpp.hpp>
+#include "geometry_msgs/msg/point.hpp"
+#include "nav_msgs/msg/path.hpp"
+#include "sailbot_msgs/srv/get_path.hpp"
+
 #include <chrono>
 #include <random>
 #define _USE_MATH_DEFINES
