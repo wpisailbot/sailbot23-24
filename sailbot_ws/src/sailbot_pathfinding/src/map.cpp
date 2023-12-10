@@ -28,38 +28,38 @@ namespace Sailbot {
         neighbors_grid->resize(max_dim, std::vector<Node>(max_dim));
 
         // Initialize nodes and their neighbors
-        for (int y = 0; y < max_dim; ++y) {
-            for (int x = 0; x < max_dim; ++x) {
+        for (uint32_t y = 0; y < max_dim; ++y) {
+            for (uint32_t x = 0; x < max_dim; ++x) {
                 neighbors_grid->at(y).at(x) = Node(x, y);
                 addNeighbors(x, y);
             }
         }
-
-        PRMNodes = std::make_shared<std::vector<std::shared_ptr<Node>>>();
     }
 
-    Map::Map(uint32_t size, std::shared_ptr<std::vector<float>> new_data, std::shared_ptr<std::vector<std::vector<Node>>> new_grid, std::shared_ptr<std::vector<std::shared_ptr<Node>>> new_prm_nodes) {
+    Map::Map(uint32_t size, std::shared_ptr<std::vector<float>> new_data, std::shared_ptr<std::vector<std::vector<Node>>> new_grid) {
         max_dim = size;
         data = new_data;
         neighbors_grid = new_grid;
-        PRMNodes = new_prm_nodes;
     }
 
 
-    void Map::addNeighbors(int x, int y) {
+    void Map::addNeighbors(uint32_t x, uint32_t y) {
         std::vector<std::pair<int, int>> neighborOffsets = { {1, 0}, {0, 1}, {-1, 0}, /*{0, -1},*/ {1, 1}, {1, -1}, {-1, -1}, {-1, 1}}; // 8-directional
 
         for (auto& offset : neighborOffsets) {
             int nx = x + offset.first;
             int ny = y + offset.second;
+            if (nx<0||ny<0){
+                return;
+            }
 
-            if (nx >= 0 && nx < max_dim && ny >= 0 && ny < max_dim) {
-                neighbors_grid->at(y).at(x).neighbors.push_back(&neighbors_grid->at(ny).at(nx));
+            if (uint32_t(nx) < max_dim && uint32_t(ny) < max_dim) {
+                neighbors_grid->at(y).at(x).neighbors.push_back(&neighbors_grid->at(uint32_t(ny)).at(uint32_t(nx)));
             }
         }
     }
 
-    Node* Map::getNode(int x, int y) {
+    Node* Map::getNode(uint32_t x, uint32_t y) {
         return &neighbors_grid->at(y).at(x);
     }
 
@@ -72,14 +72,14 @@ namespace Sailbot {
         return getNode(distrX(eng)+half_width_diff, distrY(eng)+half_height_diff);
     }
 
-    void Map::generate_obstacles(int num_obstacles, int max_blob_size) {
+    void Map::generate_obstacles(uint32_t num_obstacles, uint32_t max_blob_size) {
         std::random_device rd; // Obtain a random number from hardware
         std::mt19937 eng(rd()); // Seed the generator
         std::uniform_int_distribution<> distrX(0, width - 1); // Define range for width
         std::uniform_int_distribution<> distrY(0, height - 1); // Define range for height
         std::uniform_int_distribution<> distrSize(1, max_blob_size); // Define range for blob size
 
-        for (int i = 0; i < num_obstacles; ++i) {
+        for (uint32_t i = 0; i < num_obstacles; ++i) {
             int blob_start_x = distrX(eng)+half_width_diff;
             int blob_start_y = distrY(eng)+half_height_diff;
             int blob_size = distrSize(eng);
@@ -88,7 +88,7 @@ namespace Sailbot {
         }
 
     }
-    void Map::create_blob(std::shared_ptr<std::vector<float>> grid, uint32_t blob_start_x, uint32_t blob_start_y, int blob_size) {
+    void Map::create_blob(std::shared_ptr<std::vector<float>> grid, uint32_t blob_start_x, uint32_t blob_start_y, uint32_t blob_size) {
         std::vector<std::pair<int, int>> directions = { {1, 0}, {0, 1}, {-1, 0}, {0, -1} };
 
         std::random_device rd;
@@ -129,18 +129,18 @@ namespace Sailbot {
         // Convert cv::Mat to std::vector<float>
         auto rotated_vector = std::make_shared<std::vector<float>>();
         rotated_vector->assign((float*)rotated_mat.datastart, (float*)rotated_mat.dataend);
-        Map new_map = Map(max_dim, rotated_vector, neighbors_grid, PRMNodes);
+        Map new_map = Map(max_dim, rotated_vector, neighbors_grid);
         return new_map;
     }
 
-    bool Map::isWalkable(int x, int y) {
-        if (x >= 0 and y >= 0 and x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < 0.5)
+    bool Map::isWalkable(uint32_t x, uint32_t y) {
+        if (x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < 0.5)
             return true;
         return false;
     }
 
-    bool Map::isBlocked(int x, int y) {
-        if (x >= 0 and y >= 0 and x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < 0.5)
+    bool Map::isBlocked(uint32_t x, uint32_t y) {
+        if (x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < 0.5)
             return false;
         return true;
     }

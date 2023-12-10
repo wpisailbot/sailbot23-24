@@ -7,14 +7,15 @@ namespace Sailbot {
 	public:
 		//for initial construction
 		Map(uint32_t map_width, uint32_t map_height);
+
 		//for rotation
-		Map(uint32_t size, std::shared_ptr<std::vector<float>> new_data, std::shared_ptr<std::vector<std::vector<Node>>> new_grid, std::shared_ptr<std::vector<std::shared_ptr<Node>>> new_prm_nodes);
+		Map(uint32_t size, std::shared_ptr<std::vector<float>> new_data, std::shared_ptr<std::vector<std::vector<Node>>> new_grid);
 		Map rotate(double map_angle_deg);
-		void addNeighbors(int x, int y);
-		Node* getNode(int x, int y);
-		void generate_obstacles(int num_obstacles, int max_blob_size);
-		bool isWalkable(int x, int y);
-		bool isBlocked(int x, int y);
+		void addNeighbors(uint32_t x, uint32_t y);
+		Node* getNode(uint32_t x, uint32_t y);
+		void generate_obstacles(uint32_t num_obstacles, uint32_t max_blob_size);
+		bool isWalkable(uint32_t x, uint32_t y);
+		bool isBlocked(uint32_t x, uint32_t y);
 		int gridToIndex(uint32_t x, uint32_t y);
 		Node* randomNode();
 		//std::vector<Node*> getNeighbors(Node* node);
@@ -29,6 +30,6 @@ namespace Sailbot {
 		std::shared_ptr<std::vector<std::vector<Node>>> neighbors_grid;
 		std::shared_ptr<std::vector<float>> data;
 	private:
-		void create_blob(std::shared_ptr<std::vector<float>> grid, uint32_t blob_start_x, uint32_t blob_start_y, int blob_size);
+		void create_blob(std::shared_ptr<std::vector<float>> grid, uint32_t blob_start_x, uint32_t blob_start_y, uint32_t blob_size);
 	};
 }

@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
 project(sailbot_pathfinding)
 
+# Set C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Werror -Wextra -Wpedantic)
 endif()
 
 # find dependencies
@@ -31,7 +36,9 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(pathfinder_node src/pathfinder_node.cpp)
+file(GLOB_RECURSE project_sources src/*.cpp)
+
+add_executable(pathfinder_node ${project_sources})
 ament_target_dependencies(pathfinder_node rclcpp OpenCV geometry_msgs nav_msgs sailbot_msgs)
 
 install(TARGETS

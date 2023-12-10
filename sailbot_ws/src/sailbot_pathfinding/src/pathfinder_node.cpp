@@ -1,7 +1,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include "geometry_msgs/msg/point.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "sailbot_msgs/srv/get_path.hpp"
+#include "sailbot_msgs/srv/set_map.hpp"
 
 #include <chrono>
 #include <random>
@@ -20,12 +22,49 @@
 class Pathfinder : public rclcpp::Node
 {
 public:
+    std::unique_ptr<Sailbot::Map> pMap = nullptr;
+
     Pathfinder() : Node("pathfinder_node")
     {
-
+        this->create_service<sailbot_msgs::srv::SetMap>(
+            "set_map",
+            std::bind(&Pathfinder::handle_set_map_service, this, std::placeholders::_1, std::placeholders::_2)
+        );
+        auto service = this->create_service<sailbot_msgs::srv::GetPath>(
+            "get_path", 
+            std::bind(&Pathfinder::handle_get_path_service, this, std::placeholders::_1, std::placeholders::_2)
+        );
     }
 
-    std::vector<std::pair<double, double>> find_solution(Sailbot::Map map, double wind_angle_deg, Sailbot::Node* start_node, Sailbot::Node* goal_node) {
+    void handle_get_path_service(
+        const std::shared_ptr<sailbot_msgs::srv::GetPath::Request> request,
+        std::shared_ptr<sailbot_msgs::srv::GetPath::Response> response)
+    {
+        if(pMap == nullptr){
+            RCLCPP_WARN(this->get_logger(), "GetPath called, but no map has been set!");
+
+        }
+        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getNode(request->start.x, request->start.y), pMap->getNode(request->end.x, request->end.y));
+        for(auto p: path){
+            geometry_msgs::msg::PoseStamped pose;
+            pose.pose.position.x = p.first;
+            pose.pose.position.y = p.second; 
+            response->path.poses.push_back(pose);
+        }
+        RCLCPP_INFO(this->get_logger(), "Sending back response");
+    }
+
+    void handle_set_map_service(
+        const std::shared_ptr<sailbot_msgs::srv::SetMap::Request> request,
+        [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetMap::Response> response){
+        pMap = std::make_unique<Sailbot::Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height));
+        for(uint32_t i=0; i<request->map.info.width*request->map.info.height; i++){
+            pMap->data->push_back(float(request->map.data[i]));
+        }
+        pMap->data = pMap->data;
+    }
+
+    std::vector<std::pair<double, double>> find_solution(Sailbot::Map& map, double wind_angle_deg, Sailbot::Node* start_node, Sailbot::Node* goal_node) {
     double wind_angle_rad = wind_angle_deg * (M_PI / 180);
     double nogo_angle_rad = NOGO_ANGLE_DEGREES * (M_PI / 180);
     bool wind_blocked = false;

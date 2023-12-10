@@ -31,7 +31,7 @@ std::pair<double, double> rotateAndScale(Sailbot::Node* pt, double radians, uint
 
 std::vector<std::pair<double, double>> rotate_path_doubles(std::vector<Sailbot::Node*> path, uint32_t oldHeight, uint32_t oldWidth, uint32_t newHeight, uint32_t newWidth, double angle_deg) {
     std::vector<std::pair<double, double>> transformed_path;
-    for (Node* n : path) {
+    for (Sailbot::Node* n : path) {
         auto transformed_doubles = rotateAndScale(n, -angle_deg * (M_PI / 180), oldHeight, oldWidth, newHeight, newWidth);
         transformed_path.push_back(std::make_pair(transformed_doubles.first, transformed_doubles.second));
     }
@@ -40,7 +40,7 @@ std::vector<std::pair<double, double>> rotate_path_doubles(std::vector<Sailbot::
 
 std::vector<std::pair<double, double>> path_to_doubles(std::vector<Sailbot::Node*> path) {
     std::vector<std::pair<double, double>> doubles;
-    for (Node* n : path) {
+    for (Sailbot::Node* n : path) {
         doubles.push_back(std::make_pair(n->x, n->y));
     }
     return doubles;
