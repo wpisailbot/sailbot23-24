@@ -40,6 +40,8 @@ This package depends on:
 
 - https://github.com/wpisailbot/telemetry_messages
 - https://github.com/wpisailbot/trim_tab_messages
+- https://github.com/wpisailbot/sailbot23-24/tree/main/sailbot_ws/src/sailbot_pathfinding
+- https://github.com/wpisailbot/sailbot23-24/tree/main/sailbot_ws/src/sailbot_msgs
 
 Packages which depend on this one:
 
