@@ -4,7 +4,7 @@ ROS2 Humble package containing WPI Sailbot's pathfinding system
 
 # overview
 
-This package contains a single node (pathfinder_node.cpp), which runs two services (`set_map` and `get_path`). the `set_map` service receives an [`OccupancyGrid`](https://docs.ros2.org/foxy/api/nav_msgs/msg/OccupancyGrid.html), and creates an internal map which future `get_path` requests will use. The `get_path` service receives two [`Point`](https://docs.ros2.org/foxy/api/geometry_msgs/msg/Point.html) messages (start and goal), as well as a `float64` message (wind angle, in degrees above the positive X axis).
+This package contains a single node (pathfinder_node.cpp), which runs two services (`set_map` and `get_path`). the `set_map` service receives an [`OccupancyGrid`](https://docs.ros2.org/foxy/api/nav_msgs/msg/OccupancyGrid.html), and creates an internal map which future `get_path` requests will use. The `get_path` service receives two [`Point`](https://docs.ros2.org/foxy/api/geometry_msgs/msg/Point.html) messages (start and goal), as well as a `float64` message (wind angle, in degrees above the positive X axis), and returns a [`Path`](https://docs.ros2.org/foxy/api/nav_msgs/msg/Path.html) containing a sailable path between `start` and `goal` (empty if no path was found).
 
 The pathfinding system currently runs in three stages- first, a raycast is performed to check if the boat can move from `start` to `goal` directly. If such a maneuver would sail the boat upwind (in the no-sail zone), we fall back to a single-tack strategy through intermediate point C, with two raycasts. If, in either previous stage, the path is blocked because of an obstacle on the map, we then fall back to true pathfinding. Each stage is explained in more detail below.
 
