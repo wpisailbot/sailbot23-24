@@ -2,7 +2,7 @@
 
 Sailbot ROS code for 2023-2024 MQP
 
-This software runs on Python 3 and was developed for ROS Humble Hawksbill (installation directions can be found here: https://docs.ros.org/en/humble/Installation/Linux-Install-Debians.html).
+This software runs on Python 3 and C++ and was developed for ROS Humble Hawksbill (installation directions can be found here: https://docs.ros.org/en/humble/Installation/Linux-Install-Debians.html).
 
 This repository contains several ROS2 packages:
 - https://github.com/wpisailbot/sailbot23-24/tree/main/sailbot_ws/src/sailbot
