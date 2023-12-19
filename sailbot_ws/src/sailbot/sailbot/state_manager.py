@@ -72,9 +72,8 @@ class StateManager(Node):
     
     def restartSingleNode(self, request: RestartNode.Request, response: RestartNode.Response):
         self.get_logger().info("Getting state for node: "+request.node_name)
-        state = self.getNodeState(request.node_name)
-        self.get_logger().info("Got state:")
-        self.get_logger().info(state)
+        state: GetState.Response = self.getNodeState(request.node_name)
+        self.get_logger().info("Got state: "+state.current_state.label)
         response.success = True
         return response
 
@@ -99,7 +98,7 @@ class StateManager(Node):
             return State.PRIMARY_STATE_UNKNOWN
         
         event=Event()
-        def get_node_state_future_callback(self, future: Future, logger, node_name: str):
+        def get_node_state_future_callback(self, future: Future, logger, node_name: str) -> GetState.Response: 
             logger.info("in callback")
             nonlocal event
             event.set()

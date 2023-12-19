@@ -2,6 +2,7 @@
 import sys
 import rclpy
 from typing import Optional
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
 from rclpy.lifecycle import Publisher
 from rclpy.lifecycle import State
@@ -86,6 +87,8 @@ class NetworkComms(LifecycleNode):
 
         #receives state updates from other nodes
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
+
+        self.callback_group_input_ = MutuallyExclusiveCallbackGroup()
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
