@@ -16,6 +16,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Wind.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
+  "srv/RestartNode.srv"
   DEPENDENCIES std_msgs geometry_msgs nav_msgs
 )
 # uncomment the following section in order to fill in

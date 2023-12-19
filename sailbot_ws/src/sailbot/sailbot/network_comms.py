@@ -19,6 +19,8 @@ import json
 import math
 import time
 
+from sailbot_msgs.srv import RestartNode
+
 import telemetry_messages.python.boat_state_pb2 as boat_state_pb2
 import telemetry_messages.python.boat_state_pb2_grpc as boat_state_pb2_rpc
 import telemetry_messages.python.control_pb2 as control_pb2
@@ -182,6 +184,8 @@ class NetworkComms(LifecycleNode):
             '/trim_tab_comms/transition_event',
             self.tt_lifecycle_callback,
             10)
+        
+        self.restart_node_client = self.create_client(RestartNode, 'restart_node')
         #initial dummy values, for testing
         self.current_boat_state.latitude = 5
         self.current_boat_state.longitude = 4
@@ -433,8 +437,15 @@ class NetworkComms(LifecycleNode):
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def RestartNode(self, command: node_restart_pb2.RestartNodeRequest(), context):
+        self.get_logger().info("Received restart command for: "+command.node_name)
+        restart_node_request = RestartNode.Request()
+        restart_node_request.node_name = command.node_name
+
+        future = self.restart_node_client.call_async(restart_node_request)
+        rclpy.spin_until_future_complete(self, future)
+        self.get_logger().info("completed command")
         response = node_restart_pb2.RestartNodeResponse()
-        response.success = False
+        response.success = future.result().success
         return response
     
     def pwm_controller_heartbeat(self, message):

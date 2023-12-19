@@ -3,11 +3,16 @@ from rclpy.node import Node
 from rclpy.client import Client
 from lifecycle_msgs.srv import GetState, ChangeState
 from lifecycle_msgs.msg import State, Transition
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from sailbot_msgs.srv import RestartNode
 from enum import Enum
 import typing
 from functools import partial
 import asyncio
 from asyncio import Future
+from threading import Event
+import threading
 
 class BoatState(Enum):
     INACTIVE=1
@@ -20,7 +25,7 @@ class BoatState(Enum):
 
 class StateManager(Node):
     early_node_names = ["network_comms"]
-    # node_names = ["ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
+    #node_names = ["ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
     node_names = ["trim_tab_comms"]
     current_state = BoatState.INACTIVE
     client_state_getters: typing.Dict[str, Client] = {}
@@ -28,14 +33,16 @@ class StateManager(Node):
     def __init__(self):
         super().__init__("state_manager")
         self.get_logger().info("starting manager")
+        self.restart_node_srv = self.create_service(RestartNode, 'restart_node', self.restartSingleNode)
 
+        self.callback_group_input_ = MutuallyExclusiveCallbackGroup()
         #create service clients for each node
         for name in self.early_node_names:
-            self.client_state_getters[name] = self.create_client(GetState, name+"/get_state")
-            self.client_state_setters[name] = self.create_client(ChangeState, name+"/change_state")
+            self.client_state_getters[name] = self.create_client(GetState, name+"/get_state", callback_group=self.callback_group_input_)
+            self.client_state_setters[name] = self.create_client(ChangeState, name+"/change_state", callback_group=self.callback_group_input_)
         for name in self.node_names:
-            self.client_state_getters[name] = self.create_client(GetState, name+"/get_state")
-            self.client_state_setters[name] = self.create_client(ChangeState, name+"/change_state")
+            self.client_state_getters[name] = self.create_client(GetState, name+"/get_state", callback_group=self.callback_group_input_)
+            self.client_state_setters[name] = self.create_client(ChangeState, name+"/change_state", callback_group=self.callback_group_input_)
         
         #run async function to move nodes to configured state
         self.configure_nodes(self.early_node_names)
@@ -62,6 +69,15 @@ class StateManager(Node):
             failed_names = new_failed_names
 
         return True
+    
+    def restartSingleNode(self, request: RestartNode.Request, response: RestartNode.Response):
+        self.get_logger().info("Getting state for node: "+request.node_name)
+        state = self.getNodeState(request.node_name)
+        self.get_logger().info("Got state:")
+        self.get_logger().info(state)
+        response.success = True
+        return response
+
         
 
     def configure_nodes(self, node_names: list):
@@ -74,7 +90,7 @@ class StateManager(Node):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.transitionNodes(node_names, Transition.TRANSITION_ACTIVATE))
 
-    async def getNodeState(self, node_name: str, timeout_seconds=3):
+    def getNodeState(self, node_name: str, timeout_seconds=3):
         if(not node_name in self.client_state_getters):
             self.get_logger().error("Incorrect or nonexistant node name provided: "+node_name)
             return State.PRIMARY_STATE_UNKNOWN
@@ -82,19 +98,27 @@ class StateManager(Node):
             self.get_logger().error("Client service not available for node: "+node_name)
             return State.PRIMARY_STATE_UNKNOWN
         
+        event=Event()
+        def get_node_state_future_callback(self, future: Future, logger, node_name: str):
+            logger.info("in callback")
+            nonlocal event
+            event.set()
+            result: GetState.Response = future.result()
+            if(result):
+                logger.info("Node "+node_name+" is in state: "+result.current_state.label)
+            else:
+                logger.info("Request failed for GetState: "+node_name)
+
         request = GetState.Request()
         self.get_logger().info("awaiting get state service")
         result = self.client_state_getters[node_name].call_async(request)
-        partial_callback = partial(self.get_node_state_future_callback, node_name=node_name)
+        partial_callback = partial(get_node_state_future_callback, future = result, logger=self.get_logger(), node_name=node_name)
         result.add_done_callback(partial_callback)
-
-    def get_node_state_future_callback(self, future: Future, node_name: str):
-        self.get_logger().info("in callback")
-        result: GetState.Response = future.result()
-        if(result):
-            self.get_logger().info("Node "+node_name+" is in state: "+result.current_state.label)
-        else:
-            self.get_logger().info("Request failed for GetState: "+node_name)
+        while event.is_set() == False:
+            self.get_logger().info("sleeping")
+            rclpy.spin_once(self, timeout_sec=0)
+        return result.result()
+    
 
     async def spin_once(self):
         rclpy.spin_once(self, timeout_sec=0)
@@ -124,17 +148,28 @@ class StateManager(Node):
         else:
             self.get_logger().error("Request "+str(transition_id)+" failed for ChangeState: "+node_name)
             return False
-
-    async def timer_callback(self):
-        self.get_logger().info("Getting state")
-        await self.getNodeState("ballast_control")
             
 
 def main(args=None):
     rclpy.init(args=args)
     state_manager = StateManager()
-    rclpy.spin(state_manager)
-    rclpy.shutdown()
+
+    # Use the SingleThreadedExecutor to spin the node.
+    executor = MultiThreadedExecutor()
+    executor.add_node(state_manager)
+
+    try:
+        # Spin the node to execute callbacks
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        state_manager.get_logger().fatal(f'Unhandled exception: {e}')
+    finally:
+        # Shutdown and cleanup the node
+        executor.shutdown()
+        state_manager.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

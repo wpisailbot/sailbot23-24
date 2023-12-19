@@ -140,17 +140,20 @@ async def spin(executor: rclpy.executors.SingleThreadedExecutor, logger):
     while rclpy.ok():
         executor.spin_once(timeout_sec=0.1)
         await asyncio.sleep(0)
-        logger.info("looping")
+        #logger.info("looping")
 
 def main(args=None):
     rclpy.init(args=args)
 
-    tt_comms = TrimTabComms()
-    ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-    tt_comms.get_logger().info(ip)
-    start_server = websockets.serve(tt_comms.echo, ip, 8080)
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_server)
+    tt_comms = TrimTabComms()
+    try:
+        ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
+        tt_comms.get_logger().info(ip)
+        start_server = websockets.serve(tt_comms.echo, ip, 8080)
+        loop.run_until_complete(start_server)
+    except:
+        tt_comms.get_logger().info("failed to start websocket server")
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(tt_comms)
