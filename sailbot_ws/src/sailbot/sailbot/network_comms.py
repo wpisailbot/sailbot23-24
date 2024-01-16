@@ -4,6 +4,8 @@ import rclpy
 from typing import Optional
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
+from lifecycle_msgs.srv import ChangeState
+from lifecycle_msgs.msg import Transition
 from rclpy.lifecycle import Publisher
 from rclpy.lifecycle import State
 from rclpy.lifecycle import TransitionCallbackReturn
@@ -49,7 +51,7 @@ def get_state(state_id: int):
     if state_id == StateMsg.TRANSITION_STATE_ACTIVATING:
         return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ACTIVATING
     if state_id == StateMsg.TRANSITION_STATE_CLEANINGUP:
-        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_CLEANINGUP
+        return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_CLEANING_UP
     if state_id == StateMsg.TRANSITION_STATE_CONFIGURING:
         return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_CONFIGURING
     if state_id == StateMsg.TRANSITION_STATE_DEACTIVATING:
@@ -88,7 +90,7 @@ class NetworkComms(LifecycleNode):
         #receives state updates from other nodes
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
 
-        self.callback_group_input_ = MutuallyExclusiveCallbackGroup()
+        self.callback_group_state = MutuallyExclusiveCallbackGroup()
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -188,7 +190,7 @@ class NetworkComms(LifecycleNode):
             self.tt_lifecycle_callback,
             10)
         
-        self.restart_node_client = self.create_client(RestartNode, 'restart_node')
+        self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
         self.current_boat_state.latitude = 5
         self.current_boat_state.longitude = 4
@@ -307,6 +309,31 @@ class NetworkComms(LifecycleNode):
         return super().on_error(state)
      
     #end lifecycle callbacks
+
+    def restart_lifecycle_node_by_name(self, node_name):
+        # Create a service client to send lifecycle state change requests
+        client = self.create_client(ChangeState, f'{node_name}/change_state')
+
+        # Wait for the service to be available
+        i=0
+        while not client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(f'Waiting for {node_name} lifecycle service...')
+            i+=1
+            if i > 5:
+                return False
+
+        # Deactivate the node
+        deactivate_request = ChangeState.Request()
+        deactivate_request.transition.id = Transition.TRANSITION_DEACTIVATE
+        client.call_async(deactivate_request)
+        self.get_logger().info(f'Sent deactivate request to {node_name}')
+
+        # Reactivate the node
+        activate_request = ChangeState.Request()
+        activate_request.transition.id = Transition.TRANSITION_ACTIVATE
+        client.call_async(activate_request)
+        self.get_logger().info(f'Sent activate request to {node_name}')
+        return True
 
     def airmar_lifecycle_callback(self, msg: TransitionEvent):
         self.get_logger().info("Received airmar update!")
@@ -441,14 +468,20 @@ class NetworkComms(LifecycleNode):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def RestartNode(self, command: node_restart_pb2.RestartNodeRequest(), context):
         self.get_logger().info("Received restart command for: "+command.node_name)
-        restart_node_request = RestartNode.Request()
-        restart_node_request.node_name = command.node_name
-
-        future = self.restart_node_client.call_async(restart_node_request)
-        rclpy.spin_until_future_complete(self, future)
-        self.get_logger().info("completed command")
+        # restart_node_request = RestartNode.Request()
+        # restart_node_request.node_name = command.node_name
+        # if(self.restart_node_client.wait_for_service(3) is False):
+        #     self.get_logger().error("Client service not available for state manager!")
+        #     response.success = False
+        #     return response
+        # future = self.restart_node_client.call_async(restart_node_request)
+        # self.get_logger().info("About to spin")
+        # rclpy.spin_until_future_complete(self, future)
+        # self.get_logger().info("completed command")
+        result = self.restart_lifecycle_node_by_name(command.node_name)
         response = node_restart_pb2.RestartNodeResponse()
-        response.success = future.result().success
+        response.success = result
+        self.get_logger().info("Restart node: "+str(result))
         return response
     
     def pwm_controller_heartbeat(self, message):
@@ -481,7 +514,7 @@ def main(args=None):
     network_comms = NetworkComms()
 
     # Use the SingleThreadedExecutor to spin the node.
-    executor = rclpy.executors.SingleThreadedExecutor()
+    executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(network_comms)
 
     try:

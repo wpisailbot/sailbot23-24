@@ -73,7 +73,8 @@ class TrimTabComms(LifecycleNode):
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
-        super().on_deactivate(state)
+        return super().on_deactivate(state)
+        
 
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Cleaning up...")
@@ -134,14 +135,6 @@ class TrimTabComms(LifecycleNode):
                 self.get_logger().info("Error processing message:", e)
                 raise(e)
 
-#TODO: Horrible hack to allow perpetual async alongside ROS. This creates a bunch of unnecessary looping
-#Find some way to replace this. Move server to esp32? Need to put mDNS there as well.
-async def spin(executor: rclpy.executors.SingleThreadedExecutor, logger):
-    while rclpy.ok():
-        executor.spin_once(timeout_sec=0.1)
-        await asyncio.sleep(0)
-        #logger.info("looping")
-
 def main(args=None):
     rclpy.init(args=args)
 
@@ -158,10 +151,9 @@ def main(args=None):
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(tt_comms)
 
-    loop.run_until_complete(spin(executor, tt_comms.get_logger()))
+    executor.spin()
     tt_comms.destroy_node()
     executor.shutdown()
-    tt_comms.destroy_node()
     rclpy.shutdown()
 
 
