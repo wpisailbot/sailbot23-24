@@ -7,13 +7,25 @@ import numpy as np
 import math
 
 PIXEL_SIZE = 0.002 # In mm
-FOCAL_LENGTH = 1492 # In pixels
 CAMERA_RESOLUTION = (2208, 1242) # Width, Height
 CAMERA_WORLD_POSITION = np.array([0, 0, 0]) # XYZ in meters
 CAMERA_ORIENTATION = np.array([0, 0, 0]) # Orientation as pitch, yaw, roll
 KNOWN_DIAMETER = 0.5 # Diameter of the sphere in meters
 CIRCULARITY_THRESHOLD = 0.4 # Threshold for circularity (1 is perfect circle)
 
+#Camera calibration for LEFT camera info from ZED application
+CX = 1099.58
+CY = 634.60
+
+FX = 1053.2
+FY = 1052.39
+
+camera_matrix = np.array([[FX, 0, CX],
+                          [0, FY, CY],
+                          [0, 0, 1]])
+
+K1, K2, P1, P2, K3 = -0.0393, 0.0085, 0.0001, 0.0004, -0.0045
+distortion_coefficients = np.array([K1, K2, P1, P2, K3])
 
 class BuoyDetection(Node):
     current_x_scaling_factor = 1.0
@@ -38,17 +50,16 @@ class BuoyDetection(Node):
         self.current_y_scaling_factor = current_frame.shape[0]/CAMERA_RESOLUTION[1]
         #self.get_logger().info("x scaling factor: "+str(self.current_x_scaling_factor))
         #self.get_logger().info("y scaling factor: "+str(self.current_y_scaling_factor))
-
-
         
-        image = current_frame
+        image = cv2.undistort(current_frame, camera_matrix, distortion_coefficients)
+
         contours = self.detect_orange_objects(image)
 
         for contour in contours:
             cX, cY = self.calculate_object_center(contour)
             Z = self.calculate_depth(contour)
             #self.get_logger().info("Depth: "+str(Z))
-            world_coordinates = self.pixel_to_world(cX, cY, Z, FOCAL_LENGTH*self.current_x_scaling_factor, FOCAL_LENGTH*self.current_y_scaling_factor, 1099.58*self.current_x_scaling_factor, 634.60*self.current_y_scaling_factor)
+            world_coordinates = self.pixel_to_world(cX, cY, Z, FX*self.current_x_scaling_factor, FY*self.current_y_scaling_factor, CX*self.current_x_scaling_factor, CY*self.current_y_scaling_factor)
             self.get_logger().info(f"Object World Coordinates: {world_coordinates}")
 
     def fill_holes(self, image):
@@ -121,7 +132,7 @@ class BuoyDetection(Node):
         self.get_logger().info("radius: "+str(radius))
 
         #depth = (KNOWN_DIAMETER*PIXEL_SIZE*current_x_scaling_factor/2 * FOCAL_LENGTH*current_x_scaling_factor) / radius
-        depth = (KNOWN_DIAMETER*FOCAL_LENGTH)/(radius*2/self.current_x_scaling_factor)
+        depth = (KNOWN_DIAMETER*FX)/(radius*2/self.current_x_scaling_factor)
         return depth
 
     def calculate_object_center(self, contour):
