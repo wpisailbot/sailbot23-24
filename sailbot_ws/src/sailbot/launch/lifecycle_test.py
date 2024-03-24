@@ -1,4 +1,5 @@
 import launch
+from launch_ros.actions import Node
 from launch_ros.actions import LifecycleNode
 
 def generate_launch_description():
@@ -37,10 +38,17 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
-    state_manager_node = LifecycleNode(
+    state_manager_node = Node(
         package='sailbot', 
         executable='state_manager', 
         name='state_manager',
+        namespace='',
+        output='screen'
+    )
+    pathfinder_node = Node(
+        package='sailbot_pathfinding', 
+        executable='pathfinder_node', 
+        name='pathfinder_node',
         namespace='',
         output='screen'
     )
@@ -53,4 +61,5 @@ def generate_launch_description():
     #ld.add_action(airmar_node)
     ld.add_action(tt_node)
     ld.add_action(state_manager_node)
+    ld.add_action(pathfinder_node)
     return ld

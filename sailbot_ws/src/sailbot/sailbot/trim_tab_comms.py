@@ -138,7 +138,7 @@ class TrimTabComms(LifecycleNode):
         self.ser.write(message_string.encode())
 
     def ballast_pwm_callback(self, msg: Int16):
-        self.get_logger().info("Got ballast position")
+        #self.get_logger().info("Got ballast position")
         pwm = msg.data
         message = {
             "ballast_pwm": pwm

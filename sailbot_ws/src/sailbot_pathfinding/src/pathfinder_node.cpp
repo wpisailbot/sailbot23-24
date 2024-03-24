@@ -23,14 +23,16 @@ class Pathfinder : public rclcpp::Node
 {
 public:
     std::unique_ptr<Sailbot::Map> pMap = nullptr;
+    rclcpp::Service<sailbot_msgs::srv::SetMap>::SharedPtr pSetMapService;
+    rclcpp::Service<sailbot_msgs::srv::GetPath>::SharedPtr pGetPathService;
 
     Pathfinder() : Node("pathfinder_node")
     {
-        this->create_service<sailbot_msgs::srv::SetMap>(
+        this->pSetMapService = this->create_service<sailbot_msgs::srv::SetMap>(
             "set_map",
             std::bind(&Pathfinder::handle_set_map_service, this, std::placeholders::_1, std::placeholders::_2)
         );
-        auto service = this->create_service<sailbot_msgs::srv::GetPath>(
+        this->pGetPathService = this->create_service<sailbot_msgs::srv::GetPath>(
             "get_path", 
             std::bind(&Pathfinder::handle_get_path_service, this, std::placeholders::_1, std::placeholders::_2)
         );
