@@ -26,7 +26,7 @@ class BoatState(Enum):
 class StateManager(Node):
     early_node_names = ["network_comms"]
     #node_names = ["ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
-    node_names = ["trim_tab_comms"]
+    node_names = ["trim_tab_comms", "ballast_control"]
     current_state = BoatState.INACTIVE
     client_state_getters: typing.Dict[str, Client] = {}
     client_state_setters: typing.Dict[str, Client] = {}

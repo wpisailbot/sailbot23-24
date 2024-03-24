@@ -12,14 +12,17 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 from enum import Enum
-import asyncio
-import websockets
-import netifaces as ni
-import threading
 
 from std_msgs.msg import Int8, Int16, Float32, Empty
 
 import trim_tab_messages.python.messages_pb2 as message_pb2
+
+import serial
+import json
+import time
+
+serial_port = '/dev/ttyTHS0'
+baud_rate = 115200 
 
 # Local variables
 state = message_pb2.TRIM_STATE.TRIM_STATE_MIN_LIFT
@@ -37,6 +40,10 @@ class TrimTabComms(LifecycleNode):
         self.tt_battery_publisher: Optional[Publisher]
         self.tt_control_subscriber: Optional[Subscription]
         self.tt_angle_subscriber: Optional[Subscription]
+        self.rudder_angle_subscriber: Optional[Subscription]
+        self.ballast_pos_publisher: Optional[Publisher]
+
+
         self.timer_pub: Optional[Publisher]
 
         self.heartbeat_timer: Optional[Timer]
@@ -45,24 +52,24 @@ class TrimTabComms(LifecycleNode):
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
-        self.tt_telemetry_publisher = self.create_lifecycle_publisher(Float32, 'tt_telemetry', 10)  # Wind direction
+        self.tt_telemetry_publisher = self.create_lifecycle_publisher(Float32, 'tt_telemetry', 10)
+        self.ballast_pos_publisher = self.create_lifecycle_publisher(Int16, 'current_ballast_pos', 10)
+
         self.tt_battery_publisher = self.create_lifecycle_publisher(Int8, 'tt_battery', 10)  # Battery level
         self.tt_control_subscriber = self.create_subscription(Int8, 'tt_control', self.tt_state_callback, 10)  # Trim tab state
         self.tt_angle_subscriber = self.create_subscription(Int16, 'tt_angle', self.tt_angle_callback, 10)
 
-        self.timer_pub = self.create_lifecycle_publisher(
-        Empty, '/heartbeat/trim_tab_comms', 1)
-        #self.heartbeat_timer = self.create_timer(0.5, self.heartbeat_timer_callback)
-        # try:
-        #     ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-        #     self.get_logger().info(ip)
-        #     start_server = websockets.serve(self.echo, ip, 8080)
-        #     self.schedule_async_function(start_server)
-        #     #tt_comms_thread = threading.Thread(asyncio.get_event_loop().run_forever(), daemon=True)
-        #     #tt_comms_thread.start()
-        # except Exception as e:
-        #     self.get_logger().error()
+        self.rudder_angle_subscriber = self.create_subscription(Int16, 'rudder_angle', self.rudder_angle_callback, 10)
+        self.ballast_pwm_subscriber = self.create_subscription(Int16, 'ballast_pwm', self.ballast_pwm_callback, 10)
+
+        self.timer_pub = self.create_lifecycle_publisher(Empty, '/heartbeat/trim_tab_comms', 1)
         
+        self.ballast_timer = self.create_timer(0.01, self.ballast_timer_callback)
+
+        try:
+            self.ser = serial.Serial(serial_port, baud_rate, timeout=0.02)
+        except Exception as e:
+            self.get_logger().info(str(e))
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
@@ -81,10 +88,12 @@ class TrimTabComms(LifecycleNode):
         # Destroy subscribers, publishers, and timers
         self.destroy_lifecycle_publisher(self.tt_telemetry_publisher)
         self.destroy_lifecycle_publisher(self.tt_battery_publisher)
+        self.destroy_lifecycle_publisher(self.ballast_pos_publisher)
         self.destroy_lifecycle_publisher(self.timer_pub)
         self.destroy_subscription(self.tt_control_subscriber)
         self.destroy_subscription(self.tt_angle_subscriber)
         self.destroy_timer(self.heartbeat_timer)
+        self.destroy_timer(self.ballast_timer)
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -99,9 +108,6 @@ class TrimTabComms(LifecycleNode):
     
     #end callbacks
 
-    def schedule_async_function(self, coroutine):
-        asyncio.run_coroutine_threadsafe(coroutine, asyncio.get_event_loop())
-
     def tt_state_callback(self, msg: Int8):
         protomsg = message_pb2.ControlMessage()
         protomsg.control_type = message_pb2.CONTROL_MESSAGE_CONTROL_TYPE.CONTROL_MESSAGE_CONTROL_TYPE_STATE
@@ -111,12 +117,55 @@ class TrimTabComms(LifecycleNode):
             self.schedule_async_function(self.last_websocket.send(serialized_message))
 
     def tt_angle_callback(self, msg: Int16):
-        protomsg = message_pb2.ControlMessage()
-        protomsg.control_type = message_pb2.CONTROL_MESSAGE_CONTROL_TYPE.CONTROL_MESSAGE_CONTROL_TYPE_ANGLE
-        protomsg.control_angle = msg.data
-        serialized_message = protomsg.SerializeToString()
-        if(self.last_websocket is not None):
-            self.schedule_async_function(self.last_websocket.send(serialized_message))
+        self.get_logger().info("Sending trimtab angle")
+        angle = msg.data
+        message = {
+            "state": "manual",
+            "angle": angle
+        }
+        message_string = json.dumps(message)+'\n'
+        self.ser.write(message_string.encode())
+
+    def rudder_angle_callback(self, msg: Int16):
+        self.get_logger().info("Got rudder position")
+        degrees = msg.data
+        degrees_scaled =  (((degrees - -90) * (113 - 40)) / (90 - -90)) + 40
+
+        message = {
+            "rudder_angle": degrees_scaled
+        }
+        message_string = json.dumps(message)+'\n'
+        self.ser.write(message_string.encode())
+
+    def ballast_pwm_callback(self, msg: Int16):
+        self.get_logger().info("Got ballast position")
+        pwm = msg.data
+        message = {
+            "ballast_pwm": pwm
+        }
+        message_string = json.dumps(message)+'\n'
+        self.ser.write(message_string.encode())
+
+    def ballast_timer_callback(self):
+        message = {
+            "get_ballast_pos": True
+        }
+        message_string = json.dumps(message)+'\n'
+        self.ser.write(message_string.encode())
+        line = self.ser.readline().decode('utf-8').rstrip()
+        
+        if line:
+            try:
+                message = json.loads(line)
+
+                #print("Received position:", message["ballast_pos"])
+                pos = Int16()
+                pos.data = message["ballast_pos"]
+                self.ballast_pos_publisher.publish(pos)
+            except json.JSONDecodeError:
+                print("Error decoding JSON:", line)
+        else:
+            print("No data received within the timeout period.")
 
     async def echo(self, websocket, path):
         self.last_websocket = websocket
@@ -140,13 +189,12 @@ def main(args=None):
 
     loop = asyncio.get_event_loop()
     tt_comms = TrimTabComms()
+    #for debugging purposes
     try:
-        ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-        tt_comms.get_logger().info(ip)
-        start_server = websockets.serve(tt_comms.echo, ip, 8080)
-        loop.run_until_complete(start_server)
-    except:
-        tt_comms.get_logger().info("failed to start websocket server")
+        ser = serial.Serial(serial_port, baud_rate, timeout=1)
+        ser.close()
+    except Exception as e:
+        tt_comms.get_logger().info(str(e))
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(tt_comms)
