@@ -23,8 +23,8 @@ def bound(low, high, value):
     return max(low, min(high, value))
 
 class BallastControl(LifecycleNode):
-    ADC_FULL_STARBOARD = 0
-    ADC_FULL_PORT = 4095
+    ADC_FULL_STARBOARD = 570
+    ADC_FULL_PORT = 2140
     
     MOTOR_FAST_STARBOARD = 130
     MOTOR_FAST_PORT = 60
@@ -32,10 +32,10 @@ class BallastControl(LifecycleNode):
     CONTROL_FAST_PORT=-1.0
     CONTROL_FAST_STARBOARD=1.0
 
-    Kp = 0.0005
+    Kp = 0.003
 
-    current_target = (ADC_FULL_STARBOARD-ADC_FULL_PORT)/2+ADC_FULL_PORT
-    current_ballast_position = 2047
+    current_target = (ADC_FULL_PORT-ADC_FULL_STARBOARD)/2+ADC_FULL_STARBOARD
+    current_ballast_position = current_target
 
     def __init__(self):
         super().__init__('ballast_control')
@@ -106,12 +106,12 @@ class BallastControl(LifecycleNode):
         self.current_target = self.ADC_FULL_PORT + ((self.ADC_FULL_STARBOARD - self.ADC_FULL_PORT) / (1.0 - -1.0)) * (msg.data - -1.0)
 
     def current_ballast_position_callback(self, msg: Int16):
-        self.get_logger().info("Got current ballast position")
+        #self.get_logger().info("Got current ballast position")
         self.current_ballast_position = msg.data
 
     def control_loop_callback(self):
         motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.current_ballast_position-self.current_target)))
-        #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.ballast_adc_channel.value)+" Current motor value: "+str(motor_value))
+        #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         
         msg = Int16()
         msg.data = int(motor_value)

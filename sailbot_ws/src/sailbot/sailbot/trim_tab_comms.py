@@ -53,7 +53,7 @@ class TrimTabComms(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
         self.tt_telemetry_publisher = self.create_lifecycle_publisher(Float32, 'tt_telemetry', 10)
-        self.ballast_pos_publisher = self.create_lifecycle_publisher(Int16, 'current_ballast_pos', 10)
+        self.ballast_pos_publisher = self.create_lifecycle_publisher(Int16, 'current_ballast_position', 10)
 
         self.tt_battery_publisher = self.create_lifecycle_publisher(Int8, 'tt_battery', 10)  # Battery level
         self.tt_control_subscriber = self.create_subscription(Int8, 'tt_control', self.tt_state_callback, 10)  # Trim tab state
@@ -158,14 +158,14 @@ class TrimTabComms(LifecycleNode):
             try:
                 message = json.loads(line)
 
-                #print("Received position:", message["ballast_pos"])
+                #self.get_logger().info("Received position:", message["ballast_pos"])
                 pos = Int16()
                 pos.data = message["ballast_pos"]
                 self.ballast_pos_publisher.publish(pos)
             except json.JSONDecodeError:
-                print("Error decoding JSON:", line)
+                self.get_logger().info("Error decoding JSON")
         else:
-            print("No data received within the timeout period.")
+            self.get_logger().info("No data received within the timeout period.")
 
     async def echo(self, websocket, path):
         self.last_websocket = websocket
