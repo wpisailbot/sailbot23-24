@@ -17,8 +17,6 @@
 #include "astar_pathfinding_strategy.h"
 #include "utilities.h"
 
-#define NOGO_ANGLE_DEGREES 45
-
 class Pathfinder : public rclcpp::Node
 {
 public:
@@ -97,6 +95,7 @@ public:
 
     auto time_start = std::chrono::high_resolution_clock::now();
     auto path = solver.solve(map, start_node, goal_node, wind_angle_rad);
+    path = simplify_path(path, wind_angle_deg, map);
     auto time_stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_stop - time_start);
     std::string time_string = "Search time: " + std::to_string(duration.count());

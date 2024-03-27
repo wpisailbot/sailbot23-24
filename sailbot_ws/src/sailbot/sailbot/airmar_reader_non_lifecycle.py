@@ -99,6 +99,8 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                 self.publishIfValid(args[1], self.rot_publisher, Float64)
                 return {"rate-of-turn":args[1]}
             elif(type_code == 'GLL'):
+                self.get_logger().info("Got GPS data: ")
+                self.get_logger().info(line)
                 #convert from degree decimal minutes to decimal degrees
                 #dd = d + m/60
                 #lat = math.floor(float(args[1]) / 100) + (float(args[1]) % 100)/60.0
@@ -165,7 +167,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
             elif(type_code == 'GRS'): #"The GRS message is used to support the Receiver Autonomous Integrity Monitoring (RAIM)." -- unneeded
                 return {}
             elif(type_code == 'MWD'):
-                self.get_logger().info("Publishing wind!")
+                self.get_logger().info("Got true wind!")
                 self.publishIfValid([args[5], args[1]], self.true_wind_publisher, Wind)
                 return {"trueWind":
                     {"speed": args[5],      #in knots
@@ -175,6 +177,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                 }
             elif(type_code == 'MWV'):
                 self.publishIfValid([args[5], args[1]], self.true_wind_publisher, Wind)
+                self.get_logger().info("Got apparent wind")
                 return {"apparentWind":
                     {"speed": args[3],       #in knots 
                     "direction": args[1]   #in deg

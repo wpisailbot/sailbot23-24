@@ -42,7 +42,7 @@ class BallastControl(LifecycleNode):
         self.ballast_pwm_publisher: Optional[Publisher]
         self.position_subscription: Optional[Subscription]
         self.current_ballast_position_subscription: Optional[Subscription]
-
+        self.airmar_roll_subscription: Optional[Subscription]
         self.timer: Optional[Timer]
 
     #lifecycle node callbacks
@@ -60,6 +60,11 @@ class BallastControl(LifecycleNode):
             Int16,
             'current_ballast_position',
             self.current_ballast_position_callback,
+            10)
+        self.airmar_roll_subscription = self.create_subscription(
+            Float64,
+            '/airmar_data/roll',
+            self.airmar_roll_callback,
             10)
         self.timer = self.create_timer(0.1, self.control_loop_callback)
         self.get_logger().info("Ballast node configured")
@@ -108,6 +113,9 @@ class BallastControl(LifecycleNode):
     def current_ballast_position_callback(self, msg: Int16):
         #self.get_logger().info("Got current ballast position")
         self.current_ballast_position = msg.data
+
+    def airmar_roll_callback(self, msg: Float64):
+        self.get_logger().info("Got roll data!")
 
     def control_loop_callback(self):
         motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.current_ballast_position-self.current_target)))
