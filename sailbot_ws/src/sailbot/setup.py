@@ -34,7 +34,8 @@ setup(
             'computer_vision = sailbot.computer_vision:main',
             'network_comms = sailbot.network_comms:main',
             'state_manager = sailbot.state_manager:main',
-            'heading_manager = sailbot.heading_controller:main'
+            'heading_manager = sailbot.heading_controller:main',
+            'main_behavior = sailbot.behaviors.sailbot_behavior: main',
         ],
     },
 )
