@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'airmar_reader = sailbot.airmar_reader:main',
+            'airmar_reader_non_lifecycle = sailbot.airmar_reader_non_lifecycle:main',
             'pwm_controller = sailbot.pwm_controller:main',
             'control_system = sailbot.control_system:main',
             'trim_tab_comms = sailbot.trim_tab_comms:main',
@@ -33,6 +34,7 @@ setup(
             'computer_vision = sailbot.computer_vision:main',
             'network_comms = sailbot.network_comms:main',
             'state_manager = sailbot.state_manager:main',
+            'heading_manager = sailbot.heading_controller:main',
             'main_behavior = sailbot.behaviors.sailbot_behavior: main',
         ],
     },

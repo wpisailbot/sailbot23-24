@@ -1,4 +1,5 @@
 import launch
+from launch_ros.actions import Node
 from launch_ros.actions import LifecycleNode
 
 def generate_launch_description():
@@ -23,13 +24,13 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
-    pwm_node = LifecycleNode(
-        package='sailbot', 
-        executable='pwm_controller', 
-        name='pwm_controller',
-        namespace='',
-        output='screen'
-    )
+    # pwm_node = LifecycleNode(
+    #     package='sailbot', 
+    #     executable='pwm_controller', 
+    #     name='pwm_controller',
+    #     namespace='',
+    #     output='screen'
+    # )
     tt_node = LifecycleNode(
         package='sailbot', 
         executable='trim_tab_comms', 
@@ -37,10 +38,17 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
-    state_manager_node = LifecycleNode(
+    state_manager_node = Node(
         package='sailbot', 
         executable='state_manager', 
         name='state_manager',
+        namespace='',
+        output='screen'
+    )
+    pathfinder_node = Node(
+        package='sailbot_pathfinding', 
+        executable='pathfinder_node', 
+        name='pathfinder_node',
         namespace='',
         output='screen'
     )
@@ -49,8 +57,9 @@ def generate_launch_description():
     ld = launch.LaunchDescription()
     ld.add_action(network_comms_node)
     ld.add_action(ballast_node) 
-    ld.add_action(pwm_node)
-    ld.add_action(airmar_node)
+    #ld.add_action(pwm_node)
+    #ld.add_action(airmar_node)
     ld.add_action(tt_node)
     ld.add_action(state_manager_node)
+    ld.add_action(pathfinder_node)
     return ld

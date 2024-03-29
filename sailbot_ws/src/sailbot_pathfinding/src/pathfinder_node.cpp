@@ -17,20 +17,20 @@
 #include "astar_pathfinding_strategy.h"
 #include "utilities.h"
 
-#define NOGO_ANGLE_DEGREES 45
-
 class Pathfinder : public rclcpp::Node
 {
 public:
     std::unique_ptr<Sailbot::Map> pMap = nullptr;
+    rclcpp::Service<sailbot_msgs::srv::SetMap>::SharedPtr pSetMapService;
+    rclcpp::Service<sailbot_msgs::srv::GetPath>::SharedPtr pGetPathService;
 
     Pathfinder() : Node("pathfinder_node")
     {
-        this->create_service<sailbot_msgs::srv::SetMap>(
+        this->pSetMapService = this->create_service<sailbot_msgs::srv::SetMap>(
             "set_map",
             std::bind(&Pathfinder::handle_set_map_service, this, std::placeholders::_1, std::placeholders::_2)
         );
-        auto service = this->create_service<sailbot_msgs::srv::GetPath>(
+        this->pGetPathService = this->create_service<sailbot_msgs::srv::GetPath>(
             "get_path", 
             std::bind(&Pathfinder::handle_get_path_service, this, std::placeholders::_1, std::placeholders::_2)
         );
@@ -95,6 +95,7 @@ public:
 
     auto time_start = std::chrono::high_resolution_clock::now();
     auto path = solver.solve(map, start_node, goal_node, wind_angle_rad);
+    path = simplify_path(path, wind_angle_deg, map);
     auto time_stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_stop - time_start);
     std::string time_string = "Search time: " + std::to_string(duration.count());

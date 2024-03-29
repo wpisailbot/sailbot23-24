@@ -68,7 +68,7 @@ class NetworkComms(LifecycleNode):
 
     def __init__(self):
         super().__init__('network_comms')
-        self.pwm_control_publisher: Optional[Publisher]
+        self.rudder_control_publisher: Optional[Publisher]
         self.ballast_position_publisher: Optional[Publisher]
         self.trim_tab_control_publisher: Optional[Publisher]
         self.trim_tab_angle_publisher: Optional[Publisher]
@@ -96,6 +96,8 @@ class NetworkComms(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
         self.pwm_control_publisher = self.create_lifecycle_publisher(String, 'pwm_control', 10)
+        self.rudder_control_publisher = self.create_lifecycle_publisher(Int16, 'rudder_angle', 10)
+
         self.ballast_position_publisher = self.create_lifecycle_publisher(Float64, 'ballast_position', 10)
         self.trim_tab_control_publisher = self.create_lifecycle_publisher(Int8, 'tt_control', 10)
         self.trim_tab_angle_publisher = self.create_lifecycle_publisher(Int16, 'tt_angle', 10)
@@ -410,13 +412,9 @@ class NetworkComms(LifecycleNode):
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         #rudder commands are radians, map to degrees
         degrees = int(command.rudder_control_value*(180/math.pi))
-        degrees_scaled =  (((degrees - -90) * (113 - 40)) / (90 - -90)) + 40
-        #self.get_logger().info("input angle: {}", degrees)
-        rudder_json = {"channel": "8", "angle": degrees_scaled}
-        #self.get_logger().info("Publishing rudder command: "+str(degrees))
-        #self.get_logger().info("Publishing rudder command")
-
-        self.pwm_control_publisher.publish(make_json_string(rudder_json))
+        msg = Int16()
+        msg.data = degrees
+        self.rudder_control_publisher.publish(msg)
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files

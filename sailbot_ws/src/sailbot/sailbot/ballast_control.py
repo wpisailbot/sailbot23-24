@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import String, Float64
+from std_msgs.msg import String, Float64, Int16
 import json
 import board
 import busio
 import time
-import adafruit_ads1x15.ads1015 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
 from rclpy.lifecycle import Publisher
@@ -25,8 +23,8 @@ def bound(low, high, value):
     return max(low, min(high, value))
 
 class BallastControl(LifecycleNode):
-    ADC_FULL_STARBOARD = 20480
-    ADC_FULL_PORT = 10016
+    ADC_FULL_STARBOARD = 570
+    ADC_FULL_PORT = 2140
     
     MOTOR_FAST_STARBOARD = 130
     MOTOR_FAST_PORT = 60
@@ -34,39 +32,42 @@ class BallastControl(LifecycleNode):
     CONTROL_FAST_PORT=-1.0
     CONTROL_FAST_STARBOARD=1.0
 
-    Kp = 0.0005
+    Kp = 0.003
 
-    current_target = (ADC_FULL_STARBOARD-ADC_FULL_PORT)/2+ADC_FULL_PORT
+    current_target = (ADC_FULL_PORT-ADC_FULL_STARBOARD)/2+ADC_FULL_STARBOARD
+    current_ballast_position = current_target
 
     def __init__(self):
         super().__init__('ballast_control')
-        self.pwm_control_publisher: Optional[Publisher]
+        self.ballast_pwm_publisher: Optional[Publisher]
         self.position_subscription: Optional[Subscription]
+        self.current_ballast_position_subscription: Optional[Subscription]
+        self.airmar_roll_subscription: Optional[Subscription]
         self.timer: Optional[Timer]
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
-        try:
-            # Create the I2C bus
-            i2c = busio.I2C(board.SCL, board.SDA)
-            # Create the ADC object using the I2C bus
-            ads = ADS.ADS1015(i2c)
-            # Create single-ended input on channel 0
-            self.ballast_adc_channel = AnalogIn(ads, ADS.P0)
-        except:
-            return TransitionCallbackReturn.FAILURE
 
-        self.pwm_control_publisher = self.create_lifecycle_publisher(String, 'pwm_control', 10)
+        self.ballast_pwm_publisher = self.create_lifecycle_publisher(Int16, 'ballast_pwm', 10)
 
         self.position_subscription = self.create_subscription(
             Float64,
             'ballast_position',
             self.ballast_position_callback,
             10)
-        
+        self.current_ballast_position_subscription = self.create_subscription(
+            Int16,
+            'current_ballast_position',
+            self.current_ballast_position_callback,
+            10)
+        self.airmar_roll_subscription = self.create_subscription(
+            Float64,
+            '/airmar_data/roll',
+            self.airmar_roll_callback,
+            10)
         self.timer = self.create_timer(0.1, self.control_loop_callback)
-        self.get_logger().info("ADC node configured")
+        self.get_logger().info("Ballast node configured")
         #super().on_configure(state)
         return TransitionCallbackReturn.SUCCESS
 
@@ -106,15 +107,23 @@ class BallastControl(LifecycleNode):
         return  self.MOTOR_FAST_PORT + ((self.MOTOR_FAST_STARBOARD - self.MOTOR_FAST_PORT) / (self.CONTROL_FAST_STARBOARD - self.CONTROL_FAST_PORT)) * (control - self.CONTROL_FAST_PORT)
 
     def ballast_position_callback(self, msg: Float64):
-        self.get_logger().info("Received ballast position: "+str(msg.data))
+        self.get_logger().info("Received ballast setpoint: "+str(msg.data))
         self.current_target = self.ADC_FULL_PORT + ((self.ADC_FULL_STARBOARD - self.ADC_FULL_PORT) / (1.0 - -1.0)) * (msg.data - -1.0)
 
+    def current_ballast_position_callback(self, msg: Int16):
+        #self.get_logger().info("Got current ballast position")
+        self.current_ballast_position = msg.data
+
+    def airmar_roll_callback(self, msg: Float64):
+        self.get_logger().info("Got roll data!")
+
     def control_loop_callback(self):
-        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.ballast_adc_channel.value-self.current_target)))
-        #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.ballast_adc_channel.value)+" Current motor value: "+str(motor_value))
+        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.current_ballast_position-self.current_target)))
+        #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         
-        ballast_json = {"channel": "12", "angle": motor_value}
-        self.pwm_control_publisher.publish(make_json_string(ballast_json))
+        msg = Int16()
+        msg.data = int(motor_value)
+        self.ballast_pwm_publisher.publish(msg)
         pass
 
 
