@@ -1,0 +1,5 @@
+sensor_msgs/msg/NavSatFix[] waypoints
+---
+bool success
+---
+int32 current_target_waypoint_index

@@ -32,7 +32,8 @@ setup(
             'ballast_control = sailbot.ballast_control:main',
             'computer_vision = sailbot.computer_vision:main',
             'network_comms = sailbot.network_comms:main',
-            'state_manager = sailbot.state_manager:main'
+            'state_manager = sailbot.state_manager:main',
+            'main_behavior = sailbot.behaviors.sailbot_behavior: main',
         ],
     },
 )
