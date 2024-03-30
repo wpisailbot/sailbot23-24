@@ -1,4 +1,4 @@
-sensor_msgs/msg/NavSatFix[] waypoints
+Path waypoints
 ---
 bool success
 ---

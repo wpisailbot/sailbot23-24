@@ -8,7 +8,7 @@ from sailbot_msgs.action.action import FollowPath
 
 class PathActionServer(Node):
     def __init__(self):
-        super().__init__('fibonacci_action_server')
+        super().__init__('path_action_server')
         self._action_server = ActionServer(
             self,
             FollowPath,

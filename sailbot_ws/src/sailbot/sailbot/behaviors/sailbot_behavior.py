@@ -2,10 +2,13 @@ import py_trees
 import py_trees_ros
 import py_trees_ros.trees
 import py_trees.console as console
+from py_trees_ros.actions import ActionClient
 import rclpy
 import launch
 import launch_ros
 import sys
+from sailbot_msgs.action import FollowPath
+from sailbot_msgs.msg import Path
 
 def generate_launch_description():
     """
@@ -40,16 +43,36 @@ def sailbot_create_root() -> py_trees.behaviour.Behaviour:
         threshold=30.0
     )
 
+    pathFollow = PathFollowing("pathFollowing")
+
     priorities = py_trees.composites.Selector(name="Tasks", memory=False)
     idle = py_trees.behaviours.Running(name="Idle")
 
-    root.add_child(topics2bb)
-    topics2bb.add_child(battery2bb)
+    #root.add_child(topics2bb)
+    #topics2bb.add_child(battery2bb)
     root.add_child(priorities)
-    priorities.add_child(idle)
+    priorities.add_children([pathFollow, idle])
 
     return root
 
+class PathFollowing(ActionClient):
+    def __init__(self, name):
+        super().__init__(name,
+                         action_type=FollowPath,
+                         action_goal=FollowPath.Goal(),
+                         action_name='follow_path')
+        self.path_subscriber = None
+
+    def setup(self, **kwargs):
+        super().setup()
+        self.waypoints_subscriber = self.node.create_subscription(
+            Path, 'waypoints', self.waypoints_callback, 10)
+
+    def waypoints_callback(self, msg):
+        # Assuming the action server expects a path as part of the goal
+        self.node.get_logger().info("Got waypoints!")
+        self.action_goal.goal.path = msg
+        self.send_goal()
 
 def main():
     """

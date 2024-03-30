@@ -15,7 +15,7 @@ from std_msgs.msg import String,  Int8, Int16, Empty, Float64
 from lifecycle_msgs.msg import TransitionEvent
 from lifecycle_msgs.msg import State as StateMsg
 from sensor_msgs.msg import NavSatFix
-from sailbot_msgs.msg import Wind
+from sailbot_msgs.msg import Wind, Path
 import grpc
 from concurrent import futures
 import json
@@ -101,6 +101,8 @@ class NetworkComms(LifecycleNode):
         self.ballast_position_publisher = self.create_lifecycle_publisher(Float64, 'ballast_position', 10)
         self.trim_tab_control_publisher = self.create_lifecycle_publisher(Int8, 'tt_control', 10)
         self.trim_tab_angle_publisher = self.create_lifecycle_publisher(Int16, 'tt_angle', 10)
+
+        self.waypoints_publisher = self.create_lifecycle_publisher(Path, 'waypoints', 10)
 
         self.rot_subscription = self.create_subscription(
             Float64,
@@ -220,26 +222,26 @@ class NetworkComms(LifecycleNode):
             self.node_indices[name]=i
             i+=1
         self.current_boat_state.current_autonomous_mode = boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_NONE
-        a = boat_state_pb2.Point()
-        a.latitude = 5.1
-        a.longitude = 4.1
-        b=boat_state_pb2.Point()
-        b.latitude = 5.2
-        b.longitude = 4.1
-        self.current_boat_state.current_path.points.append(a)
-        self.current_boat_state.current_path.points.append(b)
-        c = boat_state_pb2.Point()
-        c.latitude = 4.9
-        c.longitude = 3.9
-        d=boat_state_pb2.Point()
-        d.latitude = 4.8
-        d.longitude = 3.9
-        e=boat_state_pb2.Point()
-        e.latitude = 4.7
-        e.longitude = 3.8
-        self.current_boat_state.previous_positions.points.append(c)
-        self.current_boat_state.previous_positions.points.append(d)
-        self.current_boat_state.previous_positions.points.append(e)
+        # a = boat_state_pb2.Point()
+        # a.latitude = 5.1
+        # a.longitude = 4.1
+        # b=boat_state_pb2.Point()
+        # b.latitude = 5.2
+        # b.longitude = 4.1
+        # self.current_boat_state.current_path.points.append(a)
+        # self.current_boat_state.current_path.points.append(b)
+        # c = boat_state_pb2.Point()
+        # c.latitude = 4.9
+        # c.longitude = 3.9
+        # d=boat_state_pb2.Point()
+        # d.latitude = 4.8
+        # d.longitude = 3.9
+        # e=boat_state_pb2.Point()
+        # e.latitude = 4.7
+        # e.longitude = 3.8
+        # self.current_boat_state.previous_positions.points.append(c)
+        # self.current_boat_state.previous_positions.points.append(d)
+        # self.current_boat_state.previous_positions.points.append(e)
         
         self.last_pwm_heartbeat = -1
         self.last_ctrl_heartbeat = -1
@@ -447,6 +449,7 @@ class NetworkComms(LifecycleNode):
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteAutonomousModeCommand(self, command: control_pb2.AutonomousModeCommand, context):
+        self.get_logger().info(f"Received autonomous mode command: {command.autonomous_mode}")
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         return response
@@ -457,14 +460,27 @@ class NetworkComms(LifecycleNode):
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         self.current_boat_state.current_path.ClearField("points")# = command.new_path
         self.current_boat_state.current_path.points.extend(command.new_path.points)
+
+        self.get_logger().info(f"Received path with {len(command.new_path.points)} points: ")
+        
+        waypoints = Path()
+        for point in command.new_path.points:
+            self.get_logger().info(str(point.latitude)+" : "+str(point.longitude))
+            fix = NavSatFix()
+            fix.latitude = point.latitude
+            fix.longitude = point.longitude
+            waypoints.points.append(fix)
+
+        self.waypoints_publisher.publish(waypoints)
+
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def SendBoatState(self, command: boat_state_pb2.BoatStateRequest(), context):
+    def SendBoatState(self, command: boat_state_pb2.BoatStateRequest, context):
         return self.current_boat_state
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def RestartNode(self, command: node_restart_pb2.RestartNodeRequest(), context):
+    def RestartNode(self, command: node_restart_pb2.RestartNodeRequest, context):
         self.get_logger().info("Received restart command for: "+command.node_name)
         # restart_node_request = RestartNode.Request()
         # restart_node_request.node_name = command.node_name

@@ -26,16 +26,20 @@ class BoatState(Enum):
 class StateManager(Node):
     early_node_names = ["network_comms"]
     #node_names = ["ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
-    node_names = ["trim_tab_comms", "ballast_control"]
+    node_names = []
     current_state = BoatState.INACTIVE
     client_state_getters: typing.Dict[str, Client] = {}
     client_state_setters: typing.Dict[str, Client] = {}
     def __init__(self):
         super().__init__("state_manager")
         self.get_logger().info("starting manager")
+        self.declare_parameter('managed_nodes')
+        self.node_names = self.get_parameter('managed_nodes').get_parameter_value().string_array_value
+        self.get_logger().info(f'Managed nodes: {self.node_names}')
         self.callback_group_input = ReentrantCallbackGroup()
         self.callback_group_state = ReentrantCallbackGroup()
 
+        #This service will not work, I believe because of a bug in RCLPY service calls which call lifecycle state transition services. Leaving it here for future fix.
         self.restart_node_srv = self.create_service(RestartNode, 'state_manager/restart_node', self.restart_lifecycle_node_callback, callback_group=self.callback_group_input)
 
         #create service clients for each node

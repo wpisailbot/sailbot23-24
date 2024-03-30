@@ -1,6 +1,8 @@
 import launch
 from launch_ros.actions import Node
 from launch_ros.actions import LifecycleNode
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, Command
 
 def generate_launch_description():
     network_comms_node = LifecycleNode(
@@ -38,12 +40,18 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
+    managed_node_names = DeclareLaunchArgument(
+        'managed_nodes',
+        default_value=["trim_tab_comms", "ballast_control"],
+        description='The nodes lifecycle manager will control'
+    )
     state_manager_node = Node(
         package='sailbot', 
         executable='state_manager', 
         name='state_manager',
         namespace='',
-        output='screen'
+        output='screen',
+        parameters=[{'managed_nodes': LaunchConfiguration('managed_nodes')}]
     )
     pathfinder_node = Node(
         package='sailbot_pathfinding', 
@@ -55,6 +63,7 @@ def generate_launch_description():
     
     # Launch Description
     ld = launch.LaunchDescription()
+    ld.add_action(managed_node_names)
     ld.add_action(network_comms_node)
     ld.add_action(ballast_node) 
     #ld.add_action(pwm_node)

@@ -7,17 +7,22 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
 
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Wind.msg"
+  "msg/Path.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
   "srv/RestartNode.srv"
-  DEPENDENCIES std_msgs geometry_msgs nav_msgs
+  "action/FollowPath.action"
+  DEPENDENCIES std_msgs geometry_msgs nav_msgs sensor_msgs
 )
 # uncomment the following section in order to fill in
 # further dependencies manually.

@@ -34,19 +34,35 @@ def normalRelativeAngle(angle):
     return angle
 
 
-#gets necessary rotation from an x,y,theta pose to face a point
-def getRotationToPoint(current_theta, current_x, current_y, target_x, target_y):
-    #translate to origin
-    x_diff = target_x - current_x
-    y_diff = target_y - current_y
-
-    theta_to_target = math.atan2(y_diff, x_diff); #returns in range (-pi/2, pi/2)
-    turn = normalRelativeAngle(theta_to_target-current_theta)
+#gets necessary rotation from an lat, long, theta pose to face a point
+def getRotationToPointLatLong(current_theta, current_lat, current_long, target_lat, target_long):
+    # Convert latitude and longitude from degrees to radians
+    lat1 = math.radians(current_lat)
+    lon1 = math.radians(current_long)
+    lat2 = math.radians(target_lat)
+    lon2 = math.radians(target_long)
+    
+    delta_lon = lon2 - lon1
+    
+    # Calculate the bearing from current location to target location
+    x = math.sin(delta_lon) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon))
+    initial_bearing = math.atan2(x, y)
+    
+    initial_bearing = math.degrees(initial_bearing)
+    
+    current_theta_deg = math.degrees(current_theta)
+    
+    # Calculate turn required by normalizing the difference between the bearing and current orientation
+    turn = normalRelativeAngle(math.radians(initial_bearing - current_theta_deg))
+    
     return turn
 
 class HeadingController(LifecycleNode):
 
     heading = 0
+    latitude = 0
+    longitude = 0
 
     def __init__(self):
         super().__init__('heading_control')
@@ -75,7 +91,7 @@ class HeadingController(LifecycleNode):
         self.airmar_position_subscription = self.create_subscription(
             NavSatFix,
             '/airmar_data/lat_long',
-            self.airmar_heading_callback,
+            self.airmar_position_callback,
             10)
         self.get_logger().info("Heading controller node configured")
 
@@ -178,6 +194,28 @@ class HeadingController(LifecycleNode):
 
     def airmar_heading_callback(self, msg: Float64):
         self.heading = msg.data
+        self.compute_rudder_angle()
+    
+    def airmar_position_callback(self, msg: NavSatFix):
+        self.latitude = msg.latitude
+        self.longitude = msg.longitude
+        self.compute_rudder_angle()
+    
+    def target_position_callback(self, msg: NavSatFix):
+        self.target_position = msg
+        self.compute_rudder_angle()
+    
+    def compute_rudder_angle(self):
+        heading_error = getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
+        self.rudder_simulator.input['heading_error'] = heading_error
+        self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
+        self.rudder_simulator.compute()
+        rudder_angle = self.rudder_simulator.output['rudder_angle']
+        msg = Int16()
+        msg.data = rudder_angle
+        self.rudder_angle_publisher.publish(msg)
+
+
 
 
 def main(args=None):

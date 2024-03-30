@@ -2,4 +2,4 @@ geometry_msgs/Point start
 geometry_msgs/Point end
 float64 wind_angle_deg
 ---
-nav_msgs/Path path
+Path path
