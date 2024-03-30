@@ -65,7 +65,7 @@ class HeadingController(LifecycleNode):
     longitude = 0
 
     def __init__(self):
-        super().__init__('heading_control')
+        super().__init__('heading_controller')
         self.rudder_angle_publisher: Optional[Publisher]
         self.target_position_subscription: Optional[Subscription]
         self.airmar_heading_subscription: Optional[Subscription]
@@ -211,6 +211,7 @@ class HeadingController(LifecycleNode):
         self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         self.rudder_simulator.compute()
         rudder_angle = self.rudder_simulator.output['rudder_angle']
+        self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
         msg.data = rudder_angle
         self.rudder_angle_publisher.publish(msg)
