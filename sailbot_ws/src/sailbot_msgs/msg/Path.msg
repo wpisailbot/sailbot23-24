@@ -1,1 +1,1 @@
-sensor_msgs/NavSatFix[] points
+geographic_msgs/GeoPoint[] points

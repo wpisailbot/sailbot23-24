@@ -60,18 +60,18 @@ def generate_launch_description():
         output='screen',
         parameters=[{'map_name': LaunchConfiguration('map_name')}]
     )
-    managed_node_names = DeclareLaunchArgument(
-        'managed_nodes',
-        default_value=["path_follower", "heading_controller"],
-        description='The nodes lifecycle manager will control'
-    )
+    # managed_node_names = DeclareLaunchArgument(
+    #     'managed_nodes',
+    #     default_value=["path_follower", "heading_controller"],
+    #     description='The nodes lifecycle manager will control'
+    # )
     state_manager_node = Node(
         package='sailbot', 
         executable='state_manager', 
         name='state_manager',
         namespace='',
         output='screen',
-        parameters=[{'managed_nodes': LaunchConfiguration('managed_nodes')}]
+        parameters=[{'managed_nodes': ["path_follower", "heading_controller"]}]
     )
     pathfinder_node = Node(
         package='sailbot_pathfinding', 
@@ -83,7 +83,7 @@ def generate_launch_description():
     
     # Launch Description
     ld = launch.LaunchDescription()
-    ld.add_action(managed_node_names)
+    #ld.add_action(managed_node_names)
     ld.add_action(map_name)
     ld.add_action(network_comms_node)
     ld.add_action(ballast_node) 

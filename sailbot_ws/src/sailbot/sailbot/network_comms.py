@@ -15,6 +15,7 @@ from std_msgs.msg import String,  Int8, Int16, Empty, Float64
 from lifecycle_msgs.msg import TransitionEvent
 from lifecycle_msgs.msg import State as StateMsg
 from sensor_msgs.msg import NavSatFix
+from geographic_msgs.msg import GeoPoint
 from sailbot_msgs.msg import Wind, Path
 import grpc
 from concurrent import futures
@@ -466,7 +467,7 @@ class NetworkComms(LifecycleNode):
         waypoints = Path()
         for point in command.new_path.points:
             self.get_logger().info(str(point.latitude)+" : "+str(point.longitude))
-            fix = NavSatFix()
+            fix = GeoPoint()
             fix.latitude = point.latitude
             fix.longitude = point.longitude
             waypoints.points.append(fix)

@@ -14,6 +14,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geographic_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Wind.msg"
@@ -22,7 +23,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetMap.srv"
   "srv/RestartNode.srv"
   "action/FollowPath.action"
-  DEPENDENCIES std_msgs geometry_msgs nav_msgs sensor_msgs
+  DEPENDENCIES std_msgs geometry_msgs nav_msgs sensor_msgs geographic_msgs
 )
 # uncomment the following section in order to fill in
 # further dependencies manually.

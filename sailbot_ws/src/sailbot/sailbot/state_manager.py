@@ -107,11 +107,11 @@ class StateManager(Node):
         
 
     def configure_nodes(self, node_names: list):
-        self.get_logger().info("Configuring nodes")
+        self.get_logger().info(f"Configuring {len(node_names)} nodes")
         self.transitionNodes(node_names, Transition.TRANSITION_CONFIGURE)
     
     def activate_nodes(self, node_names: list):
-        self.get_logger().info("activating nodes")
+        self.get_logger().info(f"activating {len(node_names)} nodes")
         self.transitionNodes(node_names, Transition.TRANSITION_ACTIVATE)
 
     def get_node_state(self, node_name):

@@ -2,6 +2,7 @@
 import rclpy
 from std_msgs.msg import String, Float64, Int16
 from sensor_msgs.msg import NavSatFix
+from geographic_msgs.msg import GeoPoint
 import json
 import numpy as np
 import skfuzzy as fuzz
@@ -79,7 +80,7 @@ class HeadingController(LifecycleNode):
         self.rudder_angle_publisher = self.create_lifecycle_publisher(Int16, 'rudder_angle', 10)
 
         self.target_position_subscription = self.create_subscription(
-            NavSatFix,
+            GeoPoint,
             'target_position',
             self.target_position_callback,
             10)
@@ -180,17 +181,6 @@ class HeadingController(LifecycleNode):
         return super().on_error(state)
     
     #end callbacks
-    
-    
-    def latlon_to_grid_cell(self, lat, lon):
-        grid_min_lat = 42.273340  # Minimum latitude of the grid
-        grid_min_lon = -71.759992  # Minimum longitude of the grid
-        lat_resolution = 0.0001  # Latitude resolution of the grid
-        lon_resolution = 0.0001  # Longitude resolution of the grid
-
-        grid_x = int((lon - grid_min_lon) / lon_resolution)
-        grid_y = int((lat - grid_min_lat) / lat_resolution)
-        return grid_x, grid_y
 
     def airmar_heading_callback(self, msg: Float64):
         self.heading = msg.data
@@ -201,7 +191,7 @@ class HeadingController(LifecycleNode):
         self.longitude = msg.longitude
         self.compute_rudder_angle()
     
-    def target_position_callback(self, msg: NavSatFix):
+    def target_position_callback(self, msg: GeoPoint):
         self.target_position = msg
         self.compute_rudder_angle()
     

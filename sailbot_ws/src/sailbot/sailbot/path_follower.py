@@ -4,7 +4,9 @@ from std_msgs.msg import String, Float64, Int16, Header
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, Quaternion
+from geographic_msgs.msg import GeoPoint
 from sailbot_msgs.msg import Path
+from sailbot_msgs.srv import SetMap, GetPath
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
 from rclpy.lifecycle import Publisher
@@ -12,11 +14,13 @@ from rclpy.lifecycle import State
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
+from rclpy.node import ParameterType
 from ament_index_python.packages import get_package_share_directory
 import os
 import cv2
 import re
 import numpy as np
+from pyproj import Transformer
 
 from geopy.distance import great_circle
 
@@ -81,12 +85,76 @@ def find_and_load_image(directory, location):
     # Return None if no matching file is found
     return None, None
 
+def latlong_to_grid_proj(latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
+    """
+    Convert lat/long coordinates to grid cell using pyproj for projection handling.
+    
+    Parameters:
+    - latitude, longitude: The lat/long coordinates to convert.
+    - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
+    - image_width, image_height: The dimensions of the image in pixels.
+    - src_proj: Source projection (latitude/longitude).
+    - dest_proj: Destination projection for the image.
+
+     Returns:
+    - A tuple (x, y) representing the grid cell coordinates in the image.
+    """
+    transformer = Transformer.from_crs(src_proj, dest_proj, always_xy=True)
+    north_east = transformer.transform(bbox['north'], bbox['east'])
+    south_west = transformer.transform(bbox['south'], bbox['west'])
+    
+    point_x, point_y = transformer.transform(latitude, longitude)
+    
+    # Calculate the percentage within the transformed bounding box
+    lat_pct = (north_east[1] - point_y) / (north_east[1] - south_west[1])
+    long_pct = (point_x - south_west[0]) / (north_east[0] - south_west[0])
+    
+    # Convert percentages to pixel positions
+    x = int(long_pct * image_width)
+    y = int(lat_pct * image_height)
+    
+    return x, y
+
+def grid_to_latlong_proj(x, y, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
+    """
+    Convert grid cell coordinates in an image to latitude/longitude coordinates.
+
+    Parameters:
+    - x, y: The pixel positions in the image.
+    - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
+    - image_width, image_height: The dimensions of the image in pixels.
+    - src_proj: Source projection (latitude/longitude).
+    - dest_proj: Destination projection for the image.
+
+    Returns:
+    - A tuple (latitude, longitude) representing the geographic coordinates.
+    """
+    # Initialize the transformer
+    transformer = Transformer.from_crs(dest_proj, src_proj, always_xy=True)
+    
+    # Transform the bounding box to the destination projection
+    north_east = transformer.transform(bbox['north'], bbox['east'], direction='INVERSE')
+    south_west = transformer.transform(bbox['south'], bbox['west'], direction='INVERSE')
+    
+    # Calculate the geographical coordinates from the pixel positions
+    long_pct = x / image_width
+    lat_pct = y / image_height
+    
+    # Interpolate the latitude and longitude within the bounding box
+    latitude = north_east[1] - lat_pct * (north_east[1] - south_west[1])
+    longitude = south_west[0] + long_pct * (north_east[0] - south_west[0])
+    
+    return latitude, longitude
+
 class PathFollower(LifecycleNode):
     heading = 0
     latitude = 0
     longitude = 0
     speed_knots = 0
-    current_path = Path()
+    waypoints = Path()
+    current_path = []
+    current_grid_cell = (0, 0)
+    wind_angle_deg = 0
 
     def __init__(self):
         super().__init__('path_follower')
@@ -95,51 +163,73 @@ class PathFollower(LifecycleNode):
         self.airmar_position_subscription: Optional[Subscription]
         self.airmar_speed_knots_subscription: Optional[Subscription]
         self.timer: Optional[Timer]
-
-        self.declare_parameter('map_name')
-        map_name = self.get_parameter('map_name').get_parameter_value().string_value
-        self.get_logger().info(f'Map name: {map_name}')
-        image, bbox = find_and_load_image(get_resource_dir(), "quinsigamond")
+        self.declare_parameter('map_name', 'quinsigamond')
+        self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
+        self.get_logger().info(f'Map name: {self.map_name}')
+        self.get_logger().info("Getting map image")
+        image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
         occupancy_grid_values = np.clip(image, 0, 255)
         occupancy_grid_values = ((255 - occupancy_grid_values) * 100 / 255).astype(np.int8)
         grid_msg = OccupancyGrid()
         grid_msg.header = Header(frame_id="map")
         grid_msg.info.resolution = 0.0001
         grid_msg.info.width = occupancy_grid_values.shape[1]
+        self.image_width = occupancy_grid_values.shape[1]
         grid_msg.info.height = occupancy_grid_values.shape[0]
+        self.image_height = occupancy_grid_values.shape[0]
+
         grid_msg.info.origin = Pose(position=Point(x=0.0, y=0.0, z=0.0), orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))
 
         grid_msg.data = occupancy_grid_values.ravel().tolist()
 
+        self.get_logger().info("Getting SetMap service")
+        self.set_map_cli = self.create_client(SetMap, 'set_map')
+        while not self.set_map_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('set_map service not available, waiting again...')
+        set_map_req = SetMap.Request()
+        set_map_req.map = grid_msg
+        self.get_logger().info("Setting map")
+        future = self.set_map_cli.call_async(set_map_req)
+        rclpy.spin_until_future_complete(self, future)
+
         self.get_logger().info("Map setup done")
 
+        self.get_path_cli = self.create_client(GetPath, 'get_path')
+        while not self.get_path_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('get_path service not available, waiting again...')
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
+        try:
+            self.target_position_publisher = self.create_lifecycle_publisher(NavSatFix, 'target_position', 10)
 
-        self.target_position_publisher = self.create_lifecycle_publisher(NavSatFix, 'target_position', 10)
-
-        self.airmar_heading_subscription = self.create_subscription(
-            Float64,
-            '/airmar_data/heading',
-            self.airmar_heading_callback,
-            10)
-        self.airmar_position_subscription = self.create_subscription(
-            NavSatFix,
-            '/airmar_data/lat_long',
-            self.airmar_heading_callback,
-            10)
-        self.airmar_speed_knots_subscription = self.create_subscription(
-            Float64,
-            '/airmar_data/speed_knots',
-            self.airmar_speed_knots_callback,
-            10)
-        self.waypoints_subscriber = self.node.create_subscription(
-            Path, 'waypoints', self.waypoints_callback, 10)
-        #self.timer = self.create_timer(0.1, self.control_loop_callback)
-        self.get_logger().info("Ballast node configured")
-        #super().on_configure(state)
+            self.airmar_heading_subscription = self.create_subscription(
+                Float64,
+                '/airmar_data/heading',
+                self.airmar_heading_callback,
+                10)
+            self.airmar_position_subscription = self.create_subscription(
+                GeoPoint,
+                '/airmar_data/lat_long',
+                self.airmar_heading_callback,
+                10)
+            self.airmar_speed_knots_subscription = self.create_subscription(
+                Float64,
+                '/airmar_data/speed_knots',
+                self.airmar_speed_knots_callback,
+                10)
+            self.waypoints_subscriber = self.create_subscription(
+                Path, 'waypoints', self.waypoints_callback, 10)
+            #self.timer = self.create_timer(0.1, self.control_loop_callback)
+            #super().on_configure(state)
+        
+        except Exception as e:
+            self.get_logger().info("Error in configure")
+            self.get_logger().info(str(e))
+        
+        self.get_logger().info("Path following node configured")
+        
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
@@ -178,6 +268,7 @@ class PathFollower(LifecycleNode):
     def airmar_position_callback(self, msg: NavSatFix):
         self.latitude = msg.latitude
         self.longitude = msg.longitude
+        self.current_grid_cell = latlong_to_grid_proj(msg.latitude, msg.longitude, self.bbox, self.image_width, self.image_height)
         self.find_look_ahead()
 
 
@@ -185,14 +276,70 @@ class PathFollower(LifecycleNode):
         self.speed_knots = msg.data
         self.find_look_ahead()
 
-    
-    def waypoints_callback(self, msg: Path):
-        self.path = msg
+    def get_path(self, start, goal):
+        self.get_logger().info(f"get_path with {start}, {goal}")
+        if self.wind_angle_deg is None:
+            self.get_logger().info("No wind reported yet, cannot path")
+            return
+        req = GetPath.Request()
+        start_point = Point()
+        end_point = Point()
+        start_point.x = float(start[0])
+        start_point.y = float(start[1])
+        end_point.x = float(goal[0])
+        end_point.y = float(goal[1])
+        req.start = start_point
+        req.end = end_point
+        req.wind_angle_deg = float(self.wind_angle_deg)
+        future = self.get_path_cli.call_async(req)
+        self.get_logger().info("Getting path")
+        rclpy.spin_until_future_complete(self, future)
+        return future.result()
 
+    def recalculate_path_from_waypoints(self):
+        if self.wind_angle_deg is None:
+            self.get_logger().info("No wind reported yet, cannot path")
+            return
+        
+        points = []
+        for point in self.waypoints.points:
+            points.append(latlong_to_grid_proj(point.latitude, point.longitude, self.bbox, self.image_width, self.image_height))
+        
+        path_segments = []
+        path_segments.append(self.get_path(self.current_grid_cell, points[0]))
+        for i in range(len(points)-1):
+            self.get_logger().info("Calculating path segment...")
+            path_segments.append(self.get_path(points[i], points[i+1]))
+        
+        self.get_logger().info("All segments done")
+        final_path = []
+        for segment in path_segments:
+            for poseStamped in segment.poses:
+                point = poseStamped.pose.point
+                lat, lon = grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
+                geopoint = GeoPoint()
+                geopoint.latitude = lat
+                geopoint.longitude = lon
+                final_path.append(geopoint)
+
+        self.get_logger().info(f"New path: {final_path}")
+        self.current_path = final_path
+
+
+        
+
+
+    def waypoints_callback(self, msg: Path):
+        self.get_logger().info("Got waypoints!")
+        self.waypoints = msg
+        self.recalculate_path_from_waypoints()
         self.find_look_ahead()
     
     def find_look_ahead(self):
-        look_ahead_point = find_look_ahead_point(self.path.points, (self.latitude, self.longitude), self.speed_knots)
+        if len(self.current_path) == 0:
+            self.get_logger().info("No lookAhead point for zero-length path")
+            return
+        look_ahead_point = find_look_ahead_point(self.current_path, (self.latitude, self.longitude), self.speed_knots)
         self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
         self.target_position_publisher.publish(look_ahead_point)
 
