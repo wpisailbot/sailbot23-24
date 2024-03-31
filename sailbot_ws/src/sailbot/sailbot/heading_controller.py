@@ -72,6 +72,9 @@ class HeadingController(LifecycleNode):
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
         self.timer: Optional[Timer]
+        self.target_position = GeoPoint()
+        self.target_position.latitude = 42.273051
+        self.target_position.longitude = -71.805049
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -94,6 +97,7 @@ class HeadingController(LifecycleNode):
             '/airmar_data/lat_long',
             self.airmar_position_callback,
             10)
+        self.timer = self.create_timer(1.0, self.timer_callback)
         self.get_logger().info("Heading controller node configured")
 
         heading_error = ctrl.Antecedent(np.arange(-180, 181, 1), 'heading_error')
@@ -181,6 +185,9 @@ class HeadingController(LifecycleNode):
         return super().on_error(state)
     
     #end callbacks
+
+    def timer_callback(self):
+        self.compute_rudder_angle()
 
     def airmar_heading_callback(self, msg: Float64):
         self.heading = msg.data

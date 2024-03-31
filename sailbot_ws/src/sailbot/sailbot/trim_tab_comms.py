@@ -12,6 +12,7 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 from enum import Enum
+from time import time as get_time
 
 from std_msgs.msg import Int8, Int16, Float32, Empty
 
@@ -67,7 +68,7 @@ class TrimTabComms(LifecycleNode):
         self.ballast_timer = self.create_timer(0.01, self.ballast_timer_callback)
 
         try:
-            self.ser = serial.Serial(serial_port, baud_rate, timeout=0.02)
+            self.ser = serial.Serial(serial_port, baud_rate, timeout=0.05)
         except Exception as e:
             self.get_logger().info(str(e))
         return TransitionCallbackReturn.SUCCESS
@@ -119,9 +120,11 @@ class TrimTabComms(LifecycleNode):
     def tt_angle_callback(self, msg: Int16):
         self.get_logger().info("Sending trimtab angle")
         angle = msg.data
+        this_time = get_time()
         message = {
             "state": "manual",
-            "angle": angle
+            "angle": angle,
+            "timestamp": this_time
         }
         message_string = json.dumps(message)+'\n'
         self.ser.write(message_string.encode())
@@ -152,7 +155,12 @@ class TrimTabComms(LifecycleNode):
         }
         message_string = json.dumps(message)+'\n'
         self.ser.write(message_string.encode())
-        line = self.ser.readline().decode('utf-8').rstrip()
+        line = None
+        try:
+            line = self.ser.readline().decode('utf-8').rstrip()
+        except:
+            #serial corruption
+            pass
         
         if line:
             try:
