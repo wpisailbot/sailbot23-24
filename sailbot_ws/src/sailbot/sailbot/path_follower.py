@@ -158,6 +158,10 @@ class PathFollower(LifecycleNode):
 
     def __init__(self):
         super().__init__('path_follower')
+        # Using different callback groups for subscription and service client
+        self.subscription_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
+        self.service_client_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
+
         self.target_position_publisher: Optional[Publisher]
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
@@ -183,7 +187,7 @@ class PathFollower(LifecycleNode):
         grid_msg.data = occupancy_grid_values.ravel().tolist()
 
         self.get_logger().info("Getting SetMap service")
-        self.set_map_cli = self.create_client(SetMap, 'set_map')
+        self.set_map_cli = self.create_client(SetMap, 'set_map', callback_group=self.service_client_callback_group)
         while not self.set_map_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('set_map service not available, waiting again...')
         set_map_req = SetMap.Request()
@@ -194,9 +198,12 @@ class PathFollower(LifecycleNode):
 
         self.get_logger().info("Map setup done")
 
-        self.get_path_cli = self.create_client(GetPath, 'get_path')
+        self.get_path_cli = self.create_client(GetPath, 'get_path', callback_group=self.service_client_callback_group)
         while not self.get_path_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('get_path service not available, waiting again...')
+        
+        self.get_logger().info("Path follower node setup complete")
+
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -208,19 +215,19 @@ class PathFollower(LifecycleNode):
                 Float64,
                 '/airmar_data/heading',
                 self.airmar_heading_callback,
-                10)
+                10, callback_group=self.subscription_callback_group)
             self.airmar_position_subscription = self.create_subscription(
                 GeoPoint,
                 '/airmar_data/lat_long',
                 self.airmar_heading_callback,
-                10)
+                10, callback_group=self.subscription_callback_group)
             self.airmar_speed_knots_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/speed_knots',
                 self.airmar_speed_knots_callback,
-                10)
+                10, callback_group=self.subscription_callback_group)
             self.waypoints_subscriber = self.create_subscription(
-                Path, 'waypoints', self.waypoints_callback, 10)
+                Path, 'waypoints', self.waypoints_callback, 10, callback_group=self.subscription_callback_group)
             #self.timer = self.create_timer(0.1, self.control_loop_callback)
             #super().on_configure(state)
         
@@ -291,11 +298,12 @@ class PathFollower(LifecycleNode):
         req.start = start_point
         req.end = end_point
         req.wind_angle_deg = float(self.wind_angle_deg)
-        future = self.get_path_cli.call_async(req)
         self.get_logger().info("Getting path")
-        rclpy.spin_until_future_complete(self, future)
+        #synchronous service call because ROS2 async doesn't work in callbacks
+        result = self.get_path_cli.call(req)
+        #rclpy.spin_until_future_complete(self, future)
         self.get_logger().info("Path returned!")
-        return future.result()
+        return result
 
     def recalculate_path_from_waypoints(self):
         if self.wind_angle_deg is None:
@@ -315,13 +323,16 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("All segments done")
         final_path = []
         for segment in path_segments:
-            for poseStamped in segment.poses:
+            self.get_logger().info(f"segment: {segment}")
+            for poseStamped in segment.path.poses:
                 point = poseStamped.pose.point
+                self.get_logger().info(f"point: {point}")
                 lat, lon = grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
                 geopoint.longitude = lon
                 final_path.append(geopoint)
+        self.get_logger().info("After collation")
 
         self.get_logger().info(f"New path: {final_path}")
         self.current_path = final_path
@@ -335,6 +346,7 @@ class PathFollower(LifecycleNode):
         self.waypoints = msg
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()
+        self.get_logger().info("Ending waypoints callback")
     
     def find_look_ahead(self):
         if len(self.current_path) == 0:
@@ -351,7 +363,7 @@ def main(args=None):
     path_follower = PathFollower()
 
     # Use the SingleThreadedExecutor to spin the node.
-    executor = rclpy.executors.SingleThreadedExecutor()
+    executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(path_follower)
 
     try:
