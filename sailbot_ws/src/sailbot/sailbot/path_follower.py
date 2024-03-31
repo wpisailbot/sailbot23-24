@@ -294,6 +294,7 @@ class PathFollower(LifecycleNode):
         future = self.get_path_cli.call_async(req)
         self.get_logger().info("Getting path")
         rclpy.spin_until_future_complete(self, future)
+        self.get_logger().info("Path returned!")
         return future.result()
 
     def recalculate_path_from_waypoints(self):

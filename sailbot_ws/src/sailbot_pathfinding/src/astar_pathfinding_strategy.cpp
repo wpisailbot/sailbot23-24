@@ -86,8 +86,46 @@ std::vector<std::pair<double, double>> AStarPathfindingStrategy::solve(Sailbot::
 	Sailbot::Map rotated_map = map.rotate(map_angle_deg);
 
 	auto transformed_start_doubles = rotateAndScale(start, map_angle_rad, map.max_dim, map.max_dim, rotated_map.max_dim, rotated_map.max_dim);
+	std::pair<uint32_t, uint32_t> transformed_start_cell;
+	if (transformed_start_doubles.first > map.max_dim-1) {
+		transformed_start_cell.first = map.max_dim-1;
+	}
+	else if (transformed_start_doubles.first < 0) {
+		transformed_start_cell.first = 0;
+	}
+	else {
+		transformed_start_cell.first = uint32_t(transformed_start_doubles.first);
+	}
+	if (transformed_start_doubles.second > map.max_dim-1) {
+		transformed_start_cell.second = map.max_dim-1;
+	}
+	else if (transformed_start_doubles.second < 0) {
+		transformed_start_cell.second = 0;
+	}
+	else {
+		transformed_start_cell.second = uint32_t(transformed_start_doubles.second);
+	}
 	auto transformed_goal_doubles = rotateAndScale(goal, map_angle_rad, map.max_dim, map.max_dim, rotated_map.max_dim, rotated_map.max_dim);
+	std::pair<uint32_t, uint32_t> transformed_goal_cell;
+	if (transformed_goal_doubles.first > map.max_dim-1) {
+		transformed_goal_cell.first = map.max_dim-1;
+	}
+	else if (transformed_goal_doubles.first < 0) {
+		transformed_goal_cell.first = 0;
+	}
+	else {
+		transformed_goal_cell.first = uint32_t(transformed_goal_doubles.first);
+	}
+	if (transformed_goal_doubles.second > map.max_dim-1) {
+		transformed_goal_cell.second = map.max_dim-1;
+	}
+	else if (transformed_goal_doubles.second < 0) {
+		transformed_goal_cell.second = 0;
+	}
+	else {
+		transformed_goal_cell.second = uint32_t(transformed_goal_doubles.second);
+	}
 
-	auto path = AStar(rotated_map, rotated_map.getNode(transformed_start_doubles.first, transformed_start_doubles.second), rotated_map.getNode(transformed_goal_doubles.first, transformed_goal_doubles.second));
+	auto path = AStar(rotated_map, rotated_map.getNode(transformed_start_cell.first, transformed_start_cell.second), rotated_map.getNode(transformed_goal_cell.first, transformed_goal_cell.second));
 	return rotate_path_doubles(path, map.max_dim, map.max_dim, map.max_dim, map.max_dim, map_angle_deg);
 }

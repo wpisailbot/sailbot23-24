@@ -120,12 +120,12 @@ namespace Sailbot {
         if (rotated_mat.type() != CV_32FC1) {
             rotated_mat.convertTo(rotated_mat, CV_32FC1);
         }
+        cv::imwrite("~/rotated_map.jpg", rotated_mat);
 
         // Flatten the matrix if it's not already a single row or single column
         if (rotated_mat.rows > 1 && rotated_mat.cols > 1) {
             rotated_mat = rotated_mat.reshape(1, 1); // Reshape to a single row
         }
-
         // Convert cv::Mat to std::vector<float>
         auto rotated_vector = std::make_shared<std::vector<float>>();
         rotated_vector->assign((float*)rotated_mat.datastart, (float*)rotated_mat.dataend);

@@ -44,7 +44,9 @@ public:
             RCLCPP_WARN(this->get_logger(), "GetPath called, but no map has been set!");
 
         }
+        RCLCPP_INFO(this->get_logger(), "Calculating solution");
         auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getNode(request->start.x, request->start.y), pMap->getNode(request->end.x, request->end.y));
+        RCLCPP_INFO(this->get_logger(), "Solution complete");
         for(auto p: path){
             geometry_msgs::msg::PoseStamped pose;
             pose.pose.position.x = p.first;
@@ -62,6 +64,7 @@ public:
             pMap->data->push_back(float(request->map.data[i]));
         }
         pMap->data = pMap->data;
+        RCLCPP_INFO(this->get_logger(), "Map set successfully");
     }
 
     std::vector<std::pair<double, double>> find_solution(Sailbot::Map& map, double wind_angle_deg, Sailbot::Node* start_node, Sailbot::Node* goal_node) {
@@ -71,6 +74,8 @@ public:
     //start with linear solver
     if (!is_in_nogo(start_node, goal_node, wind_angle_rad, nogo_angle_rad)) {
         LinearRaycastPathfindingStrategy linearSolver;
+        RCLCPP_INFO(this->get_logger(), "Trying linear raycast");
+
             auto path = linearSolver.solve(map, start_node, goal_node, wind_angle_rad, nogo_angle_rad);
             //return path;
             if (path.size() > 0) {
@@ -78,10 +83,12 @@ public:
             }
     }
     else {
+        RCLCPP_INFO(this->get_logger(), "Path is upwind");
         wind_blocked = true;
     }
     //if that fails, try one tack
     if (wind_blocked) {
+        RCLCPP_INFO(this->get_logger(), "Trying one tack");
         OneTackPathfindingStrategy oneTackSolver;
         auto path = oneTackSolver.solve(map, start_node, goal_node, wind_angle_rad, nogo_angle_rad);
         if (path.size() > 0) {
@@ -89,12 +96,13 @@ public:
         }
     }
     //if both fail, fall back to pathfinding
-
+    RCLCPP_INFO(this->get_logger(), "Falling back to A-star");
     //create solver and solve
     AStarPathfindingStrategy solver;
 
     auto time_start = std::chrono::high_resolution_clock::now();
     auto path = solver.solve(map, start_node, goal_node, wind_angle_rad);
+    RCLCPP_INFO(this->get_logger(), "Got A-star path");
     path = simplify_path(path, wind_angle_deg, map);
     auto time_stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_stop - time_start);
