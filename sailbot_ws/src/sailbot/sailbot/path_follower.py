@@ -213,7 +213,7 @@ class PathFollower(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
         try:
-            self.target_position_publisher = self.create_lifecycle_publisher(NavSatFix, 'target_position', 10)
+            self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
 
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
@@ -318,16 +318,17 @@ class PathFollower(LifecycleNode):
         for point in self.waypoints.points:
             points.append(latlong_to_grid_proj(point.latitude, point.longitude, self.bbox, self.image_width, self.image_height))
         
+        if len(points) == 0:
+            self.get_logger().info("Empty waypoints, will clear path")
+            self.current_path = []
+            return
         path_segments = []
         path_segments.append(self.get_path(self.current_grid_cell, points[0]))
         for i in range(len(points)-1):
-            self.get_logger().info("Calculating path segment...")
             path_segments.append(self.get_path(points[i], points[i+1]))
         
-        self.get_logger().info("All segments done")
         final_path = []
         for segment in path_segments:
-            self.get_logger().info(f"segment: {segment}")
             for poseStamped in segment.path.poses:
                 point = poseStamped.pose.position
                 self.get_logger().info(f"point: {point}")
@@ -336,7 +337,6 @@ class PathFollower(LifecycleNode):
                 geopoint.latitude = lat
                 geopoint.longitude = lon
                 final_path.append(geopoint)
-        self.get_logger().info("After collation")
 
         self.get_logger().info(f"New path: {final_path}")
         self.current_path = final_path

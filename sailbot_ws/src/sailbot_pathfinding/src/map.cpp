@@ -21,10 +21,12 @@ namespace Sailbot {
         half_width_diff = (max_dim - width) / 2;
 
         int i=0;
-        for (uint32_t y = half_height_diff; y < height + half_height_diff; y++)
-            for (uint32_t x = half_width_diff; x < width + half_width_diff; x++)
-                data->at(y * max_dim + x) = 0;//initial_data[i];
+        for (uint32_t y = half_height_diff; y < height + half_height_diff; y++){
+            for (uint32_t x = half_width_diff; x < width + half_width_diff; x++){
+                data->at(y * max_dim + x) = initial_data[i];
                 i++;
+            }
+        }
 
         neighbors_grid = std::make_shared<std::vector<std::vector<Node>>>();
         neighbors_grid->resize(max_dim, std::vector<Node>(max_dim));

@@ -65,11 +65,6 @@ public:
         const std::shared_ptr<sailbot_msgs::srv::SetMap::Request> request,
         [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetMap::Response> response){
         pMap = std::make_unique<Sailbot::Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height), request->map.data);
-        for(uint32_t i=0; i<request->map.info.width*request->map.info.height; i++){
-            if(request->map.data[i]==0){
-                RCLCPP_INFO(this->get_logger(), "Found open cell");
-            }
-        }
         //pMap->data = pMap->data;
         RCLCPP_INFO(this->get_logger(), "Map set successfully");
     }
