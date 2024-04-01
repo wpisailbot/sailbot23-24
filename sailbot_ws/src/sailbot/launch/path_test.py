@@ -5,12 +5,18 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, Command
 
 def generate_launch_description():
+    map_name = DeclareLaunchArgument(
+        'map_name',
+        default_value="quinsigamond",
+        description="The text before the first ':' in the map file name"
+    )
     network_comms_node = LifecycleNode(
         package='sailbot', 
         executable='network_comms', 
         name='network_comms',
         namespace='',
-        output='screen'
+        output='screen',
+        parameters=[{'map_name': LaunchConfiguration('map_name')}]
     )
     ballast_node = LifecycleNode(
         package='sailbot', 
@@ -46,11 +52,6 @@ def generate_launch_description():
         name='heading_controller',
         namespace='',
         output='screen'
-    )
-    map_name = DeclareLaunchArgument(
-        'map_name',
-        default_value="quinsigamond",
-        description="The text before the first ':' in the map file name"
     )
     path_follower_node = LifecycleNode(
         package='sailbot', 

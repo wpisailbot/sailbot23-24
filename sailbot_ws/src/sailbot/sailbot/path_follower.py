@@ -196,6 +196,7 @@ class PathFollower(LifecycleNode):
             self.get_logger().info('set_map service not available, waiting again...')
         set_map_req = SetMap.Request()
         set_map_req.map = grid_msg
+        self.grid_msg = grid_msg
         self.get_logger().info("Setting map")
         future = self.set_map_cli.call_async(set_map_req)
         rclpy.spin_until_future_complete(self, future)
@@ -214,7 +215,6 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("In configure")
         try:
             self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
-
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/heading',
@@ -247,6 +247,13 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Activating...")
         # Start publishers or timers
         return super().on_activate(state)
+        # map_msg = Map()
+        # map_msg.grid = self.grid_msg
+        # map_msg.north = self.bbox['north']
+        # map_msg.south = self.bbox['south']
+        # map_msg.east = self.bbox['east']
+        # map_msg.west = self.bbox['west']
+        # self.current_map_publisher.publish(map_msg)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
