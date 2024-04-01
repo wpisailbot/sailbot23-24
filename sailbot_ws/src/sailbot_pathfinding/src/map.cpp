@@ -6,7 +6,7 @@
 #include <opencv2/opencv.hpp>
 #include "raycast.h"
 namespace Sailbot {
-    Map::Map(uint32_t map_width, uint32_t map_height) {
+    Map::Map(uint32_t map_width, uint32_t map_height, std::vector<int8_t> initial_data) {
 
         height = map_height;
         width = map_width;
@@ -20,9 +20,11 @@ namespace Sailbot {
         half_height_diff = (max_dim - height) / 2;
         half_width_diff = (max_dim - width) / 2;
 
+        int i=0;
         for (uint32_t y = half_height_diff; y < height + half_height_diff; y++)
             for (uint32_t x = half_width_diff; x < width + half_width_diff; x++)
-                data->at(y * max_dim + x) = 0.0;
+                data->at(y * max_dim + x) = 0;//initial_data[i];
+                i++;
 
         neighbors_grid = std::make_shared<std::vector<std::vector<Node>>>();
         neighbors_grid->resize(max_dim, std::vector<Node>(max_dim));
@@ -120,7 +122,11 @@ namespace Sailbot {
         if (rotated_mat.type() != CV_32FC1) {
             rotated_mat.convertTo(rotated_mat, CV_32FC1);
         }
-        cv::imwrite("~/rotated_map.jpg", rotated_mat);
+        cv::Mat scaledImage;
+        mat.convertTo(scaledImage, CV_8UC1, 255.0);
+        cv::imwrite("/home/sailbot/map.jpg", scaledImage);
+        rotated_mat.convertTo(scaledImage, CV_8UC1, 255.0);
+        cv::imwrite("/home/sailbot/rotated_map.jpg", scaledImage);
 
         // Flatten the matrix if it's not already a single row or single column
         if (rotated_mat.rows > 1 && rotated_mat.cols > 1) {

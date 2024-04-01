@@ -57,7 +57,7 @@ def getRotationToPointLatLong(current_theta, current_lat, current_long, target_l
     # Calculate turn required by normalizing the difference between the bearing and current orientation
     turn = normalRelativeAngle(math.radians(initial_bearing - current_theta_deg))
     
-    return turn
+    return math.degrees(turn)
 
 class HeadingController(LifecycleNode):
 
@@ -97,12 +97,12 @@ class HeadingController(LifecycleNode):
             '/airmar_data/lat_long',
             self.airmar_position_callback,
             10)
-        self.timer = self.create_timer(1.0, self.timer_callback)
+        #self.timer = self.create_timer(1.0, self.timer_callback)
         self.get_logger().info("Heading controller node configured")
 
         heading_error = ctrl.Antecedent(np.arange(-180, 181, 1), 'heading_error')
         rate_of_change = ctrl.Antecedent(np.arange(-90, 91, 1), 'rate_of_change')
-        rudder_angle = ctrl.Consequent(np.arange(-45, 46, 1), 'rudder_angle')
+        rudder_angle = ctrl.Consequent(np.arange(-90, 91, 1), 'rudder_angle')
 
         #Negative Large (NL), Negative Medium (NM), Zero (ZE), Positive Medium (PM), and Positive Large (PL)
         # Membership functions for heading error
@@ -120,11 +120,11 @@ class HeadingController(LifecycleNode):
         rate_of_change['Large Positive'] = fuzz.smf(rate_of_change.universe, 30, 90)
 
         # Membership functions for rudder angle
-        rudder_angle['Large Negative'] = fuzz.gaussmf(rudder_angle.universe, -45, 10)  # mean = -45, std = 10
-        rudder_angle['Small Negative'] = fuzz.gaussmf(rudder_angle.universe, -15, 10)  # mean = -15, std = 10
+        rudder_angle['Large Negative'] = fuzz.gaussmf(rudder_angle.universe, -90, 10)  # mean = -45, std = 10
+        rudder_angle['Small Negative'] = fuzz.gaussmf(rudder_angle.universe, -60, 10)  # mean = -15, std = 10
         rudder_angle['Zero'] = fuzz.gaussmf(rudder_angle.universe, 0, 10)              # mean = 0, std = 10
-        rudder_angle['Small Positive'] = fuzz.gaussmf(rudder_angle.universe, 15, 10)   # mean = 15, std = 10
-        rudder_angle['Large Positive'] = fuzz.gaussmf(rudder_angle.universe, 45, 10)   # mean = 45, std = 10
+        rudder_angle['Small Positive'] = fuzz.gaussmf(rudder_angle.universe, 60, 10)   # mean = 15, std = 10
+        rudder_angle['Large Positive'] = fuzz.gaussmf(rudder_angle.universe, 90, 10)   # mean = 45, std = 10
 
         # Define the rules
         rule1 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Large Negative'], rudder_angle['Large Positive'])
@@ -204,13 +204,19 @@ class HeadingController(LifecycleNode):
     
     def compute_rudder_angle(self):
         heading_error = getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
-        self.rudder_simulator.input['heading_error'] = heading_error
-        self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
-        self.rudder_simulator.compute()
-        rudder_angle = self.rudder_simulator.output['rudder_angle']
+        self.get_logger().info(f"Heading error: {heading_error}")
+        #self.rudder_simulator.input['heading_error'] = heading_error
+        #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
+        #self.rudder_simulator.compute()
+        #rudder_angle = self.rudder_simulator.output['rudder_angle']
+        rudder_angle = heading_error # P controller for now
+        if(rudder_angle>90):
+            rudder_angle = 90
+        elif rudder_angle<-90:
+            rudder_angle = -90
         self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
-        msg.data = rudder_angle
+        msg.data = int(rudder_angle)
         self.rudder_angle_publisher.publish(msg)
 
 

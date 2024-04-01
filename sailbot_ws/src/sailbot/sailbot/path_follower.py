@@ -39,6 +39,7 @@ def find_look_ahead_point(path, current_position, current_speed):
     look_ahead_distance = calculate_look_ahead_distance(base_distance, speed_factor, current_speed)
     
     look_ahead_point = None
+    closest_distance = float('inf')
     for i, point in enumerate(path):
         distance = great_circle(current_position, (point.latitude, point.longitude)).meters
         if distance < closest_distance:
@@ -76,7 +77,7 @@ def find_and_load_image(directory, location):
 
             # Load the image
             image_path = os.path.join(directory, filename)
-            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            image = 255-cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
             if image is None:
                 raise ValueError(f"Unable to load image at {image_path}")
 
@@ -129,20 +130,18 @@ def grid_to_latlong_proj(x, y, bbox, image_width, image_height, src_proj='EPSG:4
     Returns:
     - A tuple (latitude, longitude) representing the geographic coordinates.
     """
-    # Initialize the transformer
-    transformer = Transformer.from_crs(dest_proj, src_proj, always_xy=True)
     
     # Transform the bounding box to the destination projection
-    north_east = transformer.transform(bbox['north'], bbox['east'], direction='INVERSE')
-    south_west = transformer.transform(bbox['south'], bbox['west'], direction='INVERSE')
+    north_east = (bbox['north'], bbox['east'])
+    south_west = (bbox['south'], bbox['west'])
     
     # Calculate the geographical coordinates from the pixel positions
     long_pct = x / image_width
     lat_pct = y / image_height
     
     # Interpolate the latitude and longitude within the bounding box
-    latitude = north_east[1] - lat_pct * (north_east[1] - south_west[1])
-    longitude = south_west[0] + long_pct * (north_east[0] - south_west[0])
+    latitude = north_east[0] - lat_pct * (north_east[0] - south_west[0])
+    longitude = south_west[1] + long_pct * (north_east[1] - south_west[1])
     
     return latitude, longitude
 
@@ -172,8 +171,12 @@ class PathFollower(LifecycleNode):
         self.get_logger().info(f'Map name: {self.map_name}')
         self.get_logger().info("Getting map image")
         image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
-        occupancy_grid_values = np.clip(image, 0, 255)
-        occupancy_grid_values = ((255 - occupancy_grid_values) * 100 / 255).astype(np.int8)
+        cv2.imwrite("/home/sailbot/after_load.jpg", image)
+
+
+        occupancy_grid_values = np.clip(image, 0, 1)
+
+        #occupancy_grid_values = ((255 - occupancy_grid_values) * 100 / 255).astype(np.int8)
         grid_msg = OccupancyGrid()
         grid_msg.header = Header(frame_id="map")
         grid_msg.info.resolution = 0.0001
@@ -181,10 +184,11 @@ class PathFollower(LifecycleNode):
         self.image_width = occupancy_grid_values.shape[1]
         grid_msg.info.height = occupancy_grid_values.shape[0]
         self.image_height = occupancy_grid_values.shape[0]
+        self.get_logger().info(f"map width: {self.image_width}, height: {self.image_height}")
 
         grid_msg.info.origin = Pose(position=Point(x=0.0, y=0.0, z=0.0), orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))
-
-        grid_msg.data = occupancy_grid_values.ravel().tolist()
+        self.get_logger().info(f"{occupancy_grid_values}")
+        grid_msg.data = occupancy_grid_values.flatten().tolist()
 
         self.get_logger().info("Getting SetMap service")
         self.set_map_cli = self.create_client(SetMap, 'set_map', callback_group=self.service_client_callback_group)
@@ -325,7 +329,7 @@ class PathFollower(LifecycleNode):
         for segment in path_segments:
             self.get_logger().info(f"segment: {segment}")
             for poseStamped in segment.path.poses:
-                point = poseStamped.pose.point
+                point = poseStamped.pose.position
                 self.get_logger().info(f"point: {point}")
                 lat, lon = grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
                 geopoint = GeoPoint()
