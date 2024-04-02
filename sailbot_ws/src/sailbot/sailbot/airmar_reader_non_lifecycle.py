@@ -17,6 +17,7 @@ from std_msgs.msg import String, Float64
 from sensor_msgs.msg import NavSatFix
 from sailbot_msgs.msg import Wind
 import signal
+import pyudev
 
 
 class AirmarReader(Node): #translates airmar data into json and publishes on 'airmar_data' ROS2 topic
@@ -38,8 +39,22 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
         self.pitch_publisher = self.create_publisher(Float64, 'airmar_data/pitch', 10)
         self.timer = self.create_timer(0.01, self.timer_callback)
 
-        port = '/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1170079-if00'
-        self.ser = serial.Serial(port)
+        context = pyudev.Context()
+
+        vid = '1576'
+        pid = '03b1'
+        self.device_file = None
+        for device in context.list_devices(subsystem='tty'):
+            if 'ID_VENDOR_ID' in device.properties and 'ID_MODEL_ID' in device.properties:
+                if device.properties['ID_VENDOR_ID'] == vid and device.properties['ID_MODEL_ID'] == pid:
+                    self.device_file = device.device_node
+                    break
+
+        if self.device_file:
+            print(f'Device file: {self.device_file}')
+        else:
+            print('Device not found')
+        
 
     def timer_callback(self):
         msg = String()
@@ -88,7 +103,9 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
     def readLineToJson(self):
 
         try:
+            self.ser = serial.Serial(self.device_file)
             line = self.ser.readline().decode()
+            self.ser.close()
             #self.get_logger().info(line)
             tag = line.split(',',1)[0]
             type_code = tag[-3:]
@@ -194,7 +211,8 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                         "pitch":args[3]}
                         }
             else:
-                raise ValueError("Unknown NEMA code: " + type_code)
+                pass
+                #raise ValueError("Unknown NEMA code: " + type_code)
         except Exception as e:
             print(e)
             return({})
@@ -202,12 +220,12 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
 
 def main(args=None):
 
+    rclpy.init(args=args)
+    airmar_reader = AirmarReader()
+
     # Hack to reset Maretron since it's broken and gets stuck
     command = ['echo', 'sailbot', '|', 'sudo', '-S', 'usbreset', '1576:03b1']
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    rclpy.init(args=args)
-    airmar_reader = AirmarReader()
 
     if result.returncode == 0:
         airmar_reader.get_logger().info("Command executed successfully.")
@@ -219,11 +237,11 @@ def main(args=None):
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(airmar_reader)
 
-    def signal_handler(sig, frame):
-        airmar_reader.get_logger().info('You pressed Ctrl+C! Closing serial connection...')
-        airmar_reader.ser.close()
-        sys.exit(0)
-    signal.signal(signal.SIGINT, signal_handler)
+    # def signal_handler(sig, frame):
+    #     airmar_reader.get_logger().info('You pressed Ctrl+C! Closing serial connection...')
+    #     airmar_reader.ser.close()
+    #     sys.exit(0)
+    #signal.signal(signal.SIGINT, signal_handler)
 
     try:
         # Spin the node to execute callbacks
@@ -234,7 +252,7 @@ def main(args=None):
         airmar_reader.get_logger().fatal(f'Unhandled exception: {e}')
     finally:
         # Shutdown and cleanup the node
-        airmar_reader.ser.close()
+        #airmar_reader.ser.close()
         executor.shutdown()
         airmar_reader.destroy_node()
         rclpy.shutdown()
