@@ -6,7 +6,7 @@ namespace Sailbot {
 	class Map {
 	public:
 		//for initial construction
-		Map(uint32_t map_width, uint32_t map_height);
+		Map(uint32_t map_width, uint32_t map_height, std::vector<int8_t> initial_data);
 
 		//for rotation
 		Map(uint32_t size, std::shared_ptr<std::vector<float>> new_data, std::shared_ptr<std::vector<std::vector<Node>>> new_grid);

@@ -16,12 +16,18 @@ from lifecycle_msgs.msg import TransitionEvent
 from lifecycle_msgs.msg import State as StateMsg
 from sensor_msgs.msg import NavSatFix
 from geographic_msgs.msg import GeoPoint
+from nav_msgs.msg import OccupancyGrid
+from ament_index_python.packages import get_package_share_directory
 from sailbot_msgs.msg import Wind, Path
 import grpc
 from concurrent import futures
 import json
 import math
 import time
+import os
+import cv2
+import re
+import numpy as np
 
 from sailbot_msgs.srv import RestartNode
 
@@ -31,6 +37,47 @@ import telemetry_messages.python.control_pb2 as control_pb2
 import telemetry_messages.python.control_pb2_grpc as control_pb2_grpc
 import telemetry_messages.python.node_restart_pb2 as node_restart_pb2
 import telemetry_messages.python.node_restart_pb2_grpc as node_restart_pb2_grpc
+
+def find_and_load_image(directory, location):
+    """
+    Find an image by location and load it along with its bounding box coordinates.
+
+    Parameters:
+    - directory: The directory to search in.
+    - location: The location to match.
+
+    Returns:
+    - A tuple containing the loaded image and a dictionary with the bounding box coordinates.
+    """
+    # Regular expression to match the filename format and capture coordinates
+    pattern = re.compile(rf"{location}:(-?\d+\.?\d*):(-?\d+\.?\d*):(-?\d+\.?\d*):(-?\d+\.?\d*)\.png")
+
+    for filename in os.listdir(directory):
+        match = pattern.match(filename)
+        if match:
+            # Extract the bounding box coordinates
+            south, west, north, east = map(float, match.groups())
+
+            # Load the image
+            image_path = os.path.join(directory, filename)
+            image = 255-cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            image = cv2.flip(image, 0)
+            img_rgba = cv2.cvtColor(image, cv2.COLOR_GRAY2BGRA)
+            alpha_channel = np.ones(image.shape, dtype=np.uint8) * 127
+            alpha_channel[image == 255] = 0 
+            img_rgba[:, :, 3] = alpha_channel
+            if image is None:
+                raise ValueError(f"Unable to load image at {image_path}")
+
+            return img_rgba, {"south": south, "west": west, "north": north, "east": east}
+
+    # Return None if no matching file is found
+    return None, None
+
+def get_resource_dir():
+    package_path = get_package_share_directory('sailbot')
+    resource_path = os.path.join(package_path, 'maps')
+    return resource_path
 
 def make_json_string(json_msg):
     json_str = json.dumps(json_msg)
@@ -65,6 +112,7 @@ def get_state(state_id: int):
 
 class NetworkComms(LifecycleNode):
 
+    current_map: OccupancyGrid = None
     current_boat_state = boat_state_pb2.BoatState()
 
     def __init__(self):
@@ -92,6 +140,12 @@ class NetworkComms(LifecycleNode):
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
 
         self.callback_group_state = MutuallyExclusiveCallbackGroup()
+
+        self.declare_parameter('map_name', 'quinsigamond')
+        self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
+        self.get_logger().info(f'Map name: {self.map_name}')
+        self.get_logger().info("Getting map image")
+        self.map_image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -402,6 +456,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteAutonomousModeCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetPathCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
+        boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
 
         #connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
@@ -476,6 +531,20 @@ class NetworkComms(LifecycleNode):
 
         return response
     
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def GetMap(self, command: boat_state_pb2.MapRequest, context):
+        self.get_logger().info("Received GetMap request")
+        _, buffer = cv2.imencode('.png', self.map_image)
+        #self.get_logger().info(f"Image buffer: {buffer}")
+        response = boat_state_pb2.MapResponse()
+        response.image_data = buffer.tobytes()
+        response.north = self.bbox['north']
+        response.south = self.bbox['south']
+        response.east = self.bbox['east']
+        response.west = self.bbox['west']
+        return response
+
+
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest, context):
         return self.current_boat_state

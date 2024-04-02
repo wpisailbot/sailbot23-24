@@ -39,6 +39,7 @@ def find_look_ahead_point(path, current_position, current_speed):
     look_ahead_distance = calculate_look_ahead_distance(base_distance, speed_factor, current_speed)
     
     look_ahead_point = None
+    closest_distance = float('inf')
     for i, point in enumerate(path):
         distance = great_circle(current_position, (point.latitude, point.longitude)).meters
         if distance < closest_distance:
@@ -76,7 +77,7 @@ def find_and_load_image(directory, location):
 
             # Load the image
             image_path = os.path.join(directory, filename)
-            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            image = 255-cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
             if image is None:
                 raise ValueError(f"Unable to load image at {image_path}")
 
@@ -129,20 +130,18 @@ def grid_to_latlong_proj(x, y, bbox, image_width, image_height, src_proj='EPSG:4
     Returns:
     - A tuple (latitude, longitude) representing the geographic coordinates.
     """
-    # Initialize the transformer
-    transformer = Transformer.from_crs(dest_proj, src_proj, always_xy=True)
     
     # Transform the bounding box to the destination projection
-    north_east = transformer.transform(bbox['north'], bbox['east'], direction='INVERSE')
-    south_west = transformer.transform(bbox['south'], bbox['west'], direction='INVERSE')
+    north_east = (bbox['north'], bbox['east'])
+    south_west = (bbox['south'], bbox['west'])
     
     # Calculate the geographical coordinates from the pixel positions
     long_pct = x / image_width
     lat_pct = y / image_height
     
     # Interpolate the latitude and longitude within the bounding box
-    latitude = north_east[1] - lat_pct * (north_east[1] - south_west[1])
-    longitude = south_west[0] + long_pct * (north_east[0] - south_west[0])
+    latitude = north_east[0] - lat_pct * (north_east[0] - south_west[0])
+    longitude = south_west[1] + long_pct * (north_east[1] - south_west[1])
     
     return latitude, longitude
 
@@ -158,6 +157,10 @@ class PathFollower(LifecycleNode):
 
     def __init__(self):
         super().__init__('path_follower')
+        # Using different callback groups for subscription and service client
+        self.subscription_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
+        self.service_client_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
+
         self.target_position_publisher: Optional[Publisher]
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
@@ -168,8 +171,12 @@ class PathFollower(LifecycleNode):
         self.get_logger().info(f'Map name: {self.map_name}')
         self.get_logger().info("Getting map image")
         image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
-        occupancy_grid_values = np.clip(image, 0, 255)
-        occupancy_grid_values = ((255 - occupancy_grid_values) * 100 / 255).astype(np.int8)
+        cv2.imwrite("/home/sailbot/after_load.jpg", image)
+
+
+        occupancy_grid_values = np.clip(image, 0, 1)
+
+        #occupancy_grid_values = ((255 - occupancy_grid_values) * 100 / 255).astype(np.int8)
         grid_msg = OccupancyGrid()
         grid_msg.header = Header(frame_id="map")
         grid_msg.info.resolution = 0.0001
@@ -177,50 +184,54 @@ class PathFollower(LifecycleNode):
         self.image_width = occupancy_grid_values.shape[1]
         grid_msg.info.height = occupancy_grid_values.shape[0]
         self.image_height = occupancy_grid_values.shape[0]
+        self.get_logger().info(f"map width: {self.image_width}, height: {self.image_height}")
 
         grid_msg.info.origin = Pose(position=Point(x=0.0, y=0.0, z=0.0), orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))
-
-        grid_msg.data = occupancy_grid_values.ravel().tolist()
+        self.get_logger().info(f"{occupancy_grid_values}")
+        grid_msg.data = occupancy_grid_values.flatten().tolist()
 
         self.get_logger().info("Getting SetMap service")
-        self.set_map_cli = self.create_client(SetMap, 'set_map')
+        self.set_map_cli = self.create_client(SetMap, 'set_map', callback_group=self.service_client_callback_group)
         while not self.set_map_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('set_map service not available, waiting again...')
         set_map_req = SetMap.Request()
         set_map_req.map = grid_msg
+        self.grid_msg = grid_msg
         self.get_logger().info("Setting map")
         future = self.set_map_cli.call_async(set_map_req)
         rclpy.spin_until_future_complete(self, future)
 
         self.get_logger().info("Map setup done")
 
-        self.get_path_cli = self.create_client(GetPath, 'get_path')
+        self.get_path_cli = self.create_client(GetPath, 'get_path', callback_group=self.service_client_callback_group)
         while not self.get_path_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('get_path service not available, waiting again...')
+        
+        self.get_logger().info("Path follower node setup complete")
+
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
         try:
-            self.target_position_publisher = self.create_lifecycle_publisher(NavSatFix, 'target_position', 10)
-
+            self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/heading',
                 self.airmar_heading_callback,
-                10)
+                10, callback_group=self.subscription_callback_group)
             self.airmar_position_subscription = self.create_subscription(
                 GeoPoint,
                 '/airmar_data/lat_long',
                 self.airmar_heading_callback,
-                10)
+                10, callback_group=self.subscription_callback_group)
             self.airmar_speed_knots_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/speed_knots',
                 self.airmar_speed_knots_callback,
-                10)
+                10, callback_group=self.subscription_callback_group)
             self.waypoints_subscriber = self.create_subscription(
-                Path, 'waypoints', self.waypoints_callback, 10)
+                Path, 'waypoints', self.waypoints_callback, 10, callback_group=self.subscription_callback_group)
             #self.timer = self.create_timer(0.1, self.control_loop_callback)
             #super().on_configure(state)
         
@@ -236,6 +247,13 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Activating...")
         # Start publishers or timers
         return super().on_activate(state)
+        # map_msg = Map()
+        # map_msg.grid = self.grid_msg
+        # map_msg.north = self.bbox['north']
+        # map_msg.south = self.bbox['south']
+        # map_msg.east = self.bbox['east']
+        # map_msg.west = self.bbox['west']
+        # self.current_map_publisher.publish(map_msg)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
@@ -291,11 +309,12 @@ class PathFollower(LifecycleNode):
         req.start = start_point
         req.end = end_point
         req.wind_angle_deg = float(self.wind_angle_deg)
-        future = self.get_path_cli.call_async(req)
         self.get_logger().info("Getting path")
-        rclpy.spin_until_future_complete(self, future)
+        #synchronous service call because ROS2 async doesn't work in callbacks
+        result = self.get_path_cli.call(req)
+        #rclpy.spin_until_future_complete(self, future)
         self.get_logger().info("Path returned!")
-        return future.result()
+        return result
 
     def recalculate_path_from_waypoints(self):
         if self.wind_angle_deg is None:
@@ -306,17 +325,20 @@ class PathFollower(LifecycleNode):
         for point in self.waypoints.points:
             points.append(latlong_to_grid_proj(point.latitude, point.longitude, self.bbox, self.image_width, self.image_height))
         
+        if len(points) == 0:
+            self.get_logger().info("Empty waypoints, will clear path")
+            self.current_path = []
+            return
         path_segments = []
         path_segments.append(self.get_path(self.current_grid_cell, points[0]))
         for i in range(len(points)-1):
-            self.get_logger().info("Calculating path segment...")
             path_segments.append(self.get_path(points[i], points[i+1]))
         
-        self.get_logger().info("All segments done")
         final_path = []
         for segment in path_segments:
-            for poseStamped in segment.poses:
-                point = poseStamped.pose.point
+            for poseStamped in segment.path.poses:
+                point = poseStamped.pose.position
+                self.get_logger().info(f"point: {point}")
                 lat, lon = grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
@@ -335,6 +357,7 @@ class PathFollower(LifecycleNode):
         self.waypoints = msg
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()
+        self.get_logger().info("Ending waypoints callback")
     
     def find_look_ahead(self):
         if len(self.current_path) == 0:
@@ -351,7 +374,7 @@ def main(args=None):
     path_follower = PathFollower()
 
     # Use the SingleThreadedExecutor to spin the node.
-    executor = rclpy.executors.SingleThreadedExecutor()
+    executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(path_follower)
 
     try:

@@ -45,7 +45,12 @@ public:
 
         }
         RCLCPP_INFO(this->get_logger(), "Calculating solution");
-        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getNode(request->start.x, request->start.y), pMap->getNode(request->end.x, request->end.y));
+        uint x1 = request->start.x+pMap->half_width_diff;
+        uint y1 = request->start.y+pMap->half_height_diff;
+        uint x2 = request->end.x+pMap->half_width_diff;
+        uint y2 = request->end.y+pMap->half_height_diff;
+        RCLCPP_INFO(this->get_logger(), "Adjusted cells: (%d, %d), (%d, %d)", x1, y1, x2, y2);
+        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getNode(x1, y1), pMap->getNode(x2, y2));
         RCLCPP_INFO(this->get_logger(), "Solution complete");
         for(auto p: path){
             geometry_msgs::msg::PoseStamped pose;
@@ -59,11 +64,8 @@ public:
     void handle_set_map_service(
         const std::shared_ptr<sailbot_msgs::srv::SetMap::Request> request,
         [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetMap::Response> response){
-        pMap = std::make_unique<Sailbot::Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height));
-        for(uint32_t i=0; i<request->map.info.width*request->map.info.height; i++){
-            pMap->data->push_back(float(request->map.data[i]));
-        }
-        pMap->data = pMap->data;
+        pMap = std::make_unique<Sailbot::Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height), request->map.data);
+        //pMap->data = pMap->data;
         RCLCPP_INFO(this->get_logger(), "Map set successfully");
     }
 
