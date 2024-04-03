@@ -16,6 +16,7 @@ from std_msgs.msg import String, Float64
 from sensor_msgs.msg import NavSatFix
 from sailbot_msgs.msg import Wind
 import signal
+import logging
 
 
 class AirmarReader(LifecycleNode): #translates airmar data into json and publishes on 'airmar_data' ROS2 topic
@@ -64,6 +65,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         self.roll_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/roll', 10)
         self.pitch_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/pitch', 10)
         self.timer = self.create_timer(0.01, self.timer_callback)
+
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
@@ -255,6 +257,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
 def main(args=None):
     rclpy.init(args=args)
     airmar_reader = AirmarReader()
+    airmar_reader.get_logger().set_level(logging.WARNING)
 
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()

@@ -34,36 +34,11 @@ def normalRelativeAngle(angle):
             angle+=TWO_PI
     return angle
 
-
-#gets necessary rotation from an lat, long, theta pose to face a point
-def getRotationToPointLatLong(current_theta, current_lat, current_long, target_lat, target_long):
-    # Convert latitude and longitude from degrees to radians
-    lat1 = math.radians(current_lat)
-    lon1 = math.radians(current_long)
-    lat2 = math.radians(target_lat)
-    lon2 = math.radians(target_long)
-    
-    delta_lon = lon2 - lon1
-    
-    # Calculate the bearing from current location to target location
-    x = math.sin(delta_lon) * math.cos(lat2)
-    y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon))
-    initial_bearing = math.atan2(x, y)
-    
-    initial_bearing = math.degrees(initial_bearing)
-    
-    current_theta_deg = math.degrees(current_theta)
-    
-    # Calculate turn required by normalizing the difference between the bearing and current orientation
-    turn = normalRelativeAngle(math.radians(initial_bearing - current_theta_deg))
-    
-    return math.degrees(turn)
-
 class HeadingController(LifecycleNode):
 
     heading = 0
-    latitude = 0
-    longitude = 0
+    latitude = 42.273822
+    longitude = -71.805967
 
     def __init__(self):
         super().__init__('heading_controller')
@@ -203,8 +178,8 @@ class HeadingController(LifecycleNode):
         self.compute_rudder_angle()
     
     def compute_rudder_angle(self):
-        heading_error = getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
-        self.get_logger().info(f"Heading error: {heading_error}")
+        heading_error = self.getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
+        self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} pos: {self.latitude}, {self.longitude} to pos: {self.target_position.latitude}, {self.target_position.longitude}")
         #self.rudder_simulator.input['heading_error'] = heading_error
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         #self.rudder_simulator.compute()
@@ -219,6 +194,31 @@ class HeadingController(LifecycleNode):
         msg.data = int(rudder_angle)
         self.rudder_angle_publisher.publish(msg)
 
+    #gets necessary rotation from an lat, long, theta pose to face a point
+    def getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long):
+        # Convert latitude and longitude from degrees to radians
+        lat1 = math.radians(current_lat)
+        lon1 = math.radians(current_long)
+        lat2 = math.radians(target_lat)
+        lon2 = math.radians(target_long)
+        
+        delta_lon = lon2 - lon1
+        self.get_logger().info(f"delta_lon: {delta_lon}")
+        
+        # Calculate the bearing from current location to target location
+        x = math.sin(delta_lon) * math.cos(lat2)
+        y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon))
+        self.get_logger().info(f"x: {x}, y: {y}")
+        initial_bearing = math.atan2(x, y)
+
+        initial_bearing = math.degrees(initial_bearing)
+        self.get_logger().info(f"initial bearing: {initial_bearing}")
+        
+        self.get_logger().info(f"Current theta: {current_theta}")
+        # Calculate turn required by normalizing the difference between the bearing and current orientation
+        turn = normalRelativeAngle(math.radians(initial_bearing - current_theta))
+        
+        return math.degrees(turn)
 
 
 

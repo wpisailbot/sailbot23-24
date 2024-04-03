@@ -21,6 +21,7 @@ import cv2
 import re
 import numpy as np
 from pyproj import Transformer
+import math
 
 from geopy.distance import great_circle
 
@@ -28,6 +29,11 @@ def get_resource_dir():
     package_path = get_package_share_directory('sailbot')
     resource_path = os.path.join(package_path, 'maps')
     return resource_path
+
+def distance(x1, y1, x2, y2):
+    x2x1 = x2-x1
+    y2y1 = y2-y1
+    return math.sqrt(x2x1*x2x1 + y2y1*y2y1)
 
 def calculate_look_ahead_distance(base_distance, speed_factor, current_speed):
     return base_distance + (speed_factor * current_speed)
@@ -86,6 +92,7 @@ def find_and_load_image(directory, location):
     # Return None if no matching file is found
     return None, None
 
+
 class PathFollower(LifecycleNode):
     heading = 0
     latitude = 0
@@ -93,7 +100,9 @@ class PathFollower(LifecycleNode):
     speed_knots = 0
     waypoints = Path()
     current_path = []
-    current_grid_cell = (16, 51)
+    #current_grid_cell = (16, 51)
+    current_grid_cell = (16, 16)
+
     wind_angle_deg = 270
 
     def __init__(self):
@@ -367,6 +376,22 @@ class PathFollower(LifecycleNode):
         longitude = south_west[1] + long_pct * (north_east[1] - south_west[1])
         
         return latitude, longitude
+    
+    def insert_intermediate_points(self, path, num_per_unit_distance):
+        length = len(path)
+        appended = []
+        for i in range(length):
+            if i<(length-1):
+                num = round(distance(path[i][0], path[i][1], path[i+1][0], path[i+1][1])*num_per_unit_distance)
+                appended.append(path[i])
+                x_step = (path[i+1][0]-path[i][0])/(num+1)
+                y_step = (path[i+1][1]-path[i][1])/(num+1)
+                for j in range(1, num+1):
+                    new_x = path[i][0]+x_step*j
+                    new_y = path[i][1]+y_step*j
+                    appended.append([new_x, new_y])
+        appended.append(path[-1])
+        return appended
 
 
 

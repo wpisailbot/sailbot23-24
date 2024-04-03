@@ -532,6 +532,8 @@ class NetworkComms(LifecycleNode):
             msg.mode = AutonomousMode.AUTONOMOUS_MODE_NONE
         elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_BALLAST:
             msg.mode = AutonomousMode.AUTONOMOUS_MODE_BALLAST
+        elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_BALLAST:
+            msg.mode = AutonomousMode.AUTONOMOUS_MODE_TRIMTAB
         elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_FULL:
             msg.mode = AutonomousMode.AUTONOMOUS_MODE_FULL
         self.autonomous_mode_publisher.publish(msg)

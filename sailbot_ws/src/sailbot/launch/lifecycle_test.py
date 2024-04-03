@@ -67,7 +67,7 @@ def generate_launch_description():
     ld.add_action(network_comms_node)
     ld.add_action(ballast_node) 
     #ld.add_action(pwm_node)
-    #ld.add_action(airmar_node)
+    ld.add_action(airmar_node)
     ld.add_action(tt_node)
     ld.add_action(state_manager_node)
     ld.add_action(pathfinder_node)

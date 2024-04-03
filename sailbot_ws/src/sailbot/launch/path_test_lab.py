@@ -5,12 +5,18 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, Command
 
 def generate_launch_description():
+    map_name = DeclareLaunchArgument(
+        'map_name',
+        default_value="lab",
+        description="The text before the first ':' in the map file name"
+    )
     network_comms_node = LifecycleNode(
         package='sailbot', 
         executable='network_comms', 
         name='network_comms',
         namespace='',
-        output='screen'
+        output='screen',
+        parameters=[{'map_name': LaunchConfiguration('map_name')}]
     )
     ballast_node = LifecycleNode(
         package='sailbot', 
@@ -40,18 +46,33 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
-    managed_node_names = DeclareLaunchArgument(
-        'managed_nodes',
-        default_value=[],
-        description='The nodes lifecycle manager will control'
+    heading_node = LifecycleNode(
+        package='sailbot', 
+        executable='heading_controller', 
+        name='heading_controller',
+        namespace='',
+        output='screen'
     )
+    path_follower_node = LifecycleNode(
+        package='sailbot', 
+        executable='path_follower', 
+        name='path_follower',
+        namespace='',
+        output='screen',
+        parameters=[{'map_name': LaunchConfiguration('map_name')}]
+    )
+    # managed_node_names = DeclareLaunchArgument(
+    #     'managed_nodes',
+    #     default_value=["path_follower", "heading_controller"],
+    #     description='The nodes lifecycle manager will control'
+    # )
     state_manager_node = Node(
         package='sailbot', 
         executable='state_manager', 
         name='state_manager',
         namespace='',
         output='screen',
-        parameters=[{'managed_nodes': LaunchConfiguration('managed_nodes')}]
+        parameters=[{'managed_nodes': ["airmar_reader", "path_follower", "heading_controller", "trim_tab_comms"]}]
     )
     pathfinder_node = Node(
         package='sailbot_pathfinding', 
@@ -63,12 +84,16 @@ def generate_launch_description():
     
     # Launch Description
     ld = launch.LaunchDescription()
-    ld.add_action(managed_node_names)
+    #ld.add_action(managed_node_names)
+    ld.add_action(map_name)
     ld.add_action(network_comms_node)
     ld.add_action(ballast_node) 
     #ld.add_action(pwm_node)
-    #ld.add_action(airmar_node)
+    ld.add_action(airmar_node)
     ld.add_action(tt_node)
+    ld.add_action(heading_node)
+    ld.add_action(path_follower_node)
+
     ld.add_action(state_manager_node)
     ld.add_action(pathfinder_node)
     return ld
