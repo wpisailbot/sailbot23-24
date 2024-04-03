@@ -79,8 +79,8 @@ public:
         cv::Scalar redColor(0, 0, 255); 
         cv::Scalar greenColor(0, 255, 0); 
 
-        cv::circle(colorImage, cv::Point(start_node->x, start_node->y), 5, greenColor, -1);
-        cv::circle(colorImage, cv::Point(goal_node->x, goal_node->y), 5, redColor, -1);
+        cv::circle(colorImage, cv::Point(start_node->x, start_node->y), 2, greenColor, -1);
+        cv::circle(colorImage, cv::Point(goal_node->x, goal_node->y), 2, redColor, -1);
         cv::flip(colorImage, colorImage, 0);
         cv::imwrite("/home/sailbot/map_with_points.jpg", colorImage);
 
@@ -138,9 +138,8 @@ public:
             std::string goal_string = "goal: " + std::to_string(goal_node->x - map.half_width_diff) + ", " + std::to_string(goal_node->y - map.half_height_diff);
             RCLCPP_INFO(this->get_logger(), start_string.c_str());
             RCLCPP_INFO(this->get_logger(), goal_string.c_str());
-            return path;
         }
-        return {};
+        return path;
     }
 
 private:

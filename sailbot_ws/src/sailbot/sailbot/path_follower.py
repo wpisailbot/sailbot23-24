@@ -86,35 +86,6 @@ def find_and_load_image(directory, location):
     # Return None if no matching file is found
     return None, None
 
-def grid_to_latlong_proj(x, y, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
-    """
-    Convert grid cell coordinates in an image to latitude/longitude coordinates.
-
-    Parameters:
-    - x, y: The pixel positions in the image.
-    - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
-    - image_width, image_height: The dimensions of the image in pixels.
-    - src_proj: Source projection (latitude/longitude).
-    - dest_proj: Destination projection for the image.
-
-    Returns:
-    - A tuple (latitude, longitude) representing the geographic coordinates.
-    """
-    
-    # Transform the bounding box to the destination projection
-    north_east = (bbox['north'], bbox['east'])
-    south_west = (bbox['south'], bbox['west'])
-    
-    # Calculate the geographical coordinates from the pixel positions
-    long_pct = x / image_width
-    lat_pct = y / image_height
-    
-    # Interpolate the latitude and longitude within the bounding box
-    latitude = north_east[0] - lat_pct * (north_east[0] - south_west[0])
-    longitude = south_west[1] + long_pct * (north_east[1] - south_west[1])
-    
-    return latitude, longitude
-
 class PathFollower(LifecycleNode):
     heading = 0
     latitude = 0
@@ -123,7 +94,7 @@ class PathFollower(LifecycleNode):
     waypoints = Path()
     current_path = []
     current_grid_cell = (16, 51)
-    wind_angle_deg = 0
+    wind_angle_deg = 270
 
     def __init__(self):
         super().__init__('path_follower')
@@ -312,7 +283,7 @@ class PathFollower(LifecycleNode):
             for poseStamped in segment.path.poses:
                 point = poseStamped.pose.position
                 self.get_logger().info(f"point: {point}")
-                lat, lon = grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
+                lat, lon = self.grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
                 geopoint.longitude = lon
@@ -367,6 +338,35 @@ class PathFollower(LifecycleNode):
         y = int(lat_pct * image_height)
         
         return x, y
+
+    def grid_to_latlong_proj(self, x, y, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
+        """
+        Convert grid cell coordinates in an image to latitude/longitude coordinates.
+
+        Parameters:
+        - x, y: The pixel positions in the image.
+        - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
+        - image_width, image_height: The dimensions of the image in pixels.
+        - src_proj: Source projection (latitude/longitude).
+        - dest_proj: Destination projection for the image.
+
+        Returns:
+        - A tuple (latitude, longitude) representing the geographic coordinates.
+        """
+        
+        # Transform the bounding box to the destination projection
+        north_east = (bbox['north'], bbox['east'])
+        south_west = (bbox['south'], bbox['west'])
+        
+        # Calculate the geographical coordinates from the pixel positions
+        long_pct = x / image_width
+        lat_pct = 1.0-(y / image_height)
+        
+        # Interpolate the latitude and longitude within the bounding box
+        latitude = north_east[0] - lat_pct * (north_east[0] - south_west[0])
+        longitude = south_west[1] + long_pct * (north_east[1] - south_west[1])
+        
+        return latitude, longitude
 
 
 

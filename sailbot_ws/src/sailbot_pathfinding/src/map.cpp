@@ -58,7 +58,7 @@ namespace Sailbot {
             }
 
             if (uint32_t(nx) < max_dim && uint32_t(ny) < max_dim) {
-                neighbors_grid->at(y).at(x).neighbors.push_back(&neighbors_grid->at(uint32_t(ny)).at(uint32_t(nx)));
+                neighbors_grid->at(y).at(x).neighbors.push_back(std::make_pair(nx, ny));
             }
         }
     }
