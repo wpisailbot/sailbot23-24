@@ -152,7 +152,7 @@ class PathFollower(LifecycleNode):
     speed_knots = 0
     waypoints = Path()
     current_path = []
-    current_grid_cell = (0, 0)
+    current_grid_cell = (16, 51)
     wind_angle_deg = 0
 
     def __init__(self):
@@ -162,6 +162,7 @@ class PathFollower(LifecycleNode):
         self.service_client_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
 
         self.target_position_publisher: Optional[Publisher]
+        self.current_path_publisher: Optional[Publisher]
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
         self.airmar_speed_knots_subscription: Optional[Subscription]
@@ -215,6 +216,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("In configure")
         try:
             self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
+            self.current_path_publisher = self.create_lifecycle_publisher(Path, 'current_path', 10)
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/heading',
@@ -327,14 +329,15 @@ class PathFollower(LifecycleNode):
         
         if len(points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
-            self.current_path = []
+            self.current_path = Path()
+            self.current_path_publisher.publish(self.current_path)
             return
         path_segments = []
         path_segments.append(self.get_path(self.current_grid_cell, points[0]))
         for i in range(len(points)-1):
             path_segments.append(self.get_path(points[i], points[i+1]))
         
-        final_path = []
+        final_path = Path()
         for segment in path_segments:
             for poseStamped in segment.path.poses:
                 point = poseStamped.pose.position
@@ -343,9 +346,10 @@ class PathFollower(LifecycleNode):
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
                 geopoint.longitude = lon
-                final_path.append(geopoint)
+                final_path.points.append(geopoint)
 
-        self.get_logger().info(f"New path: {final_path}")
+        self.get_logger().info(f"New path: {final_path.points}")
+        self.current_path_publisher.publish(final_path)
         self.current_path = final_path
 
 
@@ -360,10 +364,10 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Ending waypoints callback")
     
     def find_look_ahead(self):
-        if len(self.current_path) == 0:
+        if len(self.current_path.points) == 0:
             self.get_logger().info("No lookAhead point for zero-length path")
             return
-        look_ahead_point = find_look_ahead_point(self.current_path, (self.latitude, self.longitude), self.speed_knots)
+        look_ahead_point = find_look_ahead_point(self.current_path.points, (self.latitude, self.longitude), self.speed_knots)
         self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
         self.target_position_publisher.publish(look_ahead_point)
 

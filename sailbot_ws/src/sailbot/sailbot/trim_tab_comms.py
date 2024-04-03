@@ -15,6 +15,7 @@ from enum import Enum
 from time import time as get_time
 
 from std_msgs.msg import Int8, Int16, Float32, Empty
+from sailbot_msgs.msg import Wind, AutonomousMode
 
 import trim_tab_messages.python.messages_pb2 as message_pb2
 
@@ -34,6 +35,9 @@ battery_level = 100
 
 class TrimTabComms(LifecycleNode):
     last_websocket = None
+    last_winds = []
+    autonomous_mode = 0
+
     def __init__(self):
         super(TrimTabComms, self).__init__('trim_tab_comms')
 
@@ -43,6 +47,8 @@ class TrimTabComms(LifecycleNode):
         self.tt_angle_subscriber: Optional[Subscription]
         self.rudder_angle_subscriber: Optional[Subscription]
         self.ballast_pos_publisher: Optional[Publisher]
+
+        self.autonomous_mode_subscriber: Optional[Subscription]
 
 
         self.timer_pub: Optional[Publisher]
@@ -62,6 +68,10 @@ class TrimTabComms(LifecycleNode):
 
         self.rudder_angle_subscriber = self.create_subscription(Int16, 'rudder_angle', self.rudder_angle_callback, 10)
         self.ballast_pwm_subscriber = self.create_subscription(Int16, 'ballast_pwm', self.ballast_pwm_callback, 10)
+
+        self.apparent_wind_publisher = self.create_subscription(Wind, 'airmar_data/apparent_wind', self.apparent_wind_callback, 10)
+
+        self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
         self.timer_pub = self.create_lifecycle_publisher(Empty, '/heartbeat/trim_tab_comms', 1)
         
@@ -108,6 +118,63 @@ class TrimTabComms(LifecycleNode):
         return super().on_error(state)
     
     #end callbacks
+    def autonomous_mode_callback(self, msg: AutonomousMode):
+        self.get_logger().info(f"Got autonomous mode: {msg.mode}")
+        self.autonomous_mode = msg.mode
+
+    def apparent_wind_callback(self, msg: Wind):
+        direction = msg.direction
+        self.find_trim_tab_state(direction)
+
+    def update_winds(self, relative_wind):
+        # Check we have new wind
+        if len(self.last_winds) != 0 and relative_wind == self.last_winds[len(self.last_winds) - 1]:
+            return
+            # First add wind to running list
+        self.last_winds.append(float(relative_wind))
+        if len(self.last_winds) > 10:
+            self.last_winds.pop(0)
+        # Now find best trim tab state
+        smooth_angle = self.median(self.last_winds)
+        return smooth_angle
+
+    def find_trim_tab_state(self, relative_wind):  # five states of trim
+        smooth_angle = self.update_winds(relative_wind)
+        
+        # Check autonomous mode TODO: This is a coupling that shouldn't be necessary. 
+        # Can be fixed by separating nodes and using lifecycle state transitions, or by finishing behavior tree
+        autonomous_modes = AutonomousMode()
+        if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL or self.autonomous_modes != autonomous_modes.AUTONOMOUS_MODE_TRIMTAB):
+            return
+
+        msg = None
+        if 45.0 <= smooth_angle < 135:
+            # Max lift port
+            msg = {
+                state: "max_lift_port"
+            }
+        elif 135 <= smooth_angle < 180:
+            # Max drag port
+            msg = {
+                state: "max_drag_port"
+            }
+        elif 180 <= smooth_angle < 225:
+            # Max drag starboard
+            msg = {
+                state: "max_drag_starboard"
+            }
+        elif 225 <= smooth_angle < 315:
+            # Max lift starboard
+            msg = {
+                state: "max_lift_starboard"
+            }
+        else:
+            # In irons, min lift
+            msg = {
+                state: "min_lift"
+            }
+        message_string = json.dumps(msg)+'\n'
+        self.ser.write(message_string.encode())
 
     def tt_state_callback(self, msg: Int8):
         protomsg = message_pb2.ControlMessage()

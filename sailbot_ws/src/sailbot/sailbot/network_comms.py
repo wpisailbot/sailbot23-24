@@ -18,7 +18,7 @@ from sensor_msgs.msg import NavSatFix
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
-from sailbot_msgs.msg import Wind, Path
+from sailbot_msgs.msg import Wind, Path, AutonomousMode
 import grpc
 from concurrent import futures
 import json
@@ -121,6 +121,7 @@ class NetworkComms(LifecycleNode):
         self.ballast_position_publisher: Optional[Publisher]
         self.trim_tab_control_publisher: Optional[Publisher]
         self.trim_tab_angle_publisher: Optional[Publisher]
+        self.autonomous_mode_publisher: Optional[Publisher]
 
         self.rot_subscription: Optional[Subscription]
         self.navsat_subscription: Optional[Subscription]
@@ -135,6 +136,7 @@ class NetworkComms(LifecycleNode):
         self.pitch_subscription: Optional[Subscription]
         self.pwm_heartbeat_subscription: Optional[Subscription]
         self.control_system_subscription: Optional[Subscription]
+        self.current_path_subscription: Optional[Subscription]
 
         #receives state updates from other nodes
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
@@ -158,6 +160,8 @@ class NetworkComms(LifecycleNode):
         self.trim_tab_angle_publisher = self.create_lifecycle_publisher(Int16, 'tt_angle', 10)
 
         self.waypoints_publisher = self.create_lifecycle_publisher(Path, 'waypoints', 10)
+
+        self.autonomous_mode_publisher = self.create_lifecycle_publisher(AutonomousMode, 'autonomous_mode', 10)
 
         self.rot_subscription = self.create_subscription(
             Float64,
@@ -247,6 +251,11 @@ class NetworkComms(LifecycleNode):
             TransitionEvent,
             '/trim_tab_comms/transition_event',
             self.tt_lifecycle_callback,
+            10)
+        self.current_path_subscription = self.create_subscription(
+            Path,
+            'current_path',
+            self.current_path_callback,
             10)
         
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
@@ -340,6 +349,7 @@ class NetworkComms(LifecycleNode):
         self.destroy_lifecycle_publisher(self.ballast_position_publisher)
         self.destroy_lifecycle_publisher(self.trim_tab_control_publisher)
         self.destroy_lifecycle_publisher(self.trim_tab_angle_publisher)
+        self.destroy_lifecycle_publisher(self.autonomous_mode_publisher)
 
         self.destroy_subscription(self.rot_subscription)
         self.destroy_subscription(self.navsat_subscription)
@@ -368,6 +378,17 @@ class NetworkComms(LifecycleNode):
         return super().on_error(state)
      
     #end lifecycle callbacks
+
+    def current_path_callback(self, msg: Path):
+        self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")
+        self.current_boat_state.current_path.ClearField("points")# = command.new_path
+        self.get_logger().info("Cleared old path")
+        for geo_point in msg.points:
+            point_msg = boat_state_pb2.Point(latitude=geo_point.latitude, longitude = geo_point.longitude)
+            self.current_boat_state.current_path.points.append(point_msg)
+        self.get_logger().info("Added new points")
+
+        self.get_logger().info(f"length of boatState path is: {len(self.current_boat_state.current_path.points)}")
 
     def restart_lifecycle_node_by_name(self, node_name):
         # Create a service client to send lifecycle state change requests
@@ -454,7 +475,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteTrimTabCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteBallastCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteAutonomousModeCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteSetPathCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteSetWaypointsCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
@@ -478,7 +499,7 @@ class NetworkComms(LifecycleNode):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteTrimTabCommand(self, command: control_pb2.TrimTabCommand, context):
         response = control_pb2.ControlResponse()
-        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         state_msg = Int8()
         state_msg.data = 5
         angle_msg = Int16()
@@ -500,27 +521,36 @@ class NetworkComms(LifecycleNode):
         # ballast_json = {"channel": "12", "angle": current_target}
         # self.pwm_control_publisher.publish(make_json_string(ballast_json))
 
-        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteAutonomousModeCommand(self, command: control_pb2.AutonomousModeCommand, context):
         self.get_logger().info(f"Received autonomous mode command: {command.autonomous_mode}")
+        msg = AutonomousMode()
+        if command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_NONE:
+            msg.mode = AutonomousMode.AUTONOMOUS_MODE_NONE
+        elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_BALLAST:
+            msg.mode = AutonomousMode.AUTONOMOUS_MODE_BALLAST
+        elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_FULL:
+            msg.mode = AutonomousMode.AUTONOMOUS_MODE_FULL
+        self.autonomous_mode_publisher.publish(msg)
+        self.current_boat_state.autonomous_mode = command.autonomous_mode
         response = control_pb2.ControlResponse()
-        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def ExecuteSetPathCommand(self, command: control_pb2.SetPathCommand, context):
+    def ExecuteSetWaypointsCommand(self, command: control_pb2.SetWaypointsCommand, context):
         response = control_pb2.ControlResponse()
-        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
-        self.current_boat_state.current_path.ClearField("points")# = command.new_path
-        self.current_boat_state.current_path.points.extend(command.new_path.points)
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
+        self.current_boat_state.current_waypoints.ClearField("points")# = command.new_path
+        self.current_boat_state.current_waypoints.points.extend(command.new_waypoints.points)
 
-        self.get_logger().info(f"Received path with {len(command.new_path.points)} points: ")
+        self.get_logger().info(f"Received path with {len(command.new_waypoints.points)} points: ")
         
         waypoints = Path()
-        for point in command.new_path.points:
+        for point in command.new_waypoints.points:
             self.get_logger().info(str(point.latitude)+" : "+str(point.longitude))
             fix = GeoPoint()
             fix.latitude = point.latitude

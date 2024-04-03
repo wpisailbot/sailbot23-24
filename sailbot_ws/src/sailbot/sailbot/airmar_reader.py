@@ -41,14 +41,14 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         self.get_logger().info("In configure")
 
         try:
-            port = '/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1170079-if00'
+            port = '/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1163885-if00'
             # try:
             #     # Attempt to open and immediately close the port
             #     ser = serial.Serial(port)
             #     ser.close()
             # except serial.SerialException as e:
             #     print(f"Failed to reset port: {e}")
-            # self.ser = serial.Serial(port)
+            self.ser = serial.Serial(port)
         except:
             return TransitionCallbackReturn.FAILURE
         self.publisher_ = self.create_lifecycle_publisher(String, 'airmar_data', 10)
@@ -59,8 +59,8 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         self.speed_knots_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/speed_knots', 10)
         self.speed_kmh_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/speed_kmh', 10)
         self.heading_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/heading', 10)
-        self.true_wind_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/true_wind', 10)
-        self.apparent_wind_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/apparent_wind', 10)
+        self.true_wind_publisher = self.create_lifecycle_publisher(Wind, 'airmar_data/true_wind', 10)
+        self.apparent_wind_publisher = self.create_lifecycle_publisher(Wind, 'airmar_data/apparent_wind', 10)
         self.roll_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/roll', 10)
         self.pitch_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/pitch', 10)
         self.timer = self.create_timer(0.01, self.timer_callback)
@@ -100,18 +100,27 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         self.publisher_.publish(msg)
         #self.get_logger().info('Publishing: "%s"' % msg.data)
 
-    def publishIfValid(self, value, publisher: Publisher, type: type):
+    def publishIfValid(self, value, publisher, type: type):
+        #self.get_logger().info("Checking validity: ")
+        #self.get_logger().info(str(type))
+        #self.get_logger().info(str(value))
+
         if type == Float64:
             msg = Float64()
             try:
-                msg.data = value
-            except:
+                msg.data = float(value)
+                self.get_logger().info(str(msg.data))
+                publisher.publish(msg)
+            except Exception as e:
+                #self.get_logger().error(traceback.format_exc())
                 return
         elif type == Wind:
             msg = Wind()
             try:
                 msg.direction = float(value[0])
                 msg.speed = float(value[1])
+                publisher.publish(msg)
+
             except:
                 return
         elif type == NavSatFix:
@@ -120,19 +129,18 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                 msg.latitude = float(value[0])
                 msg.longitude = float(value[1])
                 msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
+                publisher.publish(msg)
             except:
                 return
         else:
             self.get_logger().info("publishIfValid: unimplemented type")
-            
-        publisher.publish(msg)
         
 
     def readLineToJson(self):
 
         try:
             line = self.ser.readline().decode()
-            self.get_logger().info(line)
+            #self.get_logger().info(line)
             tag = line.split(',',1)[0]
             type_code = tag[-3:]
             args = line.split(',')
@@ -142,6 +150,8 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                 self.publishIfValid(args[1], self.rot_publisher, Float64)
                 return {"rate-of-turn":args[1]}
             elif(type_code == 'GLL'):
+                self.get_logger().info("Got GPS data: ")
+                self.get_logger().info(line)
                 #convert from degree decimal minutes to decimal degrees
                 #dd = d + m/60
                 #lat = math.floor(float(args[1]) / 100) + (float(args[1]) % 100)/60.0
@@ -187,6 +197,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                 return ret
 
             elif(type_code == 'HDG'):
+                self.get_logger().info("Publishing heading")
                 self.publishIfValid(args[1], self.heading_publisher, Float64)
                 return {"currentHeading":args[1], #degrees
                         "magnetic-deviation":args[2], #degrees
@@ -207,6 +218,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
             elif(type_code == 'GRS'): #"The GRS message is used to support the Receiver Autonomous Integrity Monitoring (RAIM)." -- unneeded
                 return {}
             elif(type_code == 'MWD'):
+                self.get_logger().info("Got true wind!")
                 self.publishIfValid([args[5], args[1]], self.true_wind_publisher, Wind)
                 return {"trueWind":
                     {"speed": args[5],      #in knots
@@ -215,7 +227,8 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                     }
                 }
             elif(type_code == 'MWV'):
-                self.publishIfValid([args[5], args[1]], self.true_wind_publisher, Wind)
+                self.publishIfValid([args[5], args[1]], self.apparent_wind_publisher, Wind)
+                self.get_logger().info("Got apparent wind")
                 return {"apparentWind":
                     {"speed": args[3],       #in knots 
                     "direction": args[1]   #in deg
@@ -232,7 +245,8 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                         "pitch":args[3]}
                         }
             else:
-                raise ValueError("Unknown NEMA code: " + type_code)
+                pass
+                #raise ValueError("Unknown NEMA code: " + type_code)
         except Exception as e:
             print(e)
             return({})

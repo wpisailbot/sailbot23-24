@@ -19,6 +19,7 @@ find_package(geographic_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Wind.msg"
   "msg/Path.msg"
+  "msg/AutonomousMode.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
   "srv/RestartNode.srv"

@@ -54,6 +54,9 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
             print(f'Device file: {self.device_file}')
         else:
             print('Device not found')
+
+        self.ser = serial.Serial('/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1163885-if00')
+
         
 
     def timer_callback(self):
@@ -103,9 +106,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
     def readLineToJson(self):
 
         try:
-            self.ser = serial.Serial(self.device_file)
             line = self.ser.readline().decode()
-            self.ser.close()
             #self.get_logger().info(line)
             tag = line.split(',',1)[0]
             type_code = tag[-3:]
@@ -224,23 +225,25 @@ def main(args=None):
     airmar_reader = AirmarReader()
 
     # Hack to reset Maretron since it's broken and gets stuck
-    command = ['echo', 'sailbot', '|', 'sudo', '-S', 'usbreset', '1576:03b1']
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # command = ['echo', 'sailbot', '|', 'sudo', '-S', 'usbreset', '1576:03b1']
+    # result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    if result.returncode == 0:
-        airmar_reader.get_logger().info("Command executed successfully.")
-    else:
-        airmar_reader.get_logger().error("Command failed.")
-        airmar_reader.get_logger().info(result.stderr.decode())
+    # if result.returncode == 0:
+    #     airmar_reader.get_logger().info("Command executed successfully.")
+    # else:
+    #     airmar_reader.get_logger().error("Command failed.")
+    #     airmar_reader.get_logger().info(result.stderr.decode())
 
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(airmar_reader)
 
-    # def signal_handler(sig, frame):
-    #     airmar_reader.get_logger().info('You pressed Ctrl+C! Closing serial connection...')
-    #     airmar_reader.ser.close()
-    #     sys.exit(0)
+    def signal_handler(sig, frame):
+        airmar_reader.get_logger().info('You pressed Ctrl+C! Closing serial connection...')
+        airmar_reader.ser.close()
+        executor.shutdown()
+        airmar_reader.destroy_node()
+        sys.exit(0)
     #signal.signal(signal.SIGINT, signal_handler)
 
     try:
@@ -252,7 +255,7 @@ def main(args=None):
         airmar_reader.get_logger().fatal(f'Unhandled exception: {e}')
     finally:
         # Shutdown and cleanup the node
-        #airmar_reader.ser.close()
+        airmar_reader.ser.close()
         executor.shutdown()
         airmar_reader.destroy_node()
         rclpy.shutdown()
