@@ -95,8 +95,8 @@ def find_and_load_image(directory, location):
 
 class PathFollower(LifecycleNode):
     heading = 0
-    latitude = 0
-    longitude = 0
+    latitude = 42.273822
+    longitude = -71.805967
     speed_knots = 0
     waypoints = Path()
     current_path = []
@@ -238,7 +238,7 @@ class PathFollower(LifecycleNode):
     def airmar_position_callback(self, msg: NavSatFix):
         self.latitude = msg.latitude
         self.longitude = msg.longitude
-        self.current_grid_cell = self.latlong_to_grid_proj(msg.latitude, msg.longitude, self.bbox, self.image_width, self.image_height)
+        self.current_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
         self.find_look_ahead()
 
 
@@ -288,8 +288,18 @@ class PathFollower(LifecycleNode):
             path_segments.append(self.get_path(points[i], points[i+1]))
         
         final_path = Path()
+        
+        i=-1
+        final_path.points.append(GeoPoint(latitude=self.latitude, longitude=self.longitude))
         for segment in path_segments:
-            for poseStamped in segment.path.poses:
+            #skip failed waypoints
+            if(len(segment.path.poses)==0):
+                continue 
+            #append exact start position
+            if i!=-1:
+                final_path.points.append(self.waypoints.points[i])
+            for j in range(1, len(segment.path.poses)-1):
+                poseStamped = segment.path.poses[j]
                 point = poseStamped.pose.position
                 self.get_logger().info(f"point: {point}")
                 lat, lon = self.grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
@@ -297,6 +307,11 @@ class PathFollower(LifecycleNode):
                 geopoint.latitude = lat
                 geopoint.longitude = lon
                 final_path.points.append(geopoint)
+            #append exact final position
+            self.get_logger().info(f"num waypoints: {len(self.waypoints.points)}, i: {i}")
+            final_path.points.append(self.waypoints.points[i+1])
+            i+=1
+
 
         self.get_logger().info(f"New path: {final_path.points}")
         self.current_path_publisher.publish(final_path)
@@ -366,14 +381,19 @@ class PathFollower(LifecycleNode):
         # Transform the bounding box to the destination projection
         north_east = (bbox['north'], bbox['east'])
         south_west = (bbox['south'], bbox['west'])
-        
+
+        lat_res =  abs(bbox['north']-bbox['south'])/image_height
+        long_res = abs(bbox['east']-bbox['west'])/image_width
+        self.get_logger().info(f"Lat res: {lat_res}")
+        self.get_logger().info(f"Long res: {long_res}")
+
         # Calculate the geographical coordinates from the pixel positions
         long_pct = x / image_width
         lat_pct = 1.0-(y / image_height)
         
         # Interpolate the latitude and longitude within the bounding box
-        latitude = north_east[0] - lat_pct * (north_east[0] - south_west[0])
-        longitude = south_west[1] + long_pct * (north_east[1] - south_west[1])
+        latitude = (north_east[0] - lat_pct * (north_east[0] - south_west[0]))+(lat_res/2)
+        longitude = (south_west[1] + long_pct * (north_east[1] - south_west[1]))+(long_res/2)
         
         return latitude, longitude
     

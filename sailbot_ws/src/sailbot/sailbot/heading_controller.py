@@ -39,6 +39,7 @@ class HeadingController(LifecycleNode):
     heading = 0
     latitude = 42.273822
     longitude = -71.805967
+    target_position = None
 
     def __init__(self):
         super().__init__('heading_controller')
@@ -47,9 +48,9 @@ class HeadingController(LifecycleNode):
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
         self.timer: Optional[Timer]
-        self.target_position = GeoPoint()
-        self.target_position.latitude = 42.273051
-        self.target_position.longitude = -71.805049
+        # self.target_position = GeoPoint()
+        # self.target_position.latitude = 42.273051
+        # self.target_position.longitude = -71.805049
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -178,6 +179,9 @@ class HeadingController(LifecycleNode):
         self.compute_rudder_angle()
     
     def compute_rudder_angle(self):
+        if(self.target_position is None):
+            return
+        
         heading_error = self.getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
         self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} pos: {self.latitude}, {self.longitude} to pos: {self.target_position.latitude}, {self.target_position.longitude}")
         #self.rudder_simulator.input['heading_error'] = heading_error
