@@ -86,36 +86,6 @@ def find_and_load_image(directory, location):
     # Return None if no matching file is found
     return None, None
 
-def latlong_to_grid_proj(latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
-    """
-    Convert lat/long coordinates to grid cell using pyproj for projection handling.
-    
-    Parameters:
-    - latitude, longitude: The lat/long coordinates to convert.
-    - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
-    - image_width, image_height: The dimensions of the image in pixels.
-    - src_proj: Source projection (latitude/longitude).
-    - dest_proj: Destination projection for the image.
-
-     Returns:
-    - A tuple (x, y) representing the grid cell coordinates in the image.
-    """
-    transformer = Transformer.from_crs(src_proj, dest_proj, always_xy=True)
-    north_east = transformer.transform(bbox['north'], bbox['east'])
-    south_west = transformer.transform(bbox['south'], bbox['west'])
-    
-    point_x, point_y = transformer.transform(latitude, longitude)
-    
-    # Calculate the percentage within the transformed bounding box
-    lat_pct = (north_east[1] - point_y) / (north_east[1] - south_west[1])
-    long_pct = (point_x - south_west[0]) / (north_east[0] - south_west[0])
-    
-    # Convert percentages to pixel positions
-    x = int(long_pct * image_width)
-    y = int(lat_pct * image_height)
-    
-    return x, y
-
 def grid_to_latlong_proj(x, y, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
     """
     Convert grid cell coordinates in an image to latitude/longitude coordinates.
@@ -288,7 +258,7 @@ class PathFollower(LifecycleNode):
     def airmar_position_callback(self, msg: NavSatFix):
         self.latitude = msg.latitude
         self.longitude = msg.longitude
-        self.current_grid_cell = latlong_to_grid_proj(msg.latitude, msg.longitude, self.bbox, self.image_width, self.image_height)
+        self.current_grid_cell = self.latlong_to_grid_proj(msg.latitude, msg.longitude, self.bbox, self.image_width, self.image_height)
         self.find_look_ahead()
 
 
@@ -325,7 +295,7 @@ class PathFollower(LifecycleNode):
         
         points = []
         for point in self.waypoints.points:
-            points.append(latlong_to_grid_proj(point.latitude, point.longitude, self.bbox, self.image_width, self.image_height))
+            points.append(self.latlong_to_grid_proj(point.latitude, point.longitude, self.bbox, self.image_width, self.image_height))
         
         if len(points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
@@ -352,10 +322,6 @@ class PathFollower(LifecycleNode):
         self.current_path_publisher.publish(final_path)
         self.current_path = final_path
 
-
-        
-
-
     def waypoints_callback(self, msg: Path):
         self.get_logger().info("Got waypoints!")
         self.waypoints = msg
@@ -370,6 +336,37 @@ class PathFollower(LifecycleNode):
         look_ahead_point = find_look_ahead_point(self.current_path.points, (self.latitude, self.longitude), self.speed_knots)
         self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
         self.target_position_publisher.publish(look_ahead_point)
+
+    def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
+        """
+        Convert lat/long coordinates to grid cell using pyproj for projection handling.
+        
+        Parameters:
+        - latitude, longitude: The lat/long coordinates to convert.
+        - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
+        - image_width, image_height: The dimensions of the image in pixels.
+        - src_proj: Source projection (latitude/longitude).
+        - dest_proj: Destination projection for the image.
+
+        Returns:
+        - A tuple (x, y) representing the grid cell coordinates in the image.
+        """
+        transformer = Transformer.from_crs(src_proj, dest_proj, always_xy=True)
+        north_east = transformer.transform(bbox['north'], bbox['east'])
+        south_west = transformer.transform(bbox['south'], bbox['west'])
+        
+        point_x, point_y = transformer.transform(latitude, longitude)
+        
+        # Calculate the percentage within the transformed bounding box
+        long_pct = 1.0-(north_east[1] - point_y) / (north_east[1] - south_west[1])
+        lat_pct = (point_x - south_west[0]) / (north_east[0] - south_west[0])
+        self.get_logger().info(f"lat_pct: {lat_pct}, long_pct: {long_pct}")
+        
+        # Convert percentages to pixel positions
+        x = int(long_pct * image_width)
+        y = int(lat_pct * image_height)
+        
+        return x, y
 
 
 

@@ -71,6 +71,19 @@ public:
 
     std::vector<std::pair<double, double>> find_solution(Sailbot::Map &map, double wind_angle_deg, Sailbot::Node *start_node, Sailbot::Node *goal_node)
     {
+        cv::Mat mat = cv::Mat(map.max_dim, map.max_dim, CV_32FC1, map.data->data());
+        cv::Mat scaledImage;
+        mat.convertTo(scaledImage, CV_8UC1, 255.0);
+        cv::Mat colorImage;
+        cv::cvtColor(scaledImage, colorImage, cv::COLOR_GRAY2BGR);
+        cv::Scalar redColor(0, 0, 255); 
+        cv::Scalar greenColor(0, 255, 0); 
+
+        cv::circle(colorImage, cv::Point(start_node->x, start_node->y), 5, greenColor, -1);
+        cv::circle(colorImage, cv::Point(goal_node->x, goal_node->y), 5, redColor, -1);
+        cv::flip(colorImage, colorImage, 0);
+        cv::imwrite("/home/sailbot/map_with_points.jpg", colorImage);
+
         double wind_angle_rad = wind_angle_deg * (M_PI / 180);
         double nogo_angle_rad = NOGO_ANGLE_DEGREES * (M_PI / 180);
         bool wind_blocked = false;
@@ -110,6 +123,7 @@ public:
 
         auto time_start = std::chrono::high_resolution_clock::now();
         auto path = solver.solve(map, start_node, goal_node, wind_angle_rad);
+
         RCLCPP_INFO(this->get_logger(), "Got A-star path");
         path = simplify_path(path, wind_angle_deg, map);
         auto time_stop = std::chrono::high_resolution_clock::now();
