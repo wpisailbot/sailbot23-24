@@ -3,7 +3,7 @@ import rclpy
 from std_msgs.msg import String, Float64, Int16, Header
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
-from geometry_msgs.msg import Point, Pose, Quaternion
+from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
 from sailbot_msgs.msg import Path
 from sailbot_msgs.srv import SetMap, GetPath
@@ -25,7 +25,7 @@ import math
 
 from geopy.distance import great_circle
 
-def get_resource_dir():
+def get_maps_dir():
     package_path = get_package_share_directory('sailbot')
     resource_path = os.path.join(package_path, 'maps')
     return resource_path
@@ -35,31 +35,39 @@ def distance(x1, y1, x2, y2):
     y2y1 = y2-y1
     return math.sqrt(x2x1*x2x1 + y2y1*y2y1)
 
-def calculate_look_ahead_distance(base_distance, speed_factor, current_speed):
-    return base_distance + (speed_factor * current_speed)
+def interpolate_point(point1, point2, fraction):
+    lat = point1.latitude + (point2.latitude - point1.latitude) * fraction
+    lon = point1.longitude + (point2.longitude - point1.longitude) * fraction
+    return GeoPoint(latitude=lat, longitude=lon)
 
 def find_look_ahead_point(path, current_position, current_speed):
-    base_distance = 5  # Minimum look-ahead distance in meters
-    speed_factor = 1   # How much the look-ahead distance increases per knot of speed
+    base_distance = 100  # Minimum look-ahead distance in meters
+    speed_factor = 10   # How much the look-ahead distance increases per knot of speed
     
-    look_ahead_distance = calculate_look_ahead_distance(base_distance, speed_factor, current_speed)
+    look_ahead_distance = base_distance + speed_factor * current_speed
     
-    look_ahead_point = None
-    closest_distance = float('inf')
+    total_distance = 0
+    previous_point = None
     for i, point in enumerate(path):
-        distance = great_circle(current_position, (point.latitude, point.longitude)).meters
-        if distance < closest_distance:
-            closest_distance = distance
-            closest_index = i
+        if i == 0:
+            distance = great_circle(current_position, (point.latitude, point.longitude)).meters
+        else:
+            distance = great_circle((previous_point.latitude, previous_point.longitude), (point.latitude, point.longitude)).meters
+        
+        total_distance += distance
+        if total_distance >= look_ahead_distance and previous_point is not None:
+            # Find the excess distance beyond the look-ahead point
+            excess_distance = total_distance - look_ahead_distance
+            # Calculate the fraction of the distance between the last two points where the look-ahead point falls
+            fraction = (distance - excess_distance) / distance
+            # Interpolate between the previous point and the current point to find the exact look-ahead point
+            look_ahead_point = interpolate_point(previous_point, point, fraction)
+            return look_ahead_point
+        
+        previous_point = point
     
-    # Starting from the closest point, find the look ahead point
-    for point in path[closest_index:]:
-        distance = great_circle(current_position, (point.latitude, point.longitude)).meters
-        if distance >= look_ahead_distance:
-            look_ahead_point = point
-            break
-    
-    return look_ahead_point
+    # If the loop completes without returning, the look-ahead point is beyond the end of the path
+    return previous_point
 
 def find_and_load_image(directory, location):
     """
@@ -121,7 +129,7 @@ class PathFollower(LifecycleNode):
         self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
         self.get_logger().info(f'Map name: {self.map_name}')
         self.get_logger().info("Getting map image")
-        image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
+        image, self.bbox = find_and_load_image(get_maps_dir(), self.map_name)
         cv2.imwrite("/home/sailbot/after_load.jpg", image)
 
 
@@ -283,23 +291,26 @@ class PathFollower(LifecycleNode):
             self.current_path_publisher.publish(self.current_path)
             return
         path_segments = []
-        path_segments.append(self.get_path(self.current_grid_cell, points[0]))
+        path_segments.append(self.get_path(self.current_grid_cell, points[0]).path)
         for i in range(len(points)-1):
-            path_segments.append(self.get_path(points[i], points[i+1]))
+            path_segments.append(self.get_path(points[i], points[i+1]).path)
         
+        # for segment in path_segments:
+        #     segment.poses = self.insert_intermediate_points(segment.poses, 1)
+
         final_path = Path()
         
         i=-1
         final_path.points.append(GeoPoint(latitude=self.latitude, longitude=self.longitude))
         for segment in path_segments:
             #skip failed waypoints
-            if(len(segment.path.poses)==0):
+            if(len(segment.poses)==0):
                 continue 
             #append exact start position
             if i!=-1:
                 final_path.points.append(self.waypoints.points[i])
-            for j in range(1, len(segment.path.poses)-1):
-                poseStamped = segment.path.poses[j]
+            for j in range(1, len(segment.poses)-1):
+                poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
                 self.get_logger().info(f"point: {point}")
                 lat, lon = self.grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
@@ -402,14 +413,17 @@ class PathFollower(LifecycleNode):
         appended = []
         for i in range(length):
             if i<(length-1):
-                num = round(distance(path[i][0], path[i][1], path[i+1][0], path[i+1][1])*num_per_unit_distance)
+                num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i].pose.position.y)*num_per_unit_distance)
                 appended.append(path[i])
-                x_step = (path[i+1][0]-path[i][0])/(num+1)
-                y_step = (path[i+1][1]-path[i][1])/(num+1)
+                x_step = (path[i+1].pose.position.x-path[i].pose.position.x)/(num+1)
+                y_step = (path[i].pose.position.y-path[i].pose.position.y)/(num+1)
                 for j in range(1, num+1):
-                    new_x = path[i][0]+x_step*j
-                    new_y = path[i][1]+y_step*j
-                    appended.append([new_x, new_y])
+                    new_x = path[i].pose.position.x+x_step*j
+                    new_y = path[i].pose.position.y+y_step*j
+                    new_point = PoseStamped()
+                    new_point.pose.position.x = new_x
+                    new_point.pose.position.y = new_y
+                    appended.append(new_point)
         appended.append(path[-1])
         return appended
 

@@ -4,7 +4,7 @@
 #include "node.h"
 #include "map.h"
 
-#define NOGO_ANGLE_DEGREES 30
+#define NOGO_ANGLE_DEGREES 45
 double double_equals(double x, double y, double absTol = 0.000000001, double relTol = 0.000000001);
 double distance(double x1, double y1, double x2, double y2);
 std::pair<double, double> rotateAndScale(Sailbot::Node* pt, double radians, uint32_t h, uint32_t w, uint32_t h_new, uint32_t w_new);

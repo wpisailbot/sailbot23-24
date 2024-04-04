@@ -137,6 +137,7 @@ class NetworkComms(LifecycleNode):
         self.pwm_heartbeat_subscription: Optional[Subscription]
         self.control_system_subscription: Optional[Subscription]
         self.current_path_subscription: Optional[Subscription]
+        self.target_position_subscriber: Optional[Subscription]
 
         #receives state updates from other nodes
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
@@ -256,6 +257,11 @@ class NetworkComms(LifecycleNode):
             Path,
             'current_path',
             self.current_path_callback,
+            10)
+        self.target_position_subscriber = self.create_subscription(
+            GeoPoint,
+            'target_position',
+            self.target_position_callback,
             10)
         
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
@@ -378,6 +384,11 @@ class NetworkComms(LifecycleNode):
         return super().on_error(state)
      
     #end lifecycle callbacks
+
+    def target_position_callback(self, msg: GeoPoint):
+        self.get_logger().info(f"Sending target point: {msg}")
+        self.current_boat_state.current_target_point.latitude = msg.latitude
+        self.current_boat_state.current_target_point.longitude = msg.longitude
 
     def current_path_callback(self, msg: Path):
         self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")
