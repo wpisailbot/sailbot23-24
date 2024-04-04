@@ -183,7 +183,7 @@ class HeadingController(LifecycleNode):
             return
         
         heading_error = self.getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
-        self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} pos: {self.latitude}, {self.longitude} to pos: {self.target_position.latitude}, {self.target_position.longitude}")
+        #self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} pos: {self.latitude}, {self.longitude} to pos: {self.target_position.latitude}, {self.target_position.longitude}")
         #self.rudder_simulator.input['heading_error'] = heading_error
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         #self.rudder_simulator.compute()
@@ -193,7 +193,7 @@ class HeadingController(LifecycleNode):
             rudder_angle = 90
         elif rudder_angle<-90:
             rudder_angle = -90
-        self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
+        #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
         msg.data = int(rudder_angle)
         self.rudder_angle_publisher.publish(msg)
@@ -207,20 +207,20 @@ class HeadingController(LifecycleNode):
         lon2 = math.radians(target_long)
         
         delta_lon = lon2 - lon1
-        self.get_logger().info(f"delta_lon: {delta_lon}")
+        #self.get_logger().info(f"delta_lon: {delta_lon}")
         
         # Calculate the bearing from current location to target location
         x = math.sin(delta_lon) * math.cos(lat2)
         y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(delta_lon))
-        self.get_logger().info(f"x: {x}, y: {y}")
+        #self.get_logger().info(f"x: {x}, y: {y}")
         initial_bearing = math.atan2(x, y)
 
         initial_bearing = math.degrees(initial_bearing)
-        self.get_logger().info(f"initial bearing: {initial_bearing}")
+        #self.get_logger().info(f"initial bearing: {initial_bearing}")
         
-        self.get_logger().info(f"Current theta: {current_theta}")
+        #self.get_logger().info(f"Current theta: {current_theta}")
         # Calculate turn required by normalizing the difference between the bearing and current orientation
-        turn = normalRelativeAngle(math.radians(initial_bearing - current_theta))
+        turn = normalRelativeAngle(math.radians(current_theta-initial_bearing))
         
         return math.degrees(turn)
 

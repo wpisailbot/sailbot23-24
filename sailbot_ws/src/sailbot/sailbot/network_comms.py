@@ -266,20 +266,20 @@ class NetworkComms(LifecycleNode):
         
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
-        self.current_boat_state.latitude = 5
-        self.current_boat_state.longitude = 4
-        self.current_boat_state.current_heading = 12
+        self.current_boat_state.latitude = 42.273822
+        self.current_boat_state.longitude = -71.805967
+        self.current_boat_state.current_heading = 0
         self.current_boat_state.track_degrees_true = 0
         self.current_boat_state.track_degrees_magnetic = 0
-        self.current_boat_state.speed_knots = 12
-        self.current_boat_state.speed_kmh = 12
-        self.current_boat_state.rate_of_turn = 2
-        self.current_boat_state.true_wind.speed = 12
-        self.current_boat_state.true_wind.direction = 5
-        self.current_boat_state.apparent_wind.speed = 4
-        self.current_boat_state.apparent_wind.direction = 6
-        self.current_boat_state.pitch = 3
-        self.current_boat_state.roll = 2
+        self.current_boat_state.speed_knots = 0
+        self.current_boat_state.speed_kmh = 0
+        self.current_boat_state.rate_of_turn = 0
+        self.current_boat_state.true_wind.speed = 0
+        self.current_boat_state.true_wind.direction = 0
+        self.current_boat_state.apparent_wind.speed = 0
+        self.current_boat_state.apparent_wind.direction = 0
+        self.current_boat_state.pitch = 0
+        self.current_boat_state.roll = 0
         self.node_indices = {}
         node_names = ["airmar_reader", "ballast_control", "battery_monitor", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
         i=0
@@ -501,7 +501,10 @@ class NetworkComms(LifecycleNode):
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
         #rudder commands are radians, map to degrees
-        degrees = int(command.rudder_control_value*(180/math.pi))
+        degrees = command.rudder_control_value*(180/math.pi)
+        degrees = int(degrees/3)
+        self.get_logger().info(f"degrees: {degrees}")
+        
         msg = Int16()
         msg.data = degrees
         self.rudder_control_publisher.publish(msg)

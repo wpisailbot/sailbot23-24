@@ -197,12 +197,11 @@ class TrimTabComms(LifecycleNode):
         self.ser.write(message_string.encode())
 
     def rudder_angle_callback(self, msg: Int16):
-        self.get_logger().info("Got rudder position")
-        degrees = msg.data
-        degrees_scaled =  (((degrees - -90) * (113 - 40)) / (90 - -90)) + 40
+        self.get_logger().info(f"Got rudder position: {msg.data}")
+        degrees = msg.data+13 #Servo degree offset
 
         message = {
-            "rudder_angle": degrees_scaled
+            "rudder_angle": degrees
         }
         message_string = json.dumps(message)+'\n'
         self.ser.write(message_string.encode())
