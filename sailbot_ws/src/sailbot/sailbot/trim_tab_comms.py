@@ -189,7 +189,8 @@ class TrimTabComms(LifecycleNode):
             }
         if self.force_neutral_position:
             msg = {
-                state: "neutral"
+                "state": "manual",
+                "angle": 90
             }
         message_string = json.dumps(msg)+'\n'
         self.ser.write(message_string.encode())
