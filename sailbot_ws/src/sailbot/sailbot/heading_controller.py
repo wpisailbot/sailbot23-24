@@ -17,6 +17,8 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 
+from sailbot_msgs.msg import AutonomousMode, Path
+
 PI = math.pi
 TWO_PI = PI*2
 #normalizes an angle
@@ -40,6 +42,7 @@ class HeadingController(LifecycleNode):
     latitude = 42.273822
     longitude = -71.805967
     target_position = None
+    autonomous_mode = 0
 
     def __init__(self):
         super().__init__('heading_controller')
@@ -47,6 +50,10 @@ class HeadingController(LifecycleNode):
         self.target_position_subscription: Optional[Subscription]
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
+        self.autonomous_mode_subscription: Optional[Subscription]
+        self.current_path_subscription: Optional[Subscription]
+
+
         self.timer: Optional[Timer]
         # self.target_position = GeoPoint()
         # self.target_position.latitude = 42.273051
@@ -73,6 +80,14 @@ class HeadingController(LifecycleNode):
             '/airmar_data/lat_long',
             self.airmar_position_callback,
             10)
+        self.current_path_subscription = self.create_subscription(
+            Path,
+            'current_path',
+            self.current_path_callback,
+            10)
+        self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
+
+        
         #self.timer = self.create_timer(1.0, self.timer_callback)
         self.get_logger().info("Heading controller node configured")
 
@@ -162,6 +177,14 @@ class HeadingController(LifecycleNode):
     
     #end callbacks
 
+    def current_path_callback(self, msg: Path):
+        if len(msg.points) == 0:
+            self.target_position = None
+
+    def autonomous_mode_callback(self, msg: AutonomousMode):
+        self.get_logger().info(f"Got autonomous mode: {msg.mode}")
+        self.autonomous_mode = msg.mode
+
     def timer_callback(self):
         self.compute_rudder_angle()
 
@@ -179,7 +202,14 @@ class HeadingController(LifecycleNode):
         self.compute_rudder_angle()
     
     def compute_rudder_angle(self):
+        autonomous_modes = AutonomousMode()
+        if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL):
+            return
+        
         if(self.target_position is None):
+            msg = Int16()
+            msg.data = int(0)
+            self.rudder_angle_publisher.publish(msg)
             return
         
         heading_error = self.getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)

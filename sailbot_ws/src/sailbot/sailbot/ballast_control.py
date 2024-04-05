@@ -23,8 +23,8 @@ def bound(low, high, value):
     return max(low, min(high, value))
 
 class BallastControl(LifecycleNode):
-    ADC_FULL_STARBOARD = 570
-    ADC_FULL_PORT = 2140
+    ADC_FULL_STARBOARD = 770
+    ADC_FULL_PORT = 2350
     
     MOTOR_FAST_STARBOARD = 130
     MOTOR_FAST_PORT = 60
@@ -32,7 +32,7 @@ class BallastControl(LifecycleNode):
     CONTROL_FAST_PORT=-1.0
     CONTROL_FAST_STARBOARD=1.0
 
-    Kp = 0.003
+    Kp = -0.007
 
     current_target = (ADC_FULL_PORT-ADC_FULL_STARBOARD)/2+ADC_FULL_STARBOARD
     current_ballast_position = current_target
@@ -118,6 +118,9 @@ class BallastControl(LifecycleNode):
         self.get_logger().info("Got roll data!")
 
     def control_loop_callback(self):
+        if(self.current_ballast_position == 0):
+            self.get_logger().info("Ballast position is 0, assuming it's broken")
+            return
         motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.current_ballast_position-self.current_target)))
         #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         

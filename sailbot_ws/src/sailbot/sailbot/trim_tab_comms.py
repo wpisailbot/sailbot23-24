@@ -15,7 +15,7 @@ from enum import Enum
 from time import time as get_time
 
 from std_msgs.msg import Int8, Int16, Float32, Empty
-from sailbot_msgs.msg import Wind, AutonomousMode
+from sailbot_msgs.msg import Wind, AutonomousMode, Path
 
 import trim_tab_messages.python.messages_pb2 as message_pb2
 
@@ -37,6 +37,7 @@ class TrimTabComms(LifecycleNode):
     last_websocket = None
     last_winds = []
     autonomous_mode = 0
+    force_neutral_position = True
 
     def __init__(self):
         super(TrimTabComms, self).__init__('trim_tab_comms')
@@ -49,7 +50,7 @@ class TrimTabComms(LifecycleNode):
         self.ballast_pos_publisher: Optional[Publisher]
 
         self.autonomous_mode_subscriber: Optional[Subscription]
-
+        self.current_path_subscription: Optional[Subscription]
 
         self.timer_pub: Optional[Publisher]
 
@@ -72,6 +73,11 @@ class TrimTabComms(LifecycleNode):
         self.apparent_wind_publisher = self.create_subscription(Wind, 'airmar_data/apparent_wind', self.apparent_wind_callback, 10)
 
         self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
+        self.current_path_subscription = self.create_subscription(
+            Path,
+            'current_path',
+            self.current_path_callback,
+            10)
 
         self.timer_pub = self.create_lifecycle_publisher(Empty, '/heartbeat/trim_tab_comms', 1)
         
@@ -118,6 +124,14 @@ class TrimTabComms(LifecycleNode):
         return super().on_error(state)
     
     #end callbacks
+
+    def current_path_callback(self, msg: Path):
+        if len(msg.points) == 0:
+            self.force_neutral_position = True
+        else:
+            self.get_logger().info("Valid path received, allowing auto trimtab movement")
+            self.force_neutral_position = False
+
     def autonomous_mode_callback(self, msg: AutonomousMode):
         self.get_logger().info(f"Got autonomous mode: {msg.mode}")
         self.autonomous_mode = msg.mode
@@ -144,7 +158,7 @@ class TrimTabComms(LifecycleNode):
         # Check autonomous mode TODO: This is a coupling that shouldn't be necessary. 
         # Can be fixed by separating nodes and using lifecycle state transitions, or by finishing behavior tree
         autonomous_modes = AutonomousMode()
-        if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL or self.autonomous_modes != autonomous_modes.AUTONOMOUS_MODE_TRIMTAB):
+        if ((self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL) or (self.autonomous_modes != autonomous_modes.AUTONOMOUS_MODE_TRIMTAB)):
             return
 
         msg = None
@@ -172,6 +186,10 @@ class TrimTabComms(LifecycleNode):
             # In irons, min lift
             msg = {
                 state: "min_lift"
+            }
+        if self.force_neutral_position:
+            msg = {
+                state: "neutral"
             }
         message_string = json.dumps(msg)+'\n'
         self.ser.write(message_string.encode())
@@ -235,6 +253,11 @@ class TrimTabComms(LifecycleNode):
                 #self.get_logger().info("Received position:", message["ballast_pos"])
                 pos = Int16()
                 pos.data = message["ballast_pos"]
+                if(pos.data == 0):
+                    self.get_logger().info("Ballast potentiometer is not working!")
+                else:
+                    self.get_logger().info(f"Ballast position: {pos.data}")
+                #publish even if it's broken, ballast_control will detect it
                 self.ballast_pos_publisher.publish(pos)
             except json.JSONDecodeError:
                 self.get_logger().info("Error decoding JSON")
