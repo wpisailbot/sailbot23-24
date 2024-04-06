@@ -8,6 +8,7 @@ import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import math
+import traceback
 
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -270,7 +271,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        heading_control.get_logger().fatal(f'Unhandled exception: {e}')
+        trace = traceback.format_exec()
+        heading_control.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

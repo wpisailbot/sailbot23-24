@@ -13,6 +13,7 @@ import asyncio
 from asyncio import Future
 from threading import Event
 import threading
+import traceback
 
 class BoatState(Enum):
     INACTIVE=1
@@ -168,7 +169,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        state_manager.get_logger().fatal(f'Unhandled exception: {e}')
+        trace = traceback.format_exec()
+        state_manager.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

@@ -28,6 +28,7 @@ import os
 import cv2
 import re
 import numpy as np
+import traceback
 
 from sailbot_msgs.srv import RestartNode
 
@@ -654,7 +655,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        network_comms.get_logger().fatal(f'Unhandled exception: {e.with_traceback(e.__traceback__)}')
+        trace = traceback.format_exec()
+        network_comms.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

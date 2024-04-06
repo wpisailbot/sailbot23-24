@@ -17,6 +17,7 @@ from sensor_msgs.msg import NavSatFix
 from sailbot_msgs.msg import Wind
 import signal
 import logging
+import traceback
 
 
 class AirmarReader(LifecycleNode): #translates airmar data into json and publishes on 'airmar_data' ROS2 topic
@@ -275,7 +276,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        airmar_reader.get_logger().fatal(f'Unhandled exception: {e}')
+        trace = traceback.format_exec()
+        airmar_reader.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node
         airmar_reader.ser.close()

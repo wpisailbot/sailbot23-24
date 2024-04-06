@@ -6,6 +6,7 @@ import board
 import busio
 import time
 from typing import Optional
+import traceback
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
 from rclpy.lifecycle import Publisher
 from rclpy.lifecycle import State
@@ -145,7 +146,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        ballast_control.get_logger().fatal(f'Unhandled exception: {e}')
+        trace = traceback.format_exec()
+        ballast_control.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

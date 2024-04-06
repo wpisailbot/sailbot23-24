@@ -448,8 +448,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        traceback = traceback.format_exec()
-        path_follower.get_logger().fatal(f'Unhandled exception: {e}\n{traceback}')
+        trace = traceback.format_exec()
+        path_follower.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()
