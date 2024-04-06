@@ -17,8 +17,6 @@ from std_msgs.msg import String, Float64
 from sensor_msgs.msg import NavSatFix
 from sailbot_msgs.msg import Wind
 import signal
-import pyudev
-
 
 class AirmarReader(Node): #translates airmar data into json and publishes on 'airmar_data' ROS2 topic
 
@@ -38,22 +36,6 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
         self.roll_publisher = self.create_publisher(Float64, 'airmar_data/roll', 10)
         self.pitch_publisher = self.create_publisher(Float64, 'airmar_data/pitch', 10)
         self.timer = self.create_timer(0.01, self.timer_callback)
-
-        context = pyudev.Context()
-
-        vid = '1576'
-        pid = '03b1'
-        self.device_file = None
-        for device in context.list_devices(subsystem='tty'):
-            if 'ID_VENDOR_ID' in device.properties and 'ID_MODEL_ID' in device.properties:
-                if device.properties['ID_VENDOR_ID'] == vid and device.properties['ID_MODEL_ID'] == pid:
-                    self.device_file = device.device_node
-                    break
-
-        if self.device_file:
-            print(f'Device file: {self.device_file}')
-        else:
-            print('Device not found')
 
         self.ser = serial.Serial('/dev/serial/by-id/usb-Maretron_USB100__NMEA_2000_USB_Gateway__1163885-if00')
 
@@ -97,6 +79,7 @@ class AirmarReader(Node): #translates airmar data into json and publishes on 'ai
                 msg.longitude = float(value[1])
                 msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
                 publisher.publish(msg)
+                self.get_logger().info("Published latlong!")
             except:
                 return
         else:

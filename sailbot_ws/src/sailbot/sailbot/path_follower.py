@@ -22,6 +22,7 @@ import re
 import numpy as np
 from pyproj import Transformer
 import math
+import traceback
 
 from geopy.distance import great_circle
 
@@ -41,7 +42,7 @@ def interpolate_point(point1, point2, fraction):
     return GeoPoint(latitude=lat, longitude=lon)
 
 def find_look_ahead_point(path, current_position, current_speed):
-    base_distance = 100  # Minimum look-ahead distance in meters
+    base_distance = 20  # Minimum look-ahead distance in meters
     speed_factor = 10   # How much the look-ahead distance increases per knot of speed
     
     look_ahead_distance = base_distance + speed_factor * current_speed
@@ -107,7 +108,7 @@ class PathFollower(LifecycleNode):
     longitude = -71.805967
     speed_knots = 0
     waypoints = Path()
-    current_path = []
+    current_path = Path()
     #current_grid_cell = (16, 51)
     current_grid_cell = (16, 16)
 
@@ -181,9 +182,9 @@ class PathFollower(LifecycleNode):
                 self.airmar_heading_callback,
                 10, callback_group=self.subscription_callback_group)
             self.airmar_position_subscription = self.create_subscription(
-                GeoPoint,
+                NavSatFix,
                 '/airmar_data/lat_long',
-                self.airmar_heading_callback,
+                self.airmar_position_callback,
                 10, callback_group=self.subscription_callback_group)
             self.airmar_speed_knots_subscription = self.create_subscription(
                 Float64,
@@ -241,12 +242,16 @@ class PathFollower(LifecycleNode):
     #end callbacks
 
     def airmar_heading_callback(self, msg: Float64):
-        self.heading = msg.data
+        pass#self.heading = msg.data
     
     def airmar_position_callback(self, msg: NavSatFix):
         self.latitude = msg.latitude
         self.longitude = msg.longitude
-        self.current_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
+        new_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
+        if new_grid_cell != self.current_grid_cell:
+            self.get_logger().info("Recalculating path")
+            self.recalculate_path_from_waypoints()
+            
         self.find_look_ahead()
 
 
@@ -443,7 +448,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        path_follower.get_logger().fatal(f'Unhandled exception: {e}')
+        traceback = traceback.format_exec()
+        path_follower.get_logger().fatal(f'Unhandled exception: {e}\n{traceback}')
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

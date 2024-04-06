@@ -446,6 +446,7 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.rate_of_turn = msg.data
 
     def lat_long_callback(self, msg: NavSatFix):
+        self.get_logger().info(f"Got latlong: {msg.latitude}, {msg.longitude}")
         self.current_boat_state.latitude = msg.latitude
         self.current_boat_state.longitude = msg.longitude
 

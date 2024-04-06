@@ -132,6 +132,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                 msg.longitude = float(value[1])
                 msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN
                 publisher.publish(msg)
+                self.get_logger().info("Published latlong!")
             except:
                 return
         else:

@@ -72,7 +72,7 @@ def generate_launch_description():
         name='state_manager',
         namespace='',
         output='screen',
-        parameters=[{'managed_nodes': ["path_follower", "heading_controller", "trim_tab_comms"]}]
+        parameters=[{'managed_nodes': ["airmar_reader", "path_follower", "heading_controller", "trim_tab_comms"]}]
     )
     pathfinder_node = Node(
         package='sailbot_pathfinding', 
@@ -89,7 +89,7 @@ def generate_launch_description():
     ld.add_action(network_comms_node)
     ld.add_action(ballast_node) 
     #ld.add_action(pwm_node)
-    #ld.add_action(airmar_node)
+    ld.add_action(airmar_node)
     ld.add_action(tt_node)
     ld.add_action(heading_node)
     ld.add_action(path_follower_node)

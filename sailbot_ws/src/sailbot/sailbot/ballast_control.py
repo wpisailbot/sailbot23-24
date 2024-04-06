@@ -115,11 +115,12 @@ class BallastControl(LifecycleNode):
         self.current_ballast_position = msg.data
 
     def airmar_roll_callback(self, msg: Float64):
-        self.get_logger().info("Got roll data!")
+        pass
+        #self.get_logger().info("Got roll data!")
 
     def control_loop_callback(self):
         if(self.current_ballast_position == 0):
-            self.get_logger().info("Ballast position is 0, assuming it's broken")
+            #self.get_logger().info("Ballast position is 0, assuming it's broken")
             return
         motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.current_ballast_position-self.current_target)))
         #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
