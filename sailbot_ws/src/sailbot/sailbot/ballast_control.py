@@ -33,7 +33,7 @@ class BallastControl(LifecycleNode):
     CONTROL_FAST_PORT=-1.0
     CONTROL_FAST_STARBOARD=1.0
 
-    Kp = -0.007
+    Kp = 0.007
 
     current_target = (ADC_FULL_PORT-ADC_FULL_STARBOARD)/2+ADC_FULL_STARBOARD
     current_ballast_position = current_target
