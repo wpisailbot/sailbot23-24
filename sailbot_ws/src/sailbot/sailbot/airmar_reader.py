@@ -120,8 +120,8 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         elif type == Wind:
             msg = Wind()
             try:
-                msg.direction = float(value[0])
-                msg.speed = float(value[1])
+                msg.speed = float(value[0])
+                msg.direction = float(value[1])
                 publisher.publish(msg)
 
             except:
@@ -231,8 +231,8 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                     }
                 }
             elif(type_code == 'MWV'):
-                self.publishIfValid([args[5], args[1]], self.apparent_wind_publisher, Wind)
-                self.get_logger().info("Got apparent wind")
+                self.publishIfValid([args[3], args[1]], self.apparent_wind_publisher, Wind)
+                self.get_logger().info(f"Got apparent wind: {args[3]}, {args[1]}")
                 return {"apparentWind":
                     {"speed": args[3],       #in knots 
                     "direction": args[1]   #in deg

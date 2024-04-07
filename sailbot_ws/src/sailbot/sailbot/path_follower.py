@@ -249,6 +249,7 @@ class PathFollower(LifecycleNode):
         self.longitude = msg.longitude
         new_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
         if new_grid_cell != self.current_grid_cell:
+            self.current_grid_cell = new_grid_cell
             self.get_logger().info("Recalculating path")
             self.recalculate_path_from_waypoints()
             
@@ -342,7 +343,7 @@ class PathFollower(LifecycleNode):
     
     def find_look_ahead(self):
         if len(self.current_path.points) == 0:
-            self.get_logger().info("No lookAhead point for zero-length path")
+            #self.get_logger().info("No lookAhead point for zero-length path")
             return
         look_ahead_point = find_look_ahead_point(self.current_path.points, (self.latitude, self.longitude), self.speed_knots)
         self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
@@ -371,7 +372,7 @@ class PathFollower(LifecycleNode):
         # Calculate the percentage within the transformed bounding box
         long_pct = 1.0-(north_east[1] - point_y) / (north_east[1] - south_west[1])
         lat_pct = (point_x - south_west[0]) / (north_east[0] - south_west[0])
-        self.get_logger().info(f"lat_pct: {lat_pct}, long_pct: {long_pct}")
+        #self.get_logger().info(f"lat_pct: {lat_pct}, long_pct: {long_pct}")
         
         # Convert percentages to pixel positions
         x = int(long_pct * image_width)

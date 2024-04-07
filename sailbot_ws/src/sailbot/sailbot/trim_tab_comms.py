@@ -137,61 +137,77 @@ class TrimTabComms(LifecycleNode):
         self.autonomous_mode = msg.mode
 
     def apparent_wind_callback(self, msg: Wind):
+        self.get_logger().info(f"Got apparent wind: {msg.direction}")
         direction = msg.direction
         self.find_trim_tab_state(direction)
 
+    def median(self, lst):
+        n = len(lst)
+        s = sorted(lst)
+        return (sum(s[n // 2 - 1:n // 2 + 1]) / 2.0, s[n // 2])[n % 2] if n else None
+    
     def update_winds(self, relative_wind):
         # Check we have new wind
         if len(self.last_winds) != 0 and relative_wind == self.last_winds[len(self.last_winds) - 1]:
             return
             # First add wind to running list
         self.last_winds.append(float(relative_wind))
-        if len(self.last_winds) > 10:
+        if len(self.last_winds) > 20:
             self.last_winds.pop(0)
-        # Now find best trim tab state
-        smooth_angle = self.median(self.last_winds)
-        return smooth_angle
 
     def find_trim_tab_state(self, relative_wind):  # five states of trim
-        smooth_angle = self.update_winds(relative_wind)
+        #self.get_logger().info(f"apparent wind: {relative_wind}")
+        self.update_winds(relative_wind)
+        smooth_angle = self.median(self.last_winds)
+
         
         # Check autonomous mode TODO: This is a coupling that shouldn't be necessary. 
         # Can be fixed by separating nodes and using lifecycle state transitions, or by finishing behavior tree
         autonomous_modes = AutonomousMode()
-        if ((self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL) or (self.autonomous_modes != autonomous_modes.AUTONOMOUS_MODE_TRIMTAB)):
+        #self.get_logger().info(f"Auto mode: {self.autonomous_mode}")
+        if ((self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL) and (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_TRIMTAB)):
+            #self.get_logger().info(f"Skipping")
             return
 
         msg = None
         if 45.0 <= smooth_angle < 135:
             # Max lift port
             msg = {
-                state: "max_lift_port"
+                "state": "max_lift_port"
             }
+            self.get_logger().info("Max lift port")
         elif 135 <= smooth_angle < 180:
             # Max drag port
             msg = {
-                state: "max_drag_port"
+                "state": "max_drag_port"
             }
-        elif 180 <= smooth_angle < 225:
+            self.get_logger().info("Max drag port")
+
+        elif 180 <= smooth_angle < 200:
             # Max drag starboard
             msg = {
-                state: "max_drag_starboard"
+                "state": "max_drag_starboard"
             }
-        elif 225 <= smooth_angle < 315:
+            self.get_logger().info("Max drag starboard")
+        elif 200 <= smooth_angle < 315:
             # Max lift starboard
             msg = {
-                state: "max_lift_starboard"
+                "state": "max_lift_starboard"
             }
+            self.get_logger().info("Max lift starboard")
         else:
             # In irons, min lift
             msg = {
-                state: "min_lift"
+                "state": "min_lift"
             }
-        if self.force_neutral_position:
+            self.get_logger().info("Min lift")
+        if self.force_neutral_position and self.autonomous_mode == AutonomousMode.AUTONOMOUS_MODE_FULL:
             msg = {
                 "state": "manual",
                 "angle": 90
             }
+            self.get_logger().info("Force neutral")
+            
         message_string = json.dumps(msg)+'\n'
         self.ser.write(message_string.encode())
 
@@ -255,7 +271,7 @@ class TrimTabComms(LifecycleNode):
                 pos = Int16()
                 pos.data = message["ballast_pos"]
                 if(pos.data == 0):
-                    #self.get_logger().info("Ballast potentiometer is not working!")
+                    self.get_logger().info("Ballast potentiometer is not working!")
                     pass
                 else:
                     #self.get_logger().info(f"Ballast position: {pos.data}")

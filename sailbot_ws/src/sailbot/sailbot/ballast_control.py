@@ -4,7 +4,7 @@ from std_msgs.msg import String, Float64, Int16
 import json
 import board
 import busio
-import time
+from time import time as get_time
 from typing import Optional
 import traceback
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -24,8 +24,8 @@ def bound(low, high, value):
     return max(low, min(high, value))
 
 class BallastControl(LifecycleNode):
-    ADC_FULL_STARBOARD = 770
-    ADC_FULL_PORT = 2350
+    ADC_FULL_STARBOARD = 700
+    ADC_FULL_PORT = 2300
     
     MOTOR_FAST_STARBOARD = 130
     MOTOR_FAST_PORT = 60
@@ -33,7 +33,10 @@ class BallastControl(LifecycleNode):
     CONTROL_FAST_PORT=-1.0
     CONTROL_FAST_STARBOARD=1.0
 
-    Kp = 0.007
+    Kp = 0.005
+    Kd = 0.1
+    previous_error = 0
+    previous_time = get_time()
 
     current_target = (ADC_FULL_PORT-ADC_FULL_STARBOARD)/2+ADC_FULL_STARBOARD
     current_ballast_position = current_target
@@ -121,11 +124,18 @@ class BallastControl(LifecycleNode):
 
     def control_loop_callback(self):
         if(self.current_ballast_position == 0):
-            #self.get_logger().info("Ballast position is 0, assuming it's broken")
+            self.get_logger().info("Ballast position is 0, assuming it's broken")
             return
-        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*(self.current_ballast_position-self.current_target)))
+        current_error = self.current_ballast_position - self.current_target
+        current_time = get_time()
+        delta_time = current_time-self.previous_time
+        error_derivative = (current_error - self.previous_error) / delta_time
+        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*current_error))
         #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         
+        self.previous_error = current_error
+        self.previous_time = current_time
+
         msg = Int16()
         msg.data = int(motor_value)
         self.ballast_pwm_publisher.publish(msg)

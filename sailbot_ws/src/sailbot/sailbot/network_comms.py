@@ -392,15 +392,15 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.current_target_point.longitude = msg.longitude
 
     def current_path_callback(self, msg: Path):
-        self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")
+        #self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")
         self.current_boat_state.current_path.ClearField("points")# = command.new_path
-        self.get_logger().info("Cleared old path")
+        #self.get_logger().info("Cleared old path")
         for geo_point in msg.points:
             point_msg = boat_state_pb2.Point(latitude=geo_point.latitude, longitude = geo_point.longitude)
             self.current_boat_state.current_path.points.append(point_msg)
-        self.get_logger().info("Added new points")
+        #self.get_logger().info("Added new points")
 
-        self.get_logger().info(f"length of boatState path is: {len(self.current_boat_state.current_path.points)}")
+        #self.get_logger().info(f"length of boatState path is: {len(self.current_boat_state.current_path.points)}")
 
     def restart_lifecycle_node_by_name(self, node_name):
         # Create a service client to send lifecycle state change requests
@@ -447,7 +447,7 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.rate_of_turn = msg.data
 
     def lat_long_callback(self, msg: NavSatFix):
-        self.get_logger().info(f"Got latlong: {msg.latitude}, {msg.longitude}")
+        #self.get_logger().info(f"Got latlong: {msg.latitude}, {msg.longitude}")
         self.current_boat_state.latitude = msg.latitude
         self.current_boat_state.longitude = msg.longitude
 
@@ -467,12 +467,12 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.current_heading = msg.data
 
     def true_wind_callback(self, msg: Wind):
-        self.current_boat_state.true_wind.speed = msg.speed.data
-        self.current_boat_state.true_wind.direction = msg.direction.data
+        self.current_boat_state.true_wind.speed = msg.speed
+        self.current_boat_state.true_wind.direction = msg.direction
 
     def apparent_wind_callback(self, msg: Wind):
-        self.current_boat_state.apparent_wind.speed = msg.speed.data
-        self.current_boat_state.apparent_wind.direction = msg.direction.data
+        self.current_boat_state.apparent_wind.speed = msg.speed
+        self.current_boat_state.apparent_wind.direction = msg.direction
 
     def roll_callback(self, msg: Float64):
         self.current_boat_state.roll = msg.data
@@ -548,7 +548,7 @@ class NetworkComms(LifecycleNode):
             msg.mode = AutonomousMode.AUTONOMOUS_MODE_NONE
         elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_BALLAST:
             msg.mode = AutonomousMode.AUTONOMOUS_MODE_BALLAST
-        elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_BALLAST:
+        elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_TRIMTAB:
             msg.mode = AutonomousMode.AUTONOMOUS_MODE_TRIMTAB
         elif command.autonomous_mode == boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_FULL:
             msg.mode = AutonomousMode.AUTONOMOUS_MODE_FULL
