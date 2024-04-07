@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Wind.msg"
   "msg/Path.msg"
   "msg/AutonomousMode.msg"
+  "msg/TrimState.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
   "srv/RestartNode.srv"

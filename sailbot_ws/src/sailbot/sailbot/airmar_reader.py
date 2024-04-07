@@ -276,7 +276,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        trace = traceback.format_exec()
+        trace = traceback.format_exc()
         airmar_reader.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node

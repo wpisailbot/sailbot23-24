@@ -156,7 +156,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        trace = traceback.format_exec()
+        trace = traceback.format_exc()
         ballast_control.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node

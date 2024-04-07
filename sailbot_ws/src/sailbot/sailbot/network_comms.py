@@ -18,7 +18,7 @@ from sensor_msgs.msg import NavSatFix
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
-from sailbot_msgs.msg import Wind, Path, AutonomousMode
+from sailbot_msgs.msg import Wind, Path, AutonomousMode, TrimState
 import grpc
 from concurrent import futures
 import json
@@ -139,6 +139,7 @@ class NetworkComms(LifecycleNode):
         self.control_system_subscription: Optional[Subscription]
         self.current_path_subscription: Optional[Subscription]
         self.target_position_subscriber: Optional[Subscription]
+        self.trim_state_subscriber: Optional[Subscription]
 
         #receives state updates from other nodes
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
@@ -264,6 +265,11 @@ class NetworkComms(LifecycleNode):
             'target_position',
             self.target_position_callback,
             10)
+        self.trim_state_subscriber = self.create_subscription(
+            TrimState,
+            'trim_state',
+            self.trim_state_callback,
+            10)
         
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
@@ -372,6 +378,7 @@ class NetworkComms(LifecycleNode):
         self.destroy_subscription(self.pwm_heartbeat_subscription)
         self.destroy_subscription(self.control_system_heartbeat_subscription)
         self.destroy_subscription(self.trim_tab_heartbeat_subscription)
+        self.destroy_subscription(self.trim_state_subscriber)
 
         #return TransitionCallbackReturn.SUCCESS
 
@@ -391,6 +398,18 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.current_target_point.latitude = msg.latitude
         self.current_boat_state.current_target_point.longitude = msg.longitude
 
+    def trim_state_callback(self, msg: TrimState):
+        if(msg.state == TrimState.TRIM_STATE_MIN_LIFT):
+            self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MIN_LIFT
+        elif(msg.state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
+            self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MAX_LIFT_PORT
+        elif(msg.state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
+            self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
+        elif(msg.state == TrimState.TRIM_STATE_MAX_DRAG_PORT):
+            self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MAX_DRAG_PORT
+        elif(msg.state == TrimState.TRIM_STATE_MAX_DRAG_STARBOARD):
+            self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
+        
     def current_path_callback(self, msg: Path):
         #self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")
         self.current_boat_state.current_path.ClearField("points")# = command.new_path
@@ -489,6 +508,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteBallastCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteAutonomousModeCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetWaypointsCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
@@ -498,10 +518,14 @@ class NetworkComms(LifecycleNode):
         self.grpc_server.start()
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteMarkBuoyCommand(self, command: control_pb2.MarkBuoyCommand, context):
+        self.get_logger().info("Received mark buoy command")
+
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteRudderCommand(self, command: control_pb2.RudderCommand, context):
         #center = 75 degrees, full right=40, full left = 113
         response = control_pb2.ControlResponse()
-        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_ERROR
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         #rudder commands are radians, map to degrees
         degrees = command.rudder_control_value*(180/math.pi)
         degrees = int(degrees/3)
@@ -655,7 +679,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        trace = traceback.format_exec()
+        trace = traceback.format_exc()
         network_comms.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     finally:
         # Shutdown and cleanup the node
