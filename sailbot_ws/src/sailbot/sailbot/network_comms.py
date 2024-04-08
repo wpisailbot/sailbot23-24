@@ -210,7 +210,7 @@ class NetworkComms(LifecycleNode):
         
         self.true_wind_subscription = self.create_subscription(
             Wind,
-            'airmar_data/true_wind',
+            'true_wind_smoothed',
             self.true_wind_callback,
             10)
         
