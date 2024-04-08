@@ -319,7 +319,7 @@ class PathFollower(LifecycleNode):
 
     def get_relevant_square_corners(self, target_point, previous_point, next_point, direction):
         corners = self.get_square_corners((target_point.latitude, target_point.longitude), (previous_point.latitude, previous_point.longitude), 10, direction)
-        
+        self.get_logger().info(f"Target: {target_point}, previous: {previous_point}, next: {next_point}, corners: {corners}")
         if next_point is None:
             return corners
         
@@ -331,6 +331,8 @@ class PathFollower(LifecycleNode):
         d2 = great_circle(corners[3], (next_point.latitude, next_point.longitude)).meters
         if(d2<d1):
             relevant.append(corners[3])
+        
+        return relevant
 
 
     def recalculate_path_from_waypoints(self):
@@ -338,12 +340,15 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("No wind reported yet, cannot path")
             return
         
-        points = []
+        grid_points = []
+        exact_points = []
         waypointIndex = 0
         for waypoint in self.waypoints.waypoints:
             #if we just want to intersect the point, we can add it directly
             if (waypoint.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
-                points.append(self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height))
+                self.get_logger().info(f"Intersect")
+                grid_points.append(self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height))
+                exact_points.append(waypoint.point)
             #otherwise, we need to do some math
             else:
                 nextPoint = None
@@ -358,24 +363,27 @@ class PathFollower(LifecycleNode):
                 corners = []
                 if waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT:
                     corners = self.get_relevant_square_corners(waypoint.point, previousPoint, nextPoint, "right")
+                    self.get_logger().info(f"Circle right {corners}")
                 elif waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
+                    self.get_logger().info(f"Circle left {corners}")
                     corners = self.get_relevant_square_corners(waypoint.point, previousPoint, nextPoint, "left")
 
                 for corner in corners:
-                    points.append(self.latlong_to_grid_proj(corner[0], corner[1], self.bbox, self.image_width, self.image_height))
+                    grid_points.append(self.latlong_to_grid_proj(corner[0], corner[1], self.bbox, self.image_width, self.image_height))
+                    exact_points.append(GeoPoint(latitude = corner[0], longitude = corner[1]))
 
 
             waypointIndex+=1
 
-        if len(points) == 0:
+        if len(grid_points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
             self.current_path = Path()
             self.current_path_publisher.publish(self.current_path)
             return
         path_segments = []
-        path_segments.append(self.get_path(self.current_grid_cell, points[0]).path)
-        for i in range(len(points)-1):
-            path_segments.append(self.get_path(points[i], points[i+1]).path)
+        path_segments.append(self.get_path(self.current_grid_cell, grid_points[0]).path)
+        for i in range(len(grid_points)-1):
+            path_segments.append(self.get_path(grid_points[i], grid_points[i+1]).path)
         
         # for segment in path_segments:
         #     segment.poses = self.insert_intermediate_points(segment.poses, 1)
@@ -390,7 +398,7 @@ class PathFollower(LifecycleNode):
                 continue 
             #append exact start position
             if i!=-1:
-                final_path.points.append(self.waypoints.waypoints[i].point)
+                final_path.points.append(exact_points[i])
             for j in range(1, len(segment.poses)-1):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
@@ -401,8 +409,8 @@ class PathFollower(LifecycleNode):
                 geopoint.longitude = lon
                 final_path.points.append(geopoint)
             #append exact final position
-            self.get_logger().info(f"num waypoints: {len(self.waypoints.waypoints)}, i: {i}")
-            final_path.points.append(self.waypoints.waypoints[i+1].point)
+            self.get_logger().info(f"num waypoints: {len(exact_points)}, i: {i}")
+            final_path.points.append(exact_points[i+1])
             i+=1
 
 
