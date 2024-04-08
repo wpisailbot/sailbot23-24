@@ -5,7 +5,7 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
-from sailbot_msgs.msg import Path, Waypoint, WaypointPath
+from sailbot_msgs.msg import Path, Waypoint, WaypointPath, Wind
 from sailbot_msgs.srv import SetMap, GetPath
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -183,19 +183,32 @@ class PathFollower(LifecycleNode):
                 Float64,
                 '/airmar_data/heading',
                 self.airmar_heading_callback,
-                10, callback_group=self.subscription_callback_group)
+                10,
+                callback_group=self.subscription_callback_group)
             self.airmar_position_subscription = self.create_subscription(
                 NavSatFix,
                 '/airmar_data/lat_long',
                 self.airmar_position_callback,
-                10, callback_group=self.subscription_callback_group)
+                10,
+                callback_group=self.subscription_callback_group)
             self.airmar_speed_knots_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/speed_knots',
                 self.airmar_speed_knots_callback,
-                10, callback_group=self.subscription_callback_group)
+                10,
+                callback_group=self.subscription_callback_group)
             self.waypoints_subscriber = self.create_subscription(
-                WaypointPath, 'waypoints', self.waypoints_callback, 10, callback_group=self.subscription_callback_group)
+                WaypointPath, 
+                'waypoints',
+                self.waypoints_callback,
+                10, 
+                callback_group=self.subscription_callback_group)
+            self.true_wind_subscriber = self.create_subscription(
+                Wind,
+                'true_wind_smoothed',
+                self.true_wind_callback,
+                10,
+                callback_group=self.subscription_callback_group)
             #self.timer = self.create_timer(0.1, self.control_loop_callback)
             #super().on_configure(state)
         
@@ -319,7 +332,7 @@ class PathFollower(LifecycleNode):
         return None
 
     def get_relevant_square_corners(self, target_point, previous_point, next_point, direction):
-        corners = self.get_square_corners((previous_point.latitude, previous_point.longitude), (target_point.latitude, target_point.longitude), 10, direction)
+        corners = self.get_square_corners((previous_point.latitude, previous_point.longitude), (target_point.latitude, target_point.longitude), 30, direction)
         self.get_logger().info(f"Target: {target_point}, previous: {previous_point}, next: {next_point}, corners: {corners}")
         if next_point is None:
             return corners
@@ -425,7 +438,10 @@ class PathFollower(LifecycleNode):
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()
         self.get_logger().info("Ending waypoints callback")
-    
+
+    def true_wind_callback(self, msg: Wind):
+        self.wind_angle_deg = msg.direction
+
     def find_look_ahead(self):
         if len(self.current_path.points) == 0:
             #self.get_logger().info("No lookAhead point for zero-length path")

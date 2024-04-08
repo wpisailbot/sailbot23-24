@@ -72,12 +72,19 @@ def generate_launch_description():
         name='state_manager',
         namespace='',
         output='screen',
-        parameters=[{'managed_nodes': ["airmar_reader", "path_follower", "heading_controller", "trim_tab_comms", "ballast_control"]}]
+        parameters=[{'managed_nodes': ["wind_smoother", "airmar_reader", "path_follower", "heading_controller", "trim_tab_comms", "ballast_control"]}]
     )
     pathfinder_node = Node(
         package='sailbot_pathfinding', 
         executable='pathfinder_node', 
         name='pathfinder_node',
+        namespace='',
+        output='screen'
+    )
+    wind_smoother_node = Node(
+        package='sailbot',
+        executable='wind_smoother',
+        name='wind_smoother',
         namespace='',
         output='screen'
     )
@@ -93,6 +100,7 @@ def generate_launch_description():
     ld.add_action(tt_node)
     ld.add_action(heading_node)
     ld.add_action(path_follower_node)
+    ld.add_action(wind_smoother_node)
 
     ld.add_action(state_manager_node)
     ld.add_action(pathfinder_node)

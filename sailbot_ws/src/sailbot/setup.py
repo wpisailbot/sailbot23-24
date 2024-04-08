@@ -37,7 +37,8 @@ setup(
             'state_manager = sailbot.state_manager:main',
             'heading_controller = sailbot.heading_controller:main',
             'path_follower = sailbot.path_follower:main', 
-            'main_behavior = sailbot.behaviors.sailbot_behavior: main',
+            'main_behavior = sailbot.behaviors.sailbot_behavior:main',
+            'wind_smoother = sailbot.wind_smoother:main',
         ],
     },
 )

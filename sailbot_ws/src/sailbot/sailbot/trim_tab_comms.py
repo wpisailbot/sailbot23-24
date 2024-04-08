@@ -74,6 +74,7 @@ class TrimTabComms(LifecycleNode):
 
         self.autonomous_mode_subscriber: Optional[Subscription]
         self.current_path_subscription: Optional[Subscription]
+        self.apparent_wind_subscriber: Optional[Subscription]
 
         self.timer_pub: Optional[Publisher]
 
@@ -104,7 +105,7 @@ class TrimTabComms(LifecycleNode):
         self.rudder_angle_subscriber = self.create_subscription(Int16, 'rudder_angle', self.rudder_angle_callback, 10)
         self.ballast_pwm_subscriber = self.create_subscription(Int16, 'ballast_pwm', self.ballast_pwm_callback, 10)
 
-        self.apparent_wind_publisher = self.create_subscription(Wind, 'airmar_data/apparent_wind', self.apparent_wind_callback, 10)
+        self.apparent_wind_subscriber = self.create_subscription(Wind, 'apparent_wind_smoothed', self.apparent_wind_callback, 10)
 
         self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
         self.current_path_subscription = self.create_subscription(
@@ -174,27 +175,12 @@ class TrimTabComms(LifecycleNode):
 
     def apparent_wind_callback(self, msg: Wind):
         #self.get_logger().info(f"Got apparent wind: {msg.direction}")
-        direction = msg.direction
-        self.find_trim_tab_state(direction)
-
-    def median(self, lst):
-        n = len(lst)
-        s = sorted(lst)
-        return (sum(s[n // 2 - 1:n // 2 + 1]) / 2.0, s[n // 2])[n % 2] if n else None
-    
-    def update_winds(self, relative_wind):
-        # Check we have new wind
-        if len(self.last_winds) != 0 and relative_wind == self.last_winds[len(self.last_winds) - 1]:
-            return
-            # First add wind to running list
-        self.last_winds.append(float(relative_wind))
-        if len(self.last_winds) > 20:
-            self.last_winds.pop(0)
+        self.find_trim_tab_state(msg.direction)
 
     def find_trim_tab_state(self, relative_wind):  # five states of trim
         #self.get_logger().info(f"apparent wind: {relative_wind}")
-        self.update_winds(relative_wind)
-        smooth_angle = self.median(self.last_winds)
+        #self.update_winds(relative_wind)
+        #smooth_angle = self.median(self.last_winds)
 
         
         # Check autonomous mode TODO: This is a coupling that shouldn't be necessary. 
@@ -207,14 +193,14 @@ class TrimTabComms(LifecycleNode):
 
         msg = None
         trim_state_msg = TrimState()
-        if 45.0 <= smooth_angle < 135:
+        if 45.0 <= relative_wind < 135:
             # Max lift port
             msg = {
                 "state": "max_lift_port"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
             self.get_logger().info("Max lift port")
-        elif 135 <= smooth_angle < 180:
+        elif 135 <= relative_wind < 180:
             # Max drag port
             msg = {
                 "state": "max_drag_port"
@@ -222,14 +208,14 @@ class TrimTabComms(LifecycleNode):
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_PORT
             self.get_logger().info("Max drag port")
 
-        elif 180 <= smooth_angle < 200:
+        elif 180 <= relative_wind < 200:
             # Max drag starboard
             msg = {
                 "state": "max_drag_starboard"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
             self.get_logger().info("Max drag starboard")
-        elif 200 <= smooth_angle < 315:
+        elif 200 <= relative_wind < 315:
             # Max lift starboard
             msg = {
                 "state": "max_lift_starboard"

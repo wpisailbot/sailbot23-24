@@ -216,7 +216,7 @@ class NetworkComms(LifecycleNode):
         
         self.apparent_wind_subscription = self.create_subscription(
             Wind,
-            'airmar_data/apparent_wind',
+            'apparent_wind_smoothed',
             self.apparent_wind_callback,
             10)
         
@@ -282,7 +282,7 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.speed_kmh = 0
         self.current_boat_state.rate_of_turn = 0
         self.current_boat_state.true_wind.speed = 0
-        self.current_boat_state.true_wind.direction = 0
+        self.current_boat_state.true_wind.direction = 270.0
         self.current_boat_state.apparent_wind.speed = 0
         self.current_boat_state.apparent_wind.direction = 0
         self.current_boat_state.pitch = 0
