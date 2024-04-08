@@ -25,6 +25,9 @@ import math
 import traceback
 
 from geopy.distance import great_circle
+from geopy.distance import geodesic
+from geopy.point import Point as geopy_point
+from math import sqrt, radians, degrees
 
 def get_maps_dir():
     package_path = get_package_share_directory('sailbot')
@@ -281,6 +284,54 @@ class PathFollower(LifecycleNode):
         #rclpy.spin_until_future_complete(self, future)
         self.get_logger().info("Path returned!")
         return result
+    
+    def calculate_initial_bearing(self, point_A, point_B):
+        lat1, lon1 = map(radians, point_A)
+        lat2, lon2 = map(radians, point_B)
+
+        dLon = lon2 - lon1
+        x = math.sin(dLon) * math.cos(lat2)
+        y = math.cos(lat1) * math.sin(lat2) - (math.sin(lat1) * math.cos(lat2) * math.cos(dLon))
+        initial_bearing = math.atan2(x, y)
+
+        return degrees(initial_bearing)
+
+    def get_square_corners(self, A, B, side_length, direction):
+        # Convert side length to diagonal distance
+        diagonal_distance = (side_length * sqrt(2)) / 2  # Half diagonal for geodesic distance
+        
+        def destination_point(start_point, bearing, distance):
+            return geodesic(meters=distance).destination(start_point, bearing)
+        
+        # Initial point and bearing
+        bearing_AB = self.calculate_initial_bearing(A, B)
+        bearings = [(bearing_AB + angle) % 360 for angle in [45, -45, 135, -135]]  # four bearings for a perpendicular square
+        
+        point_B = geopy_point(B)
+        # 0, 1, 2, 3 = back right, back left, front right, front left
+        corners = [destination_point(point_B, bearing, diagonal_distance) for bearing in bearings]
+        if (direction == "left"):
+            return [corners[2], corners[0], corners[1], corners[3]]
+        elif (direction == "right"):
+            return [corners[3], corners[1], corners[0], corners[2]]
+        
+        return corners
+
+    def get_relevant_square_corners(self, target_point, previous_point, next_point, direction):
+        corners = self.get_square_corners((target_point.latitude, target_point.longitude), (previous_point.latitude, previous_point.longitude), 10, direction)
+        
+        if next_point is None:
+            return corners
+        
+        relevant = corners[:2]
+        d0 = great_circle(corners[1], (next_point.latitude, next_point.longitude)).meters
+        d1 = great_circle(corners[2], (next_point.latitude, next_point.longitude)).meters
+        if(d1<d0):
+            relevant.append(corners[2])
+        d2 = great_circle(corners[3], (next_point.latitude, next_point.longitude)).meters
+        if(d2<d1):
+            relevant.append(corners[3])
+
 
     def recalculate_path_from_waypoints(self):
         if self.wind_angle_deg is None:
@@ -288,12 +339,34 @@ class PathFollower(LifecycleNode):
             return
         
         points = []
+        waypointIndex = 0
         for waypoint in self.waypoints.waypoints:
             #if we just want to intersect the point, we can add it directly
-            if(waypoint.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
+            if (waypoint.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
                 points.append(self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height))
             #otherwise, we need to do some math
-        
+            else:
+                nextPoint = None
+                if(len(self.waypoints.waypoints)>waypointIndex+1):
+                    nextPoint = self.waypoints.waypoints[waypointIndex+1].point
+                previousPoint = None
+                if(waypointIndex != 0):
+                    previousPoint = self.waypoints.waypoints[waypointIndex].point
+                else:
+                    previousPoint = GeoPoint(latitude=self.latitude, longitude=self.longitude)
+
+                corners = []
+                if waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT:
+                    corners = self.get_relevant_square_corners(waypoint.point, previousPoint, nextPoint, "right")
+                elif waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
+                    corners = self.get_relevant_square_corners(waypoint.point, previousPoint, nextPoint, "left")
+
+                for corner in corners:
+                    points.append(self.latlong_to_grid_proj(corner[0], corner[1], self.bbox, self.image_width, self.image_height))
+
+
+            waypointIndex+=1
+
         if len(points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
             self.current_path = Path()
