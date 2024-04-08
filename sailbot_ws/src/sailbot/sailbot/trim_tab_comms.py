@@ -173,7 +173,7 @@ class TrimTabComms(LifecycleNode):
         self.autonomous_mode = msg.mode
 
     def apparent_wind_callback(self, msg: Wind):
-        self.get_logger().info(f"Got apparent wind: {msg.direction}")
+        #self.get_logger().info(f"Got apparent wind: {msg.direction}")
         direction = msg.direction
         self.find_trim_tab_state(direction)
 

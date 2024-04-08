@@ -5,7 +5,7 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
-from sailbot_msgs.msg import Path
+from sailbot_msgs.msg import Path, Waypoint, WaypointPath
 from sailbot_msgs.srv import SetMap, GetPath
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -107,7 +107,7 @@ class PathFollower(LifecycleNode):
     latitude = 42.273822
     longitude = -71.805967
     speed_knots = 0
-    waypoints = Path()
+    waypoints = WaypointPath()
     current_path = Path()
     #current_grid_cell = (16, 51)
     current_grid_cell = (16, 16)
@@ -192,7 +192,7 @@ class PathFollower(LifecycleNode):
                 self.airmar_speed_knots_callback,
                 10, callback_group=self.subscription_callback_group)
             self.waypoints_subscriber = self.create_subscription(
-                Path, 'waypoints', self.waypoints_callback, 10, callback_group=self.subscription_callback_group)
+                WaypointPath, 'waypoints', self.waypoints_callback, 10, callback_group=self.subscription_callback_group)
             #self.timer = self.create_timer(0.1, self.control_loop_callback)
             #super().on_configure(state)
         
@@ -288,8 +288,11 @@ class PathFollower(LifecycleNode):
             return
         
         points = []
-        for point in self.waypoints.points:
-            points.append(self.latlong_to_grid_proj(point.latitude, point.longitude, self.bbox, self.image_width, self.image_height))
+        for waypoint in self.waypoints.waypoints:
+            #if we just want to intersect the point, we can add it directly
+            if(waypoint.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
+                points.append(self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height))
+            #otherwise, we need to do some math
         
         if len(points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
@@ -314,7 +317,7 @@ class PathFollower(LifecycleNode):
                 continue 
             #append exact start position
             if i!=-1:
-                final_path.points.append(self.waypoints.points[i])
+                final_path.points.append(self.waypoints.waypoints[i].point)
             for j in range(1, len(segment.poses)-1):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
@@ -325,8 +328,8 @@ class PathFollower(LifecycleNode):
                 geopoint.longitude = lon
                 final_path.points.append(geopoint)
             #append exact final position
-            self.get_logger().info(f"num waypoints: {len(self.waypoints.points)}, i: {i}")
-            final_path.points.append(self.waypoints.points[i+1])
+            self.get_logger().info(f"num waypoints: {len(self.waypoints.waypoints)}, i: {i}")
+            final_path.points.append(self.waypoints.waypoints[i+1].point)
             i+=1
 
 

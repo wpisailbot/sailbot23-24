@@ -21,6 +21,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Path.msg"
   "msg/AutonomousMode.msg"
   "msg/TrimState.msg"
+  "msg/Waypoint.msg"
+  "msg/WaypointPath.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
   "srv/RestartNode.srv"

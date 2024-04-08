@@ -18,7 +18,7 @@ from sensor_msgs.msg import NavSatFix
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
-from sailbot_msgs.msg import Wind, Path, AutonomousMode, TrimState
+from sailbot_msgs.msg import Wind, Path, AutonomousMode, TrimState, Waypoint, WaypointPath
 import grpc
 from concurrent import futures
 import json
@@ -162,7 +162,7 @@ class NetworkComms(LifecycleNode):
         self.trim_tab_control_publisher = self.create_lifecycle_publisher(Int8, 'tt_control', 10)
         self.trim_tab_angle_publisher = self.create_lifecycle_publisher(Int16, 'tt_angle', 10)
 
-        self.waypoints_publisher = self.create_lifecycle_publisher(Path, 'waypoints', 10)
+        self.waypoints_publisher = self.create_lifecycle_publisher(WaypointPath, 'waypoints', 10)
 
         self.autonomous_mode_publisher = self.create_lifecycle_publisher(AutonomousMode, 'autonomous_mode', 10)
 
@@ -584,21 +584,32 @@ class NetworkComms(LifecycleNode):
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteSetWaypointsCommand(self, command: control_pb2.SetWaypointsCommand, context):
+        self.get_logger().info("Received waypoints command")
         response = control_pb2.ControlResponse()
+        self.get_logger().info("1")
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
-        self.current_boat_state.current_waypoints.ClearField("points")# = command.new_path
-        self.current_boat_state.current_waypoints.points.extend(command.new_waypoints.points)
+        self.get_logger().info("2")
+        self.current_boat_state.current_waypoints.ClearField("waypoints")# = command.new_path
+        self.get_logger().info("3")
+        self.current_boat_state.current_waypoints.waypoints.extend(command.new_waypoints.waypoints)
+        self.get_logger().info("4")
+        self.get_logger().info(f"Received waypoints with {len(command.new_waypoints.waypoints)} points: ")
+        self.get_logger().info("5")
+        waypoints = WaypointPath()
+        for waypoint in command.new_waypoints.waypoints:
+            self.get_logger().info(str(waypoint.point.latitude)+" : "+str(waypoint.point.longitude))
+            fix = Waypoint()
+            fix.point.latitude = waypoint.point.latitude
+            fix.point.longitude = waypoint.point.longitude
+            if(waypoint.type == boat_state_pb2.WaypointType.WAYPOINT_TYPE_INTERSECT):
+                fix.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+            elif(waypoint.type == boat_state_pb2.WaypointType.WAYPOINT_TYPE_CIRCLE_RIGHT):
+                fix.type = Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT
+            elif(waypoint.type == boat_state_pb2.WaypointType.WAYPOINT_TYPE_CIRCLE_LEFT):
+                fix.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
+            waypoints.waypoints.append(fix)
 
-        self.get_logger().info(f"Received path with {len(command.new_waypoints.points)} points: ")
-        
-        waypoints = Path()
-        for point in command.new_waypoints.points:
-            self.get_logger().info(str(point.latitude)+" : "+str(point.longitude))
-            fix = GeoPoint()
-            fix.latitude = point.latitude
-            fix.longitude = point.longitude
-            waypoints.points.append(fix)
-
+        self.get_logger().info("Publishing waypoints")
         self.waypoints_publisher.publish(waypoints)
 
         return response

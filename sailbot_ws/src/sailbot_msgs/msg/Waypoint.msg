@@ -1,0 +1,5 @@
+uint8 WAYPOINT_TYPE_INTERSECT = 0
+uint8 WAYPOINT_TYPE_CIRCLE_RIGHT = 1
+uint8 WAYPOINT_TYPE_CIRCLE_LEFT = 2
+geographic_msgs/GeoPoint point
+uint8 type
