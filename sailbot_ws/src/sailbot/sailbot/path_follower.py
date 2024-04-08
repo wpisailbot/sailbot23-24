@@ -310,15 +310,16 @@ class PathFollower(LifecycleNode):
         point_B = geopy_point(B)
         # 0, 1, 2, 3 = back right, back left, front right, front left
         corners = [destination_point(point_B, bearing, diagonal_distance) for bearing in bearings]
-        if (direction == "left"):
-            return [corners[2], corners[0], corners[1], corners[3]]
-        elif (direction == "right"):
+        if (direction == "right"):
             return [corners[3], corners[1], corners[0], corners[2]]
+        elif (direction == "left"):
+            return [corners[2], corners[0], corners[1], corners[3]]
         
-        return corners
+        #This should not happen
+        return None
 
     def get_relevant_square_corners(self, target_point, previous_point, next_point, direction):
-        corners = self.get_square_corners((target_point.latitude, target_point.longitude), (previous_point.latitude, previous_point.longitude), 10, direction)
+        corners = self.get_square_corners((previous_point.latitude, previous_point.longitude), (target_point.latitude, target_point.longitude), 10, direction)
         self.get_logger().info(f"Target: {target_point}, previous: {previous_point}, next: {next_point}, corners: {corners}")
         if next_point is None:
             return corners
@@ -356,7 +357,7 @@ class PathFollower(LifecycleNode):
                     nextPoint = self.waypoints.waypoints[waypointIndex+1].point
                 previousPoint = None
                 if(waypointIndex != 0):
-                    previousPoint = self.waypoints.waypoints[waypointIndex].point
+                    previousPoint = self.waypoints.waypoints[waypointIndex-1].point
                 else:
                     previousPoint = GeoPoint(latitude=self.latitude, longitude=self.longitude)
 
