@@ -3,7 +3,6 @@
 #include <random>
 #include <chrono>
 #include <cmath>
-#include <opencv2/opencv.hpp>
 #include "raycast.h"
 namespace Sailbot {
     Map::Map(uint32_t map_width, uint32_t map_height, std::vector<int8_t> initial_data) {
@@ -15,6 +14,7 @@ namespace Sailbot {
         max_dim = ceil(sqrt(pow(height, 2) + pow(width, 2)));
 
         data = std::make_shared<std::vector<float>>(max_dim * max_dim, 1.0f); // Initialize grid with ones
+        base_data = std::make_shared<std::vector<float>>(max_dim * max_dim, 1.0f); // Initialize grid with ones
 
         //fill interior area with 0
         half_height_diff = (max_dim - height) / 2;
@@ -24,6 +24,7 @@ namespace Sailbot {
         for (uint32_t y = half_height_diff; y < height + half_height_diff; y++){
             for (uint32_t x = half_width_diff; x < width + half_width_diff; x++){
                 data->at(y * max_dim + x) = initial_data[i];
+                base_data->at(y * max_dim + x) = initial_data[i];
                 i++;
             }
         }
@@ -112,6 +113,15 @@ namespace Sailbot {
         }
     }
 
+    void Map::apply_threat_mask(cv::Mat threat_mask){
+
+        cv::Mat mat = cv::Mat(max_dim, max_dim, CV_32FC1, base_data->data());
+        cv::Mat result;
+        cv::add(mat, threat_mask, result);
+        std::vector<float> flattened(result.begin<float>(), result.end<float>());
+        data = std::make_shared<std::vector<float>>(flattened);
+    }
+
     Map Map::rotate(double map_angle_deg) {
         //rotate map
         cv::Mat mat = cv::Mat(max_dim, max_dim, CV_32FC1, data->data());
@@ -124,11 +134,11 @@ namespace Sailbot {
         if (rotated_mat.type() != CV_32FC1) {
             rotated_mat.convertTo(rotated_mat, CV_32FC1);
         }
-        cv::Mat scaledImage;
-        mat.convertTo(scaledImage, CV_8UC1, 255.0);
-        cv::imwrite("/home/sailbot/map.jpg", scaledImage);
-        rotated_mat.convertTo(scaledImage, CV_8UC1, 255.0);
-        cv::imwrite("/home/sailbot/rotated_map.jpg", scaledImage);
+        //cv::Mat scaledImage;
+        //mat.convertTo(scaledImage, CV_8UC1, 255.0);
+        //cv::imwrite("/home/sailbot/map.jpg", scaledImage);
+        //rotated_mat.convertTo(scaledImage, CV_8UC1, 255.0);
+        //cv::imwrite("/home/sailbot/rotated_map.jpg", scaledImage);
 
         // Flatten the matrix if it's not already a single row or single column
         if (rotated_mat.rows > 1 && rotated_mat.cols > 1) {

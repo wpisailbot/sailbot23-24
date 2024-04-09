@@ -4,11 +4,13 @@
 #include "nav_msgs/msg/path.hpp"
 #include "sailbot_msgs/srv/get_path.hpp"
 #include "sailbot_msgs/srv/set_map.hpp"
+#include "sailbot_msgs/srv/set_threat.hpp"
 
 #include <chrono>
 #include <random>
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <vector>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/utils/logger.hpp>
 #include "map.h"
@@ -20,9 +22,12 @@
 class Pathfinder : public rclcpp::Node
 {
 public:
+    std::vector<std::pair<Threat, cv::Mat>> threats;
+    cv::Mat threatsMap;
     std::unique_ptr<Sailbot::Map> pMap = nullptr;
     rclcpp::Service<sailbot_msgs::srv::SetMap>::SharedPtr pSetMapService;
     rclcpp::Service<sailbot_msgs::srv::GetPath>::SharedPtr pGetPathService;
+    rclcpp::Service<sailbot_msgs::srv::SetThreat>::SharedPtr pSetThreatService;
 
     Pathfinder() : Node("pathfinder_node")
     {
@@ -32,6 +37,9 @@ public:
         this->pGetPathService = this->create_service<sailbot_msgs::srv::GetPath>(
             "get_path",
             std::bind(&Pathfinder::handle_get_path_service, this, std::placeholders::_1, std::placeholders::_2));
+        this->pSetThreatService = this->create_service<sailbot_msgs::srv::SetThreat>(
+            "set_threat",
+            std::bind(&Pathfinder::handle_set_threat_service, this, std::placeholders::_1, std::placeholders::_2));
     }
 
     void handle_get_path_service(
@@ -65,8 +73,49 @@ public:
         [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetMap::Response> response)
     {
         pMap = std::make_unique<Sailbot::Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height), request->map.data);
+        threatsMap = cv::Mat::zeros(pMap->max_dim, pMap->max_dim, CV_32FC1);
         // pMap->data = pMap->data;
         RCLCPP_INFO(this->get_logger(), "Map set successfully");
+    }
+
+    void handle_set_threat_service(
+        const std::shared_ptr<sailbot_msgs::srv::SetThreat::Request> request,
+        [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetThreat::Response> response)
+    {
+        if(pMap == nullptr){
+            RCLCPP_WARN(this->get_logger(), "SetThreat failed: Cannot add threats before a map is set");
+        }
+        Threat threat;
+        threat.size = request->threat.size;
+        threat.intensity = request->threat.intensity;
+        cv::Point2f center(request->threat.center.x, request->threat.center.y);
+        threat.center = center;
+        int offsetX;
+        int offsetY;
+        auto gaussian = createLocalizedGaussianThreat(threat, offsetX, offsetY);
+        threat.offsetX = offsetX+pMap->half_width_diff;
+        threat.offsetY = offsetY+pMap->half_width_diff;
+        int index = threats.size();
+        if(request->id != -1){
+            index = request->id;
+        }
+        try {
+            threats.at(index) = std::make_pair(threat, gaussian);
+            regenerateThreatMap();
+        } catch (const std::out_of_range& e) {
+            RCLCPP_WARN(this->get_logger(), "SetThreat failed: Do not provide threat IDs for new threats. They will be returned to you.");
+        }
+        RCLCPP_INFO(this->get_logger(), "Set threat handled");
+    }
+
+    void regenerateThreatMap(){
+        threatsMap = cv::Mat::zeros(pMap->max_dim, pMap->max_dim, CV_32FC1);
+        for(auto pair : threats){
+            auto threat = pair.first;
+            auto gaussian = pair.second;
+            applyThreatToMat(threatsMap, gaussian, threat.offsetX, threat.offsetY);
+        }
+        pMap->apply_threat_mask(threatsMap);
     }
 
     std::vector<std::pair<double, double>> find_solution(Sailbot::Map &map, double wind_angle_deg, Sailbot::Node *start_node, Sailbot::Node *goal_node)

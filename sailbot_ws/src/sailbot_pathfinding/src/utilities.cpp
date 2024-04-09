@@ -1,7 +1,6 @@
 #include "utilities.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
-#include <opencv2/opencv.hpp>
 #include <random>
 #include "raycast.h"
 
@@ -169,4 +168,37 @@ void displayGrid(std::shared_ptr<std::vector<float>> grid, int width, int height
     cv::Mat flipped;
     cv::flip(image, flipped, 0);
     cv::imshow(name, flipped);
+}
+
+cv::Mat createLocalizedGaussianThreat(const Threat& threat, int& offsetX, int& offsetY) {
+    // Define the area of influence, using 3 standard deviations as a cutoff.
+    int areaSize = std::ceil(3 * threat.size);
+    offsetX = std::max(0, int(threat.center.x) - areaSize);
+    offsetY = std::max(0, int(threat.center.y) - areaSize);
+
+    int rows = 2 * areaSize + 1;
+    int cols = 2 * areaSize + 1;
+    cv::Mat gaussian = cv::Mat::zeros(rows, cols, CV_32FC1);
+
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
+            float dx = (x + offsetX) - threat.center.x;
+            float dy = (y + offsetY) - threat.center.y;
+            float distanceSquared = dx * dx + dy * dy;
+            gaussian.at<float>(y, x) = std::exp(-distanceSquared / (2 * threat.size * threat.size)) * threat.intensity;
+        }
+    }
+    return gaussian;
+}
+
+void applyThreatToMat(cv::Mat& mat, const cv::Mat& threatMask, int offsetX, int offsetY) {
+    for (int y = 0; y < threatMask.rows; ++y) {
+        for (int x = 0; x < threatMask.cols; ++x) {
+            int mapX = x + offsetX;
+            int mapY = y + offsetY;
+            if (mapX >= 0 && mapX < mat.cols && mapY >= 0 && mapY < mat.rows) {
+                mat.at<float>(mapY, mapX) = std::max(mat.at<float>(mapY, mapX), threatMask.at<float>(y, x));
+            }
+        }
+    }
 }

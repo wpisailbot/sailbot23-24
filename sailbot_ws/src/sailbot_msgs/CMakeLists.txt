@@ -23,9 +23,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TrimState.msg"
   "msg/Waypoint.msg"
   "msg/WaypointPath.msg"
+  "msg/GaussianThreat.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
   "srv/RestartNode.srv"
+  "srv/SetThreat.srv"
   "action/FollowPath.action"
   DEPENDENCIES std_msgs geometry_msgs nav_msgs sensor_msgs geographic_msgs
 )
