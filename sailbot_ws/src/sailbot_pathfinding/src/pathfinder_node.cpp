@@ -82,8 +82,24 @@ public:
         const std::shared_ptr<sailbot_msgs::srv::SetThreat::Request> request,
         [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetThreat::Response> response)
     {
-        if(pMap == nullptr){
+        if (pMap == nullptr)
+        {
             RCLCPP_WARN(this->get_logger(), "SetThreat failed: Cannot add threats before a map is set");
+        }
+        if (request->id != -1)
+        {
+            try
+            {
+                Threat threat;
+                cv::Mat mat;
+                threats.at(request->id) = std::make_pair(threat, mat);
+                regenerateThreatMap();
+                return;
+            }
+            catch (const std::out_of_range &e)
+            {
+                RCLCPP_WARN(this->get_logger(), "Threat removal failed! ID is probably incorrect.");
+            }
         }
         Threat threat;
         threat.size = request->threat.size;
@@ -93,24 +109,39 @@ public:
         int offsetX;
         int offsetY;
         auto gaussian = createLocalizedGaussianThreat(threat, offsetX, offsetY);
-        threat.offsetX = offsetX+pMap->half_width_diff;
-        threat.offsetY = offsetY+pMap->half_width_diff;
+        threat.offsetX = offsetX + pMap->half_width_diff;
+        threat.offsetY = offsetY + pMap->half_height_diff;
         int index = threats.size();
-        if(request->id != -1){
+        if (request->id != -1)
+        {
             index = request->id;
         }
-        try {
-            threats.at(index) = std::make_pair(threat, gaussian);
+        try
+        {
+            RCLCPP_INFO(this->get_logger(), "Setting threat at id: (%d)", index);
+            if(int(threats.size())>index){
+                threats.at(index) = std::make_pair(threat, gaussian);
+            } else {
+                threats.push_back(std::make_pair(threat, gaussian));
+            }
+            RCLCPP_WARN(this->get_logger(), "Regenerating threat mask:");
             regenerateThreatMap();
-        } catch (const std::out_of_range& e) {
+            RCLCPP_WARN(this->get_logger(), "Completed threat mask:");
+
+            response->assigned_id = index;
+        }
+        catch (const std::out_of_range &e)
+        {
             RCLCPP_WARN(this->get_logger(), "SetThreat failed: Do not provide threat IDs for new threats. They will be returned to you.");
         }
         RCLCPP_INFO(this->get_logger(), "Set threat handled");
     }
 
-    void regenerateThreatMap(){
+    void regenerateThreatMap()
+    {
         threatsMap = cv::Mat::zeros(pMap->max_dim, pMap->max_dim, CV_32FC1);
-        for(auto pair : threats){
+        for (auto pair : threats)
+        {
             auto threat = pair.first;
             auto gaussian = pair.second;
             applyThreatToMat(threatsMap, gaussian, threat.offsetX, threat.offsetY);
@@ -120,18 +151,18 @@ public:
 
     std::vector<std::pair<double, double>> find_solution(Sailbot::Map &map, double wind_angle_deg, Sailbot::Node *start_node, Sailbot::Node *goal_node)
     {
-        // cv::Mat mat = cv::Mat(map.max_dim, map.max_dim, CV_32FC1, map.data->data());
-        // cv::Mat scaledImage;
-        // mat.convertTo(scaledImage, CV_8UC1, 255.0);
-        // cv::Mat colorImage;
-        // cv::cvtColor(scaledImage, colorImage, cv::COLOR_GRAY2BGR);
-        // cv::Scalar redColor(0, 0, 255); 
-        // cv::Scalar greenColor(0, 255, 0); 
+        cv::Mat mat = cv::Mat(map.max_dim, map.max_dim, CV_32FC1, map.data->data());
+        cv::Mat scaledImage;
+        mat.convertTo(scaledImage, CV_8UC1, 255.0);
+        cv::Mat colorImage;
+        cv::cvtColor(scaledImage, colorImage, cv::COLOR_GRAY2BGR);
+        cv::Scalar redColor(0, 0, 255);
+        cv::Scalar greenColor(0, 255, 0);
 
-        // cv::circle(colorImage, cv::Point(start_node->x, start_node->y), 2, greenColor, -1);
-        // cv::circle(colorImage, cv::Point(goal_node->x, goal_node->y), 2, redColor, -1);
-        // cv::flip(colorImage, colorImage, 0);
-        // cv::imwrite("/home/sailbot/map_with_points.jpg", colorImage);
+        cv::circle(colorImage, cv::Point(start_node->x, start_node->y), 1, greenColor, -1);
+        cv::circle(colorImage, cv::Point(goal_node->x, goal_node->y), 1, redColor, -1);
+        cv::flip(colorImage, colorImage, 0);
+        cv::imwrite("/home/sailbot/map_with_points.jpg", colorImage);
 
         double wind_angle_rad = wind_angle_deg * (M_PI / 180);
         double nogo_angle_rad = NOGO_ANGLE_DEGREES * (M_PI / 180);

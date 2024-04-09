@@ -5,8 +5,8 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
-from sailbot_msgs.msg import Path, Waypoint, WaypointPath, Wind
-from sailbot_msgs.srv import SetMap, GetPath
+from sailbot_msgs.msg import Path, Waypoint, WaypointPath, Wind, GaussianThreat
+from sailbot_msgs.srv import SetMap, GetPath, SetThreat
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
 from rclpy.lifecycle import Publisher
@@ -117,6 +117,8 @@ class PathFollower(LifecycleNode):
 
     wind_angle_deg = 270
 
+    threat_ids = []
+
     def __init__(self):
         super().__init__('path_follower')
         # Using different callback groups for subscription and service client
@@ -169,6 +171,10 @@ class PathFollower(LifecycleNode):
         self.get_path_cli = self.create_client(GetPath, 'get_path', callback_group=self.service_client_callback_group)
         while not self.get_path_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('get_path service not available, waiting again...')
+        
+        self.set_threat_cli = self.create_client(SetThreat, 'set_threat', callback_group=self.service_client_callback_group)
+        while not self.set_threat_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('set_threat service not available, waiting again...')
         
         self.get_logger().info("Path follower node setup complete")
 
@@ -447,13 +453,45 @@ class PathFollower(LifecycleNode):
     def waypoints_callback(self, msg: WaypointPath):
         self.get_logger().info("Got waypoints!")
         self.waypoints = msg
+        self.clear_threats()
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()
         self.get_logger().info("Ending waypoints callback")
     
+    def clear_threats(self):
+        for id in self.threat_ids:
+            req = SetThreat.Request()
+            req.id = id
+            req.remove = True
+            self.get_logger().info("Removing threat")
+            #synchronous service call because ROS2 async doesn't work in callbacks
+            result = self.set_threat_cli.call(req)
+            self.get_logger().info("Threat removed")
+
+
+    def add_threat(self, waypoint):
+        threat = GaussianThreat()
+        threat.size = 5.0
+        threat.intensity = 1.0
+        x, y = self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height)
+        threat.center.x = float(x)
+        threat.center.y = float(y)
+        
+        req = SetThreat.Request()
+        req.threat = threat
+        
+        self.get_logger().info("Setting threat")
+        #synchronous service call because ROS2 async doesn't work in callbacks
+        result = self.set_threat_cli.call(req)
+        self.get_logger().info(f"Threat id returned: {result.assigned_id}")
+        self.threat_ids.append(result.assigned_id)
+        return result
+
     def single_waypoint_callback(self, msg: Waypoint):
         self.get_logger().info("Got single waypoint")
         self.waypoints.waypoints.append(msg)
+        if msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT or msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
+            self.add_threat(msg)
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()
         self.get_logger().info("Ending single waypoint callback")

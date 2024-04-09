@@ -1,4 +1,5 @@
 GaussianThreat threat
 int16 id -1
+bool remove false
 ---
 int16 assigned_id -1
