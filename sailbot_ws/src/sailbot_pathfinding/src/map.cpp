@@ -49,7 +49,7 @@ namespace Sailbot {
 
 
     void Map::addNeighbors(uint32_t x, uint32_t y) {
-        std::vector<std::pair<int, int>> neighborOffsets = { {1, 0}, {0, 1}, {-1, 0}, /*{0, -1},*/ {1, 1}, {1, -1}, {-1, -1}, {-1, 1}}; // 8-directional
+        std::vector<std::pair<int, int>> neighborOffsets = { {1, 0}, {0, 1}, {-1, 0}, /*{0, -1},*/ {1, 1}, {1, -1}, {-1, -1}, {-1, 1}}; // 7-directional
 
         for (auto& offset : neighborOffsets) {
             int nx = x + offset.first;

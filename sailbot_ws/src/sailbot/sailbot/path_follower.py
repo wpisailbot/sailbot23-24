@@ -203,6 +203,12 @@ class PathFollower(LifecycleNode):
                 self.waypoints_callback,
                 10, 
                 callback_group=self.subscription_callback_group)
+            self.single_waypoint_subscriber = self.create_subscription(
+                Waypoint, 
+                'single_waypoint',
+                self.single_waypoint_callback,
+                10, 
+                callback_group=self.subscription_callback_group)
             self.true_wind_subscriber = self.create_subscription(
                 Wind,
                 'true_wind_smoothed',
@@ -438,12 +444,20 @@ class PathFollower(LifecycleNode):
         self.current_path_publisher.publish(final_path)
         self.current_path = final_path
 
-    def waypoints_callback(self, msg: Path):
+    def waypoints_callback(self, msg: WaypointPath):
         self.get_logger().info("Got waypoints!")
         self.waypoints = msg
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()
         self.get_logger().info("Ending waypoints callback")
+    
+    def single_waypoint_callback(self, msg: Waypoint):
+        self.get_logger().info("Got single waypoint")
+        self.waypoints.waypoints.append(msg)
+        self.recalculate_path_from_waypoints()
+        self.find_look_ahead()
+        self.get_logger().info("Ending single waypoint callback")
+
 
     def true_wind_callback(self, msg: Wind):
         self.wind_angle_deg = msg.direction

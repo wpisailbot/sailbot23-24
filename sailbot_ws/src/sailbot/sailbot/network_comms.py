@@ -123,6 +123,8 @@ class NetworkComms(LifecycleNode):
         self.trim_tab_control_publisher: Optional[Publisher]
         self.trim_tab_angle_publisher: Optional[Publisher]
         self.autonomous_mode_publisher: Optional[Publisher]
+        self.waypoints_publisher: Optional[Publisher]
+        self.single_waypoint_publisher: Optional[Publisher]
 
         self.rot_subscription: Optional[Subscription]
         self.navsat_subscription: Optional[Subscription]
@@ -163,6 +165,8 @@ class NetworkComms(LifecycleNode):
         self.trim_tab_angle_publisher = self.create_lifecycle_publisher(Int16, 'tt_angle', 10)
 
         self.waypoints_publisher = self.create_lifecycle_publisher(WaypointPath, 'waypoints', 10)
+        self.single_waypoint_publisher = self.create_lifecycle_publisher(Waypoint, 'single_waypoint', 10)
+
 
         self.autonomous_mode_publisher = self.create_lifecycle_publisher(AutonomousMode, 'autonomous_mode', 10)
 
@@ -323,7 +327,11 @@ class NetworkComms(LifecycleNode):
         self.last_pwm_heartbeat = -1
         self.last_ctrl_heartbeat = -1
         self.last_tt_heartbeat = -1
-        self.create_grpc_server()
+        try:
+            self.create_grpc_server()
+        except Exception as e:
+            trace = traceback.format_exc()
+            self.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
 
         self.pwm_heartbeat_subscription = self.create_subscription(
             Empty,
@@ -388,7 +396,7 @@ class NetworkComms(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
     
     def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
-        self.get_logger().info("Error caught!")
+        self.get_logger().error("Error caught!")
         return super().on_error(state)
      
     #end lifecycle callbacks
@@ -510,6 +518,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteBallastCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteAutonomousModeCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetWaypointsCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteAddWaypointCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
@@ -588,15 +597,10 @@ class NetworkComms(LifecycleNode):
     def ExecuteSetWaypointsCommand(self, command: control_pb2.SetWaypointsCommand, context):
         self.get_logger().info("Received waypoints command")
         response = control_pb2.ControlResponse()
-        self.get_logger().info("1")
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
-        self.get_logger().info("2")
         self.current_boat_state.current_waypoints.ClearField("waypoints")# = command.new_path
-        self.get_logger().info("3")
         self.current_boat_state.current_waypoints.waypoints.extend(command.new_waypoints.waypoints)
-        self.get_logger().info("4")
         self.get_logger().info(f"Received waypoints with {len(command.new_waypoints.waypoints)} points: ")
-        self.get_logger().info("5")
         waypoints = WaypointPath()
         for waypoint in command.new_waypoints.waypoints:
             self.get_logger().info(str(waypoint.point.latitude)+" : "+str(waypoint.point.longitude))
@@ -616,6 +620,26 @@ class NetworkComms(LifecycleNode):
 
         return response
     
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteAddWaypointCommand(self, command: control_pb2.AddWaypointCommand, context):
+        self.get_logger().info("Received add single waypoint command")
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
+        self.current_boat_state.current_waypoints.waypoints.append(command.new_waypoint)
+        waypoint = Waypoint()
+        waypoint.point.latitude = command.new_waypoint.point.latitude
+        waypoint.point.longitude = command.new_waypoint.point.longitude
+        if(command.new_waypoint.type == boat_state_pb2.WaypointType.WAYPOINT_TYPE_INTERSECT):
+            waypoint.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+        elif(command.new_waypoint.type == boat_state_pb2.WaypointType.WAYPOINT_TYPE_CIRCLE_RIGHT):
+            waypoint.type = Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT
+        elif(command.new_waypoint.type == boat_state_pb2.WaypointType.WAYPOINT_TYPE_CIRCLE_LEFT):
+            waypoint.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
+
+        self.get_logger().info("Publishing single waypoint")
+        self.single_waypoint_publisher.publish(waypoint)
+        return response
+
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def GetMap(self, command: boat_state_pb2.MapRequest, context):
         self.get_logger().info("Received GetMap request")

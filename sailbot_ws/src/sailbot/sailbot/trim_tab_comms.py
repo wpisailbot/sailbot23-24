@@ -155,9 +155,7 @@ class TrimTabComms(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
     
     def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
-        self.get_logger().info("Error caught!")
-        trace = traceback.format_exc()
-        self.get_logger().fatal(f'Unhandled exception: {trace}')
+        self.get_logger().error("Error caught!")
         return super().on_error(state)
     
     #end callbacks
