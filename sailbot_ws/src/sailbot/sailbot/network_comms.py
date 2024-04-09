@@ -409,6 +409,8 @@ class NetworkComms(LifecycleNode):
             self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MAX_DRAG_PORT
         elif(msg.state == TrimState.TRIM_STATE_MAX_DRAG_STARBOARD):
             self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
+        elif(msg.state == TrimState.TRIM_STATE_MANUAL):
+            self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MANUAL
         
     def current_path_callback(self, msg: Path):
         #self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")

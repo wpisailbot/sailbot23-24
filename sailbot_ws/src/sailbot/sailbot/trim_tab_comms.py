@@ -171,6 +171,14 @@ class TrimTabComms(LifecycleNode):
 
     def autonomous_mode_callback(self, msg: AutonomousMode):
         self.get_logger().info(f"Got autonomous mode: {msg.mode}")
+        if(msg.mode == AutonomousMode.AUTONOMOUS_MODE_NONE):
+            message = {
+                "state": "manual",
+            }
+            trim_state_msg = TrimState()
+            trim_state_msg.state = TrimState.TRIM_STATE_MANUAL
+            self.trim_state_debug_publisher.publish(trim_state_msg)
+
         self.autonomous_mode = msg.mode
 
     def apparent_wind_callback(self, msg: Wind):

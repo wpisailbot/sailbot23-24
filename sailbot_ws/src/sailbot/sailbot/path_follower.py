@@ -290,7 +290,13 @@ class PathFollower(LifecycleNode):
         end_point.y = float(goal[1])
         req.start = start_point
         req.end = end_point
-        req.wind_angle_deg = float(self.wind_angle_deg)
+        
+        #Pathfinder assumes 0 is along the X axis
+        wind_angle_adjusted = self.wind_angle_deg-90
+        if(wind_angle_adjusted<0):
+            wind_angle_adjusted+=360
+
+        req.wind_angle_deg = float(wind_angle_adjusted)
         self.get_logger().info("Getting path")
         #synchronous service call because ROS2 async doesn't work in callbacks
         result = self.get_path_cli.call(req)
