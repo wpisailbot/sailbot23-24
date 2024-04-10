@@ -425,8 +425,8 @@ class PathFollower(LifecycleNode):
         for i in range(len(grid_points)-1):
             path_segments.append(self.get_path(grid_points[i], grid_points[i+1]).path)
         
-        # for segment in path_segments:
-        #     segment.poses = self.insert_intermediate_points(segment.poses, 1)
+        #for segment in path_segments:
+        #    segment.poses = self.insert_intermediate_points(segment.poses, 1)
 
         final_path = Path()
         
@@ -437,8 +437,8 @@ class PathFollower(LifecycleNode):
             if(len(segment.poses)==0):
                 continue 
             #append exact start position
-            if i!=-1:
-                final_path.points.append(exact_points[i])
+            # if i!=-1:
+            #     final_path.points.append(exact_points[i])
             for j in range(1, len(segment.poses)-1):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
