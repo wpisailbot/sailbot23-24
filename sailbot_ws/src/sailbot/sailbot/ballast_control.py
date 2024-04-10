@@ -124,7 +124,7 @@ class BallastControl(LifecycleNode):
 
     def control_loop_callback(self):
         if(self.current_ballast_position == 0):
-            self.get_logger().info("Ballast position is 0, assuming it's broken")
+            #self.get_logger().info("Ballast position is 0, assuming it's broken")
             return
         current_error = self.current_ballast_position - self.current_target
         current_time = get_time()

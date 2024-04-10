@@ -107,8 +107,10 @@ def find_and_load_image(directory, location):
 
 class PathFollower(LifecycleNode):
     heading = 0
-    latitude = 42.273822
-    longitude = -71.805967
+    # latitude = 42.273822
+    # longitude = -71.805967
+    latitude = 42.276842
+    longitude = -71.756035
     speed_knots = 0
     waypoints = WaypointPath()
     current_path = Path()
@@ -150,6 +152,8 @@ class PathFollower(LifecycleNode):
         grid_msg.info.height = occupancy_grid_values.shape[0]
         self.image_height = occupancy_grid_values.shape[0]
         self.get_logger().info(f"map width: {self.image_width}, height: {self.image_height}")
+
+        self.current_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
 
         grid_msg.info.origin = Pose(position=Point(x=0.0, y=0.0, z=0.0), orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0))
         self.get_logger().info(f"{occupancy_grid_values}")
@@ -303,10 +307,12 @@ class PathFollower(LifecycleNode):
         req.start = start_point
         req.end = end_point
         
-        #Pathfinder assumes 0 is along the X axis
+        #Pathfinder assumes 0 is along the +X axis and counter-clockwise. Airmar data is 0 along -y axis and clockwise.
         wind_angle_adjusted = self.wind_angle_deg-90
-        if(wind_angle_adjusted<0):
-            wind_angle_adjusted+=360
+        # wind_angle_adjusted = 360-wind_angle_adjusted
+        # wind_angle_adjusted = wind_angle_adjusted+90
+        # if(wind_angle_adjusted>360):
+        #     wind_angle_adjusted-=360
 
         req.wind_angle_deg = float(wind_angle_adjusted)
         self.get_logger().info("Getting path")

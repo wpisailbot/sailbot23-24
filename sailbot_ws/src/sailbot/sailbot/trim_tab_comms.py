@@ -92,6 +92,8 @@ class TrimTabComms(LifecycleNode):
             for port in esp32_ports:
                 print(port)
                 subprocess.run(['python3', '-m', 'esptool', '--port', port, 'run'], check=True)
+        else:
+            self.get_logger().warn("No ESP32 ports found!")
 
         self.tt_telemetry_publisher = self.create_lifecycle_publisher(Float32, 'tt_telemetry', 10)
         self.ballast_pos_publisher = self.create_lifecycle_publisher(Int16, 'current_ballast_position', 10)
@@ -269,8 +271,12 @@ class TrimTabComms(LifecycleNode):
 
     def rudder_angle_callback(self, msg: Int16):
         self.get_logger().info(f"Got rudder position: {msg.data}")
-        degrees = msg.data+13 #Servo degree offset
-
+        degrees = msg.data
+        if(degrees>30):
+            degrees = 30
+        elif (degrees<-30):
+            degrees = -30
+        #degrees = degrees+13 #Servo degree offset
         message = {
             "rudder_angle": degrees
         }
@@ -307,7 +313,7 @@ class TrimTabComms(LifecycleNode):
                 pos = Int16()
                 pos.data = message["ballast_pos"]
                 if(pos.data == 0):
-                    self.get_logger().info("Ballast potentiometer is not working!")
+                    #self.get_logger().info("Ballast potentiometer is not working!")
                     pass
                 else:
                     #self.get_logger().info(f"Ballast position: {pos.data}")

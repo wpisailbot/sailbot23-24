@@ -277,8 +277,10 @@ class NetworkComms(LifecycleNode):
         
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
-        self.current_boat_state.latitude = 42.273822
-        self.current_boat_state.longitude = -71.805967
+        # self.current_boat_state.latitude = 42.273822
+        # self.current_boat_state.longitude = -71.805967
+        self.current_boat_state.latitude = 42.276842
+        self.current_boat_state.longitude = -71.756035
         self.current_boat_state.current_heading = 0
         self.current_boat_state.track_degrees_true = 0
         self.current_boat_state.track_degrees_magnetic = 0
@@ -539,11 +541,10 @@ class NetworkComms(LifecycleNode):
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         #rudder commands are radians, map to degrees
         degrees = command.rudder_control_value*(180/math.pi)
-        degrees = int(degrees/3)
         self.get_logger().info(f"degrees: {degrees}")
         
         msg = Int16()
-        msg.data = degrees
+        msg.data = int(degrees)
         self.rudder_control_publisher.publish(msg)
         return response
     
