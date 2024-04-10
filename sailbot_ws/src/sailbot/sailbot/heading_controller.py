@@ -219,7 +219,7 @@ class HeadingController(LifecycleNode):
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         #self.rudder_simulator.compute()
         #rudder_angle = self.rudder_simulator.output['rudder_angle']
-        rudder_angle = heading_error # P controller for now
+        rudder_angle = heading_error*0.5 # P controller for now
         if(rudder_angle>90):
             rudder_angle = 90
         elif rudder_angle<-90:

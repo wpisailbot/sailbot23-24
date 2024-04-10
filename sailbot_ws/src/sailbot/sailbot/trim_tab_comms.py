@@ -182,7 +182,7 @@ class TrimTabComms(LifecycleNode):
         self.autonomous_mode = msg.mode
 
     def apparent_wind_callback(self, msg: Wind):
-        #self.get_logger().info(f"Got apparent wind: {msg.direction}")
+        self.get_logger().info(f"Got apparent wind: {msg.direction}")
         self.find_trim_tab_state(msg.direction)
 
     def find_trim_tab_state(self, relative_wind):  # five states of trim
@@ -235,7 +235,7 @@ class TrimTabComms(LifecycleNode):
             msg = {
                 "state": "min_lift"
             }
-            trim_state_msg.state = TrimState.TRIM_STATE_MIM_LIFT
+            trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
             self.get_logger().info("Min lift")
         #if we're in full auto and have no target, don't go anywhere
         if self.force_neutral_position and self.autonomous_mode == AutonomousMode.AUTONOMOUS_MODE_FULL:

@@ -95,6 +95,8 @@ class PathFollower(LifecycleNode):
 
     previous_look_ahead_index = 0
 
+    waypoint_indices = []
+
     last_recalculation_time = time.time()
 
     def __init__(self):
@@ -353,6 +355,8 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("No wind reported yet, cannot path")
             return
         
+        self.waypoint_indices = []
+        
         grid_points = []
         exact_points = []
         waypointIndex = 0
@@ -404,6 +408,7 @@ class PathFollower(LifecycleNode):
         final_path = Path()
         
         i=-1
+        k=0
         final_path.points.append(GeoPoint(latitude=self.latitude, longitude=self.longitude))
         for segment in path_segments:
             #skip failed waypoints
@@ -421,9 +426,11 @@ class PathFollower(LifecycleNode):
                 geopoint.latitude = lat
                 geopoint.longitude = lon
                 final_path.points.append(geopoint)
+                k+=1
             #append exact final position
             self.get_logger().info(f"num waypoints: {len(exact_points)}, i: {i}")
             final_path.points.append(exact_points[i+1])
+            self.waypoint_indices.append(k)
             i+=1
 
 
@@ -434,6 +441,7 @@ class PathFollower(LifecycleNode):
     def waypoints_callback(self, msg: WaypointPath):
         self.get_logger().info("Got waypoints!")
         self.waypoints = msg
+        self.previous_look_ahead_index = 0
         self.clear_threats()
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()
@@ -528,6 +536,10 @@ class PathFollower(LifecycleNode):
                 self.get_logger().info(f"Calulated lookAhead point: {point.latitude}, {point.longitude}")
                 self.target_position_publisher.publish(point)
                 return
+            else:
+                if(i==self.waypoint_indices[0]):
+                    self.waypoint_indices.pop(0)
+                    self.waypoints.pop(0)
 
     # def find_look_ahead(self):
     #     if len(self.current_path.points) == 0:
