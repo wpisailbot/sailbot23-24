@@ -23,6 +23,7 @@ import numpy as np
 from pyproj import Transformer
 import math
 import traceback
+import time
 
 from geopy.distance import great_circle
 from geopy.distance import geodesic
@@ -120,6 +121,8 @@ class PathFollower(LifecycleNode):
     wind_angle_deg = 270
 
     threat_ids = []
+
+    last_recalculation_time = time.time()
 
     def __init__(self):
         super().__init__('path_follower')
@@ -280,10 +283,12 @@ class PathFollower(LifecycleNode):
         self.latitude = msg.latitude
         self.longitude = msg.longitude
         new_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
-        if new_grid_cell != self.current_grid_cell:
+        current_time = time.time()
+        if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > 10):
             self.current_grid_cell = new_grid_cell
             self.get_logger().info("Recalculating path")
             self.recalculate_path_from_waypoints()
+            self.last_recalculation_time = time.time()
             
         self.find_look_ahead()
 
@@ -307,12 +312,9 @@ class PathFollower(LifecycleNode):
         req.start = start_point
         req.end = end_point
         
-        #Pathfinder assumes 0 is along the +X axis and counter-clockwise. Airmar data is 0 along -y axis and clockwise.
+        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along +y axis.
         wind_angle_adjusted = self.wind_angle_deg-90
-        # wind_angle_adjusted = 360-wind_angle_adjusted
-        # wind_angle_adjusted = wind_angle_adjusted+90
-        # if(wind_angle_adjusted>360):
-        #     wind_angle_adjusted-=360
+
 
         req.wind_angle_deg = float(wind_angle_adjusted)
         self.get_logger().info("Getting path")
