@@ -45,35 +45,6 @@ def interpolate_point(point1, point2, fraction):
     lon = point1.longitude + (point2.longitude - point1.longitude) * fraction
     return GeoPoint(latitude=lat, longitude=lon)
 
-def find_look_ahead_point(path, current_position, current_speed):
-    base_distance = 20  # Minimum look-ahead distance in meters
-    speed_factor = 10   # How much the look-ahead distance increases per knot of speed
-    
-    look_ahead_distance = base_distance + speed_factor * current_speed
-    
-    total_distance = 0
-    previous_point = None
-    for i, point in enumerate(path):
-        if i == 0:
-            distance = great_circle(current_position, (point.latitude, point.longitude)).meters
-        else:
-            distance = great_circle((previous_point.latitude, previous_point.longitude), (point.latitude, point.longitude)).meters
-        
-        total_distance += distance
-        if total_distance >= look_ahead_distance and previous_point is not None:
-            # Find the excess distance beyond the look-ahead point
-            excess_distance = total_distance - look_ahead_distance
-            # Calculate the fraction of the distance between the last two points where the look-ahead point falls
-            fraction = (distance - excess_distance) / distance
-            # Interpolate between the previous point and the current point to find the exact look-ahead point
-            look_ahead_point = interpolate_point(previous_point, point, fraction)
-            return look_ahead_point
-        
-        previous_point = point
-    
-    # If the loop completes without returning, the look-ahead point is beyond the end of the path
-    return previous_point
-
 def find_and_load_image(directory, location):
     """
     Find an image by location and load it along with its bounding box coordinates.
@@ -121,6 +92,8 @@ class PathFollower(LifecycleNode):
     wind_angle_deg = 270
 
     threat_ids = []
+
+    previous_look_ahead_index = 0
 
     last_recalculation_time = time.time()
 
@@ -425,8 +398,8 @@ class PathFollower(LifecycleNode):
         for i in range(len(grid_points)-1):
             path_segments.append(self.get_path(grid_points[i], grid_points[i+1]).path)
         
-        #for segment in path_segments:
-        #    segment.poses = self.insert_intermediate_points(segment.poses, 1)
+        for segment in path_segments:
+           segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
 
         final_path = Path()
         
@@ -508,13 +481,61 @@ class PathFollower(LifecycleNode):
     def true_wind_callback(self, msg: Wind):
         self.wind_angle_deg = msg.direction
 
+    def find_look_ahead_point(self, path, current_position, current_speed):
+        base_distance = 10  # Minimum look-ahead distance in meters
+        speed_factor = 1   # How much the look-ahead distance increases per knot of speed
+        
+        look_ahead_distance = base_distance + speed_factor * current_speed
+        
+        total_distance = 0
+        previous_point = None
+        for i, point in enumerate(path):
+            if i == 0:
+                distance = great_circle(current_position, (point.latitude, point.longitude)).meters
+            else:
+                distance = great_circle((previous_point.latitude, previous_point.longitude), (point.latitude, point.longitude)).meters
+            
+            total_distance += distance
+            if total_distance >= look_ahead_distance and previous_point is not None:
+                # Find the excess distance beyond the look-ahead point
+                excess_distance = total_distance - look_ahead_distance
+                # Calculate the fraction of the distance between the last two points where the look-ahead point falls
+                fraction = (distance - excess_distance) / distance
+                # Interpolate between the previous point and the current point to find the exact look-ahead point
+                look_ahead_point = interpolate_point(previous_point, point, fraction)
+                return look_ahead_point
+            
+            previous_point = point
+        
+        # If the loop completes without returning, the look-ahead point is beyond the end of the path
+        return previous_point
+    
     def find_look_ahead(self):
         if len(self.current_path.points) == 0:
             #self.get_logger().info("No lookAhead point for zero-length path")
             return
-        look_ahead_point = find_look_ahead_point(self.current_path.points, (self.latitude, self.longitude), self.speed_knots)
-        self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
-        self.target_position_publisher.publish(look_ahead_point)
+        
+        base_distance = 5  # Minimum look-ahead distance in meters
+        speed_factor = 1   # How much the look-ahead distance increases per knot of speed
+        
+        look_ahead_distance = base_distance + speed_factor * self.speed_knots
+
+        for i in range(self.previous_look_ahead_index, len(self.current_path.points)):
+            point = self.current_path.points[i]
+            distance = great_circle((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
+            if(distance>look_ahead_distance):
+                self.previous_look_ahead_index = i
+                self.get_logger().info(f"Calulated lookAhead point: {point.latitude}, {point.longitude}")
+                self.target_position_publisher.publish(point)
+                return
+
+    # def find_look_ahead(self):
+    #     if len(self.current_path.points) == 0:
+    #         #self.get_logger().info("No lookAhead point for zero-length path")
+    #         return
+    #     look_ahead_point = self.find_look_ahead_point(self.current_path.points, (self.latitude, self.longitude), self.speed_knots)
+    #     self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
+    #     self.target_position_publisher.publish(look_ahead_point)
 
     def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
         """
@@ -586,10 +607,13 @@ class PathFollower(LifecycleNode):
         appended = []
         for i in range(length):
             if i<(length-1):
-                num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i].pose.position.y)*num_per_unit_distance)
+                num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i+1].pose.position.y)*num_per_unit_distance)
+                self.get_logger().info(f"Num to insert: {num}")
                 appended.append(path[i])
                 x_step = (path[i+1].pose.position.x-path[i].pose.position.x)/(num+1)
-                y_step = (path[i].pose.position.y-path[i].pose.position.y)/(num+1)
+                self.get_logger().info(f"X step: {x_step}")
+                y_step = (path[i+1].pose.position.y-path[i].pose.position.y)/(num+1)
+                self.get_logger().info(f"y step: {y_step}")
                 for j in range(1, num+1):
                     new_x = path[i].pose.position.x+x_step*j
                     new_y = path[i].pose.position.y+y_step*j
