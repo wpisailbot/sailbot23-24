@@ -15,20 +15,9 @@ from threading import Event
 import threading
 import traceback
 
-class BoatState(Enum):
-    INACTIVE=1
-    INITIALIZING = 2
-    IDLE = 3
-    STATION_KEEPING=4
-    WAYPOINT_FOLLOWING=5
-
-#node_names = ["airmar_reader", "ballast_control", "battery_monitor", "computer_vision", "control_system", "computer_vision", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
-
 class StateManager(Node):
     early_node_names = ["network_comms"]
-    #node_names = ["ballast_control", "pwm_controller", "airmar_reader", "trim_tab_comms"]
     node_names = []
-    current_state = BoatState.INACTIVE
     client_state_getters: typing.Dict[str, Client] = {}
     client_state_setters: typing.Dict[str, Client] = {}
     def __init__(self):
@@ -60,6 +49,7 @@ class StateManager(Node):
         self.activate_nodes(self.node_names)
         #self.timer = self.create_timer(2, self.timer_callback)
 
+    # Can sometimess get stuck? Maybe just move to sequential, or find source of deadlock
     def transitionNodes(self, node_names: list, transition_id: int):
         #assemble and run list of async configure transition calls
         failed_names = node_names.copy()
@@ -79,6 +69,7 @@ class StateManager(Node):
 
         return True
     
+    # Incomplete- services calling services doesn't really work
     def restart_lifecycle_node_callback(self, request, response):
         node_name = request.node_name
         try:
@@ -91,6 +82,7 @@ class StateManager(Node):
 
         return response
 
+    # Incomplete- services calling services doesn't really work
     def restart_node(self, node_name):
         current_state = self.get_node_state(node_name)
 

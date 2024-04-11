@@ -29,6 +29,7 @@ from geopy.distance import great_circle
 from geopy.distance import geodesic
 from geopy.point import Point as geopy_point
 from math import sqrt, radians, degrees
+from typing import Tuple, List
 
 def get_maps_dir():
     package_path = get_package_share_directory('sailbot')
@@ -124,7 +125,7 @@ class PathFollower(LifecycleNode):
         #occupancy_grid_values = ((255 - occupancy_grid_values) * 100 / 255).astype(np.int8)
         grid_msg = OccupancyGrid()
         grid_msg.header = Header(frame_id="map")
-        grid_msg.info.resolution = 0.0001
+        grid_msg.info.resolution = 0.00001
         grid_msg.info.width = occupancy_grid_values.shape[1]
         self.image_width = occupancy_grid_values.shape[1]
         grid_msg.info.height = occupancy_grid_values.shape[0]
@@ -218,13 +219,6 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Activating...")
         # Start publishers or timers
         return super().on_activate(state)
-        # map_msg = Map()
-        # map_msg.grid = self.grid_msg
-        # map_msg.north = self.bbox['north']
-        # map_msg.south = self.bbox['south']
-        # map_msg.east = self.bbox['east']
-        # map_msg.west = self.bbox['west']
-        # self.current_map_publisher.publish(map_msg)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
@@ -251,10 +245,10 @@ class PathFollower(LifecycleNode):
     
     #end callbacks
 
-    def airmar_heading_callback(self, msg: Float64):
+    def airmar_heading_callback(self, msg: Float64) -> None:
         pass#self.heading = msg.data
     
-    def airmar_position_callback(self, msg: NavSatFix):
+    def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude
         self.longitude = msg.longitude
         new_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
@@ -268,11 +262,11 @@ class PathFollower(LifecycleNode):
         self.find_look_ahead()
 
 
-    def airmar_speed_knots_callback(self, msg: Float64):
+    def airmar_speed_knots_callback(self, msg: Float64) -> None:
         self.speed_knots = msg.data
         self.find_look_ahead()
 
-    def get_path(self, start, goal):
+    def get_path(self, start, goal) -> GetPath.Response:
         self.get_logger().info(f"get_path with {start}, {goal}")
         if self.wind_angle_deg is None:
             self.get_logger().info("No wind reported yet, cannot path")
@@ -299,7 +293,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Path returned!")
         return result
     
-    def calculate_initial_bearing(self, point_A, point_B):
+    def calculate_initial_bearing(self, point_A, point_B) -> float:
         lat1, lon1 = map(radians, point_A)
         lat2, lon2 = map(radians, point_B)
 
@@ -310,7 +304,7 @@ class PathFollower(LifecycleNode):
 
         return degrees(initial_bearing)
 
-    def get_square_corners(self, A, B, side_length, direction):
+    def get_square_corners(self, A, B, side_length, direction) -> List[Tuple[float, float]]:
         # Convert side length to diagonal distance
         diagonal_distance = (side_length * sqrt(2)) / 2  # Half diagonal for geodesic distance
         
@@ -332,7 +326,7 @@ class PathFollower(LifecycleNode):
         #This should not happen
         return None
 
-    def get_relevant_square_corners(self, target_point, previous_point, next_point, direction):
+    def get_relevant_square_corners(self, target_point, previous_point, next_point, direction) -> List[Tuple[float, float]]:
         corners = self.get_square_corners((previous_point.latitude, previous_point.longitude), (target_point.latitude, target_point.longitude), 30, direction)
         self.get_logger().info(f"Target: {target_point}, previous: {previous_point}, next: {next_point}, corners: {corners}")
         if next_point is None:
@@ -350,7 +344,7 @@ class PathFollower(LifecycleNode):
         return relevant
 
 
-    def recalculate_path_from_waypoints(self):
+    def recalculate_path_from_waypoints(self) -> None:
         if self.wind_angle_deg is None:
             self.get_logger().info("No wind reported yet, cannot path")
             return
@@ -441,7 +435,7 @@ class PathFollower(LifecycleNode):
         self.current_path_publisher.publish(final_path)
         self.current_path = final_path
 
-    def waypoints_callback(self, msg: WaypointPath):
+    def waypoints_callback(self, msg: WaypointPath) -> None:
         self.get_logger().info("Got waypoints!")
         self.waypoints = msg
         self.clear_threats()
@@ -449,7 +443,7 @@ class PathFollower(LifecycleNode):
         self.find_look_ahead()
         self.get_logger().info("Ending waypoints callback")
     
-    def clear_threats(self):
+    def clear_threats(self) -> None:
         for id in self.threat_ids:
             req = SetThreat.Request()
             req.id = id
@@ -460,7 +454,7 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("Threat removed")
 
 
-    def add_threat(self, waypoint):
+    def add_threat(self, waypoint) -> None:
         threat = GaussianThreat()
         threat.size = 5.0
         threat.intensity = 1.0
@@ -476,9 +470,8 @@ class PathFollower(LifecycleNode):
         result = self.set_threat_cli.call(req)
         self.get_logger().info(f"Threat id returned: {result.assigned_id}")
         self.threat_ids.append(result.assigned_id)
-        return result
 
-    def single_waypoint_callback(self, msg: Waypoint):
+    def single_waypoint_callback(self, msg: Waypoint) -> None:
         self.get_logger().info("Got single waypoint")
         self.waypoints.waypoints.append(msg)
         if msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT or msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
@@ -488,7 +481,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Ending single waypoint callback")
 
 
-    def true_wind_callback(self, msg: Wind):
+    def true_wind_callback(self, msg: Wind) -> None:
         self.wind_angle_deg = msg.direction
 
     def find_look_ahead_point(self, path, current_position, current_speed):
@@ -520,7 +513,7 @@ class PathFollower(LifecycleNode):
         # If the loop completes without returning, the look-ahead point is beyond the end of the path
         return previous_point
     
-    def find_look_ahead(self):
+    def find_look_ahead(self) -> None:
         if len(self.current_path.points) == 0:
             #self.get_logger().info("No lookAhead point for zero-length path")
             return
@@ -551,7 +544,7 @@ class PathFollower(LifecycleNode):
     #     self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
     #     self.target_position_publisher.publish(look_ahead_point)
 
-    def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
+    def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
         """
         Convert lat/long coordinates to grid cell using pyproj for projection handling.
         
@@ -582,7 +575,7 @@ class PathFollower(LifecycleNode):
         
         return x, y
 
-    def grid_to_latlong_proj(self, x, y, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857'):
+    def grid_to_latlong_proj(self, x, y, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[float, float]:
         """
         Convert grid cell coordinates in an image to latitude/longitude coordinates.
 
@@ -616,7 +609,7 @@ class PathFollower(LifecycleNode):
         
         return latitude, longitude
     
-    def insert_intermediate_points(self, path, num_per_unit_distance):
+    def insert_intermediate_points(self, path, num_per_unit_distance) -> List[PoseStamped]:
         length = len(path)
         appended = []
         for i in range(length):

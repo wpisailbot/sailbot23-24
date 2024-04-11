@@ -202,7 +202,7 @@ class HeadingController(LifecycleNode):
         self.target_position = msg
         self.compute_rudder_angle()
     
-    def compute_rudder_angle(self):
+    def compute_rudder_angle(self) -> None:
         autonomous_modes = AutonomousMode()
         if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL):
             return
@@ -230,7 +230,7 @@ class HeadingController(LifecycleNode):
         self.rudder_angle_publisher.publish(msg)
 
     #gets necessary rotation from an lat, long, theta pose to face a point
-    def getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long):
+    def getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -> float:
         # Convert latitude and longitude from degrees to radians
         lat1 = math.radians(current_lat)
         lon1 = math.radians(current_long)

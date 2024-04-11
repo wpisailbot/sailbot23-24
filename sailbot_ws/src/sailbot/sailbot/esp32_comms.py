@@ -17,8 +17,6 @@ from time import time as get_time
 from std_msgs.msg import Int8, Int16, Float32, Empty
 from sailbot_msgs.msg import Wind, AutonomousMode, Path, TrimState
 
-import trim_tab_messages.python.messages_pb2 as message_pb2
-
 import serial
 import json
 import time
@@ -30,12 +28,11 @@ serial_port = '/dev/ttyTHS0'
 baud_rate = 115200 
 
 # Local variables
-state = message_pb2.TRIM_STATE.TRIM_STATE_MIN_LIFT
 angle = 0
 wind_dir = 0.0
 battery_level = 100
 
-def find_esp32_serial_ports():
+def find_esp32_serial_ports() -> list:
     # Common VID:PID pairs for USB-to-Serial adapters used with ESP32
     esp32_vid_pid = [
         ('10C4', 'EA60'),  # Silicon Labs CP210x
@@ -101,7 +98,6 @@ class TrimTabComms(LifecycleNode):
         self.tt_battery_publisher = self.create_lifecycle_publisher(Int8, 'tt_battery', 10)  # Battery level
         self.trim_state_debug_publisher = self.create_lifecycle_publisher(TrimState, 'trim_state', 10)
 
-        self.tt_control_subscriber = self.create_subscription(Int8, 'tt_control', self.tt_state_callback, 10)  # Trim tab state
         self.tt_angle_subscriber = self.create_subscription(Int16, 'tt_angle', self.tt_angle_callback, 10)
 
         self.rudder_angle_subscriber = self.create_subscription(Int16, 'rudder_angle', self.rudder_angle_callback, 10)
@@ -162,14 +158,14 @@ class TrimTabComms(LifecycleNode):
     
     #end callbacks
 
-    def current_path_callback(self, msg: Path):
+    def current_path_callback(self, msg: Path) -> None:
         if len(msg.points) == 0:
             self.force_neutral_position = True
         else:
             self.get_logger().info("Valid path received, allowing auto trimtab movement")
             self.force_neutral_position = False
 
-    def autonomous_mode_callback(self, msg: AutonomousMode):
+    def autonomous_mode_callback(self, msg: AutonomousMode) -> None:
         self.get_logger().info(f"Got autonomous mode: {msg.mode}")
         if(msg.mode == AutonomousMode.AUTONOMOUS_MODE_NONE):
             message = {
@@ -181,15 +177,12 @@ class TrimTabComms(LifecycleNode):
 
         self.autonomous_mode = msg.mode
 
-    def apparent_wind_callback(self, msg: Wind):
+    def apparent_wind_callback(self, msg: Wind) -> None:
         self.get_logger().info(f"Got apparent wind: {msg.direction}")
         self.find_trim_tab_state(msg.direction)
 
-    def find_trim_tab_state(self, relative_wind):  # five states of trim
+    def find_trim_tab_state(self, relative_wind) -> None:  # five states of trim
         #self.get_logger().info(f"apparent wind: {relative_wind}")
-        #self.update_winds(relative_wind)
-        #smooth_angle = self.median(self.last_winds)
-
         
         # Check autonomous mode TODO: This is a coupling that shouldn't be necessary. 
         # Can be fixed by separating nodes and using lifecycle state transitions, or by finishing behavior tree
@@ -249,15 +242,7 @@ class TrimTabComms(LifecycleNode):
         message_string = json.dumps(msg)+'\n'
         self.ser.write(message_string.encode())
 
-    def tt_state_callback(self, msg: Int8):
-        protomsg = message_pb2.ControlMessage()
-        protomsg.control_type = message_pb2.CONTROL_MESSAGE_CONTROL_TYPE.CONTROL_MESSAGE_CONTROL_TYPE_STATE
-        protomsg.state = msg.data
-        serialized_message = protomsg.SerializeToString()
-        if(self.last_websocket is not None):
-            self.schedule_async_function(self.last_websocket.send(serialized_message))
-
-    def tt_angle_callback(self, msg: Int16):
+    def tt_angle_callback(self, msg: Int16) -> None:
         self.get_logger().info("Sending trimtab angle")
         angle = msg.data
         this_time = get_time()
@@ -269,7 +254,7 @@ class TrimTabComms(LifecycleNode):
         message_string = json.dumps(message)+'\n'
         self.ser.write(message_string.encode())
 
-    def rudder_angle_callback(self, msg: Int16):
+    def rudder_angle_callback(self, msg: Int16) -> None:
         self.get_logger().info(f"Got rudder position: {msg.data}")
         degrees = msg.data
         if(degrees>30):
@@ -283,7 +268,7 @@ class TrimTabComms(LifecycleNode):
         message_string = json.dumps(message)+'\n'
         self.ser.write(message_string.encode())
 
-    def ballast_pwm_callback(self, msg: Int16):
+    def ballast_pwm_callback(self, msg: Int16) -> None:
         #self.get_logger().info("Got ballast position")
         pwm = msg.data
         message = {
@@ -292,7 +277,7 @@ class TrimTabComms(LifecycleNode):
         message_string = json.dumps(message)+'\n'
         self.ser.write(message_string.encode())
 
-    def ballast_timer_callback(self):
+    def ballast_timer_callback(self) -> None:
         message = {
             "get_ballast_pos": True
         }
@@ -325,27 +310,9 @@ class TrimTabComms(LifecycleNode):
         else:
             self.get_logger().info("No data received within the timeout period.")
 
-    async def echo(self, websocket, path):
-        self.last_websocket = websocket
-        async for message in websocket:
-            try:
-                # Deserialize the protobuf message
-                protobuf_message = message_pb2.DataMessage()
-                protobuf_message.ParseFromString(message)
-
-                self.get_logger().info("Received message:"+ str(protobuf_message.windAngle)+": "+str(protobuf_message.batteryLevel))
-
-                # Optionally, send a response back (as a string or protobuf)
-                await websocket.send("Message received")
-                
-            except Exception as e:
-                self.get_logger().info("Error processing message:", e)
-                raise(e)
-
 def main(args=None):
     rclpy.init(args=args)
 
-    loop = asyncio.get_event_loop()
     tt_comms = TrimTabComms()
 
     try:
