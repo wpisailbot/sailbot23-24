@@ -56,9 +56,15 @@ class TrimTabComms(LifecycleNode):
     last_winds = []
     autonomous_mode = 0
     force_neutral_position = True
+    could_be_tacking = False
+    last_lift_state = TrimState.TRIM_STATE_MIN_LIFT
+    rudder_angle_limit_deg = None
 
     def __init__(self):
         super(TrimTabComms, self).__init__('trim_tab_comms')
+
+        self.set_parameters()
+        self.get_parameters()
 
         self.tt_telemetry_publisher: Optional[Publisher]
         self.tt_battery_publisher: Optional[Publisher]
@@ -77,6 +83,12 @@ class TrimTabComms(LifecycleNode):
 
         self.heartbeat_timer: Optional[Timer]
         self.timer: Optional[Timer]
+
+    def set_parameters(self) -> None:
+        self.declare_parameter('sailbot.rudder.angle_limit_deg', 30)
+
+    def get_parameters(self) -> None:
+        self.rudder_angle_limit_deg = self.get_parameter('sailbot.rudder.angle_limit_deg').get_parameter_value().integer_value
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -200,6 +212,7 @@ class TrimTabComms(LifecycleNode):
                 "state": "max_lift_port"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
+            self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_PORT
             self.get_logger().info("Max lift port")
         elif 135 <= relative_wind < 180:
             # Max drag port
@@ -207,6 +220,7 @@ class TrimTabComms(LifecycleNode):
                 "state": "max_drag_port"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_PORT
+            #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_PORT
             self.get_logger().info("Max drag port")
 
         elif 180 <= relative_wind < 200:
@@ -215,6 +229,7 @@ class TrimTabComms(LifecycleNode):
                 "state": "max_drag_starboard"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
+            #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
             self.get_logger().info("Max drag starboard")
         elif 200 <= relative_wind < 315:
             # Max lift starboard
@@ -222,14 +237,41 @@ class TrimTabComms(LifecycleNode):
                 "state": "max_lift_starboard"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
+            self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
             self.get_logger().info("Max lift starboard")
         else:
-            # In irons, min lift
-            msg = {
-                "state": "min_lift"
-            }
-            trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
-            self.get_logger().info("Min lift")
+            self.get_logger().info("In Min lift")
+            # In irons
+            
+            #adjust behavior to not stop during a tack
+            if(self.could_be_tacking):
+                self.get_logger().info("Tacking detected!")
+                if(self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
+                    trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
+                    self.get_logger().info("Switching from starboard to port")
+                    msg = {
+                        "state": "max_lift_port"
+                    }
+                elif (self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
+                    self.get_logger().info("Switching from port to starboard")
+                    trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
+                    msg = {
+                        "state": "max_lift_starboard"
+                    }
+                else:
+                    #how did we get here?
+                    self.get_logger().warn("Went into min lift in tack mode, but previous state was not max lift. Did the wind change suddenly?")
+                    msg = {
+                        "state": "min_lift"
+                    }
+                    trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
+            else:
+                msg = {
+                    "state": "min_lift"
+                }
+                trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
+                # Don't log min lift as last state so we never get stuck in it
+
         #if we're in full auto and have no target, don't go anywhere
         if self.force_neutral_position and self.autonomous_mode == AutonomousMode.AUTONOMOUS_MODE_FULL:
             msg = {
@@ -257,10 +299,16 @@ class TrimTabComms(LifecycleNode):
     def rudder_angle_callback(self, msg: Int16) -> None:
         self.get_logger().info(f"Got rudder position: {msg.data}")
         degrees = msg.data
-        if(degrees>30):
-            degrees = 30
-        elif (degrees<-30):
-            degrees = -30
+        # If rudder angles are high, limit them, and note that we could be tacking
+        # This lets find_trim_tab_state adjust its behavior accordingly, if it would enter min_lift.
+        if(degrees>self.rudder_angle_limit_deg):
+            self.could_be_tacking = True
+            degrees = self.rudder_angle_limit_deg
+        elif (degrees<-self.rudder_angle_limit_deg):
+            self.could_be_tacking = True
+            degrees = -self.rudder_angle_limit_deg
+        else:
+            self.could_be_tacking = False
         #degrees = degrees+13 #Servo degree offset
         message = {
             "rudder_angle": degrees

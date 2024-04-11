@@ -12,6 +12,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, glob('launch/*.py')),
+        ('share/' + package_name + '/config/', glob('config/*.yaml')),
         ('share/' + package_name +'/maps/', glob('maps/*.png')),
         ('lib/'+package_name+'/telemetry_messages/python/', glob('sailbot/telemetry_messages/python/*')),
         ('lib/'+package_name+'/trim_tab_messages/python/', glob('sailbot/trim_tab_messages/python/*')),

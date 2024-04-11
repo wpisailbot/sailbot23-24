@@ -92,6 +92,9 @@ class PathFollower(LifecycleNode):
 
     wind_angle_deg = 270
 
+    buoy_rounding_distance_meters = None
+    min_path_recalculation_interval_seconds = None
+
     threat_ids = []
 
     previous_look_ahead_index = 0
@@ -112,8 +115,10 @@ class PathFollower(LifecycleNode):
         self.airmar_position_subscription: Optional[Subscription]
         self.airmar_speed_knots_subscription: Optional[Subscription]
         self.timer: Optional[Timer]
-        self.declare_parameter('map_name', 'quinsigamond')
-        self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
+        
+        self.set_parameters()
+        self.get_parameters()
+    
         self.get_logger().info(f'Map name: {self.map_name}')
         self.get_logger().info("Getting map image")
         image, self.bbox = find_and_load_image(get_maps_dir(), self.map_name)
@@ -161,6 +166,21 @@ class PathFollower(LifecycleNode):
         
         self.get_logger().info("Path follower node setup complete")
 
+
+    def set_parameters(self) -> None:
+        self.declare_parameter('sailbot.pathfinding.buoy_rounding_distance_meters', 5.0)
+        self.declare_parameter('sailbot.pathfinding.buoy_threat_size_map_units', 1.0)
+        self.declare_parameter('sailbot.pathfinding.buoy_threat_guassian_intensity', 1.0)
+        self.declare_parameter('sailbot.pathfinding.min_path_recalculation_interval_seconds', 10.0)
+        self.declare_parameter('map_name', 'quinsigamond')
+
+    def get_parameters(self) -> None:
+        self.buoy_rounding_distance_meters = self.get_parameter('sailbot.pathfinding.buoy_rounding_distance_meters').get_parameter_value().double_value
+        self.buoy_threat_size_map_units = self.get_parameter('sailbot.pathfinding.buoy_threat_size_map_units').get_parameter_value().double_value
+        self.buoy_threat_guassian_intensity = self.get_parameter('sailbot.pathfinding.buoy_threat_guassian_intensity').get_parameter_value().double_value
+        self.min_path_recalculation_interval_seconds = self.get_parameter('sailbot.pathfinding.min_path_recalculation_interval_seconds').get_parameter_value().double_value
+
+        self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -253,7 +273,7 @@ class PathFollower(LifecycleNode):
         self.longitude = msg.longitude
         new_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
         current_time = time.time()
-        if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > 10):
+        if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
             self.current_grid_cell = new_grid_cell
             self.get_logger().info("Recalculating path")
             self.recalculate_path_from_waypoints()
@@ -327,7 +347,7 @@ class PathFollower(LifecycleNode):
         return None
 
     def get_relevant_square_corners(self, target_point, previous_point, next_point, direction) -> List[Tuple[float, float]]:
-        corners = self.get_square_corners((previous_point.latitude, previous_point.longitude), (target_point.latitude, target_point.longitude), 30, direction)
+        corners = self.get_square_corners((previous_point.latitude, previous_point.longitude), (target_point.latitude, target_point.longitude), self.buoy_rounding_distance_meters, direction)
         self.get_logger().info(f"Target: {target_point}, previous: {previous_point}, next: {next_point}, corners: {corners}")
         if next_point is None:
             return corners
@@ -456,7 +476,7 @@ class PathFollower(LifecycleNode):
 
     def add_threat(self, waypoint) -> None:
         threat = GaussianThreat()
-        threat.size = 5.0
+        threat.size = self.buoy_threat_size_map_units
         threat.intensity = 1.0
         x, y = self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height)
         threat.center.x = float(x)

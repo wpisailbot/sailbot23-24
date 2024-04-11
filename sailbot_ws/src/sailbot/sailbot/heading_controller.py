@@ -18,7 +18,7 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 
-from sailbot_msgs.msg import AutonomousMode, Path
+from sailbot_msgs.msg import AutonomousMode, Path, Wind
 
 PI = math.pi
 TWO_PI = PI*2
@@ -43,10 +43,16 @@ class HeadingController(LifecycleNode):
     latitude = 42.273822
     longitude = -71.805967
     target_position = None
+    wind_direction_deg = None
     autonomous_mode = 0
+    heading_kp = None
 
     def __init__(self):
         super().__init__('heading_controller')
+
+        self.set_parameters()
+        self.get_parameters()
+
         self.rudder_angle_publisher: Optional[Publisher]
         self.target_position_subscription: Optional[Subscription]
         self.airmar_heading_subscription: Optional[Subscription]
@@ -60,6 +66,11 @@ class HeadingController(LifecycleNode):
         # self.target_position.latitude = 42.273051
         # self.target_position.longitude = -71.805049
 
+    def set_parameters(self) -> None:
+        self.declare_parameter('sailbot.heading_kp', 0.5)
+
+    def get_parameters(self) -> None:
+        self.heading_kp = self.get_parameter('sailbot.heading_kp').get_parameter_value().double_value
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
@@ -85,6 +96,11 @@ class HeadingController(LifecycleNode):
             Path,
             'current_path',
             self.current_path_callback,
+            10)
+        self.true_wind_subscription = self.create_subscription(
+            Wind,
+            'true_wind_smoothed',
+            self.true_wind_callback,
             10)
         self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
@@ -178,30 +194,52 @@ class HeadingController(LifecycleNode):
     
     #end callbacks
 
-    def current_path_callback(self, msg: Path):
+    def current_path_callback(self, msg: Path) -> None:
         if len(msg.points) == 0:
             self.target_position = None
 
-    def autonomous_mode_callback(self, msg: AutonomousMode):
+    def autonomous_mode_callback(self, msg: AutonomousMode) -> None:
         self.get_logger().info(f"Got autonomous mode: {msg.mode}")
         self.autonomous_mode = msg.mode
 
-    def timer_callback(self):
+    def timer_callback(self) -> None:
         self.compute_rudder_angle()
 
-    def airmar_heading_callback(self, msg: Float64):
+    def airmar_heading_callback(self, msg: Float64) -> None:
         self.heading = msg.data
         self.compute_rudder_angle()
     
-    def airmar_position_callback(self, msg: NavSatFix):
+    def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude
         self.longitude = msg.longitude
         self.compute_rudder_angle()
     
-    def target_position_callback(self, msg: GeoPoint):
+    def target_position_callback(self, msg: GeoPoint) -> None:
         self.target_position = msg
         self.compute_rudder_angle()
+
+    def true_wind_callback(self, msg: Wind) -> None:
+        self.wind_direction_deg = msg.direction
     
+    def needs_to_tack(boat_heading, target_heading, wind_direction) -> bool:
+        # Normalize angles
+        boat_heading %= 360
+        target_heading %= 360
+        wind_direction %= 360
+        
+        clockwise = ((target_heading - boat_heading + 360) % 360) < 180
+        
+        if clockwise:
+            if boat_heading <= wind_direction < target_heading or \
+            (target_heading < boat_heading and (wind_direction > boat_heading or wind_direction < target_heading)):
+                return True
+        else:
+            if target_heading <= wind_direction < boat_heading or \
+            (boat_heading < target_heading and (wind_direction < boat_heading or wind_direction > target_heading)):
+                return True
+        
+        return False
+
     def compute_rudder_angle(self) -> None:
         autonomous_modes = AutonomousMode()
         if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL):
@@ -219,11 +257,21 @@ class HeadingController(LifecycleNode):
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         #self.rudder_simulator.compute()
         #rudder_angle = self.rudder_simulator.output['rudder_angle']
-        rudder_angle = heading_error*0.5 # P controller for now
+        rudder_angle = heading_error*self.heading_kp # P controller for now
         if(rudder_angle>90):
             rudder_angle = 90
         elif rudder_angle<-90:
             rudder_angle = -90
+
+        # If we are tacking, turn as hard as possible.
+        # Trim tab controller will see this and skip over min_lift
+        if(self.wind_direction_deg is not None):
+            if(self.needs_to_tack(self.heading, self.wind_direction_deg)):
+                if(rudder_angle>0):
+                    rudder_angle = 90
+                else:
+                    rudder_angle = -90
+
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
         msg.data = int(rudder_angle)

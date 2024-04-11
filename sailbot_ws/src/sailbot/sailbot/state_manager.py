@@ -122,10 +122,6 @@ class StateManager(Node):
         else:
             self.get_logger().error('Failed to call get_state service')
             return None
-    
-
-    async def spin_once(self):
-        rclpy.spin_once(self, timeout_sec=0)
 
     def change_node_state(self, node_name, transition):
         # Create a service client for ChangeState

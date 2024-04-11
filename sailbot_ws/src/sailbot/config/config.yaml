@@ -1,0 +1,19 @@
+heading_controller:
+  ros__parameters:
+    sailbot:
+      heading_kp: 0.5
+    
+esp32_comms:
+  ros__parameters:
+    sailbot:
+      rudder:
+        angle_limit_deg: 30
+
+path_follower:
+  ros__parameters:
+    sailbot:
+      pathfinding:
+        buoy_rounding_distance_meters: 3.0
+        buoy_threat_size_map_units: 1.0
+        buoy_threat_guassian_intensity: 1.0
+        min_path_recalculation_interval_seconds: 10.0

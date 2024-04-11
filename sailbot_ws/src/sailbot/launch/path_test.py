@@ -1,14 +1,21 @@
 import launch
+import os
 from launch_ros.actions import Node
 from launch_ros.actions import LifecycleNode
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, Command
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     map_name = DeclareLaunchArgument(
         'map_name',
         default_value="quinsigamond",
         description="The text before the first ':' in the map file name"
+    )
+    config_file_path = os.path.join(
+        get_package_share_directory('sailbot'),
+        'config',
+        'config.yaml'
     )
     network_comms_node = LifecycleNode(
         package='sailbot', 
@@ -39,19 +46,21 @@ def generate_launch_description():
     #     namespace='',
     #     output='screen'
     # )
-    tt_node = LifecycleNode(
+    esp_node = LifecycleNode(
         package='sailbot', 
         executable='esp32_comms', 
         name='esp32_comms',
         namespace='',
-        output='screen'
+        output='screen',
+        parameters=[config_file_path]
     )
     heading_node = LifecycleNode(
         package='sailbot', 
         executable='heading_controller', 
         name='heading_controller',
         namespace='',
-        output='screen'
+        output='screen',
+        parameters=[config_file_path]
     )
     path_follower_node = LifecycleNode(
         package='sailbot', 
@@ -59,7 +68,7 @@ def generate_launch_description():
         name='path_follower',
         namespace='',
         output='screen',
-        parameters=[{'map_name': LaunchConfiguration('map_name')}]
+        parameters=[config_file_path, {'map_name': LaunchConfiguration('map_name')}]
     )
     # managed_node_names = DeclareLaunchArgument(
     #     'managed_nodes',
@@ -101,7 +110,7 @@ def generate_launch_description():
     ld.add_action(airmar_node)
     ld.add_action(wind_smoother_node)
 
-    ld.add_action(tt_node)
+    ld.add_action(esp_node)
     ld.add_action(heading_node)
     ld.add_action(path_follower_node)
 
