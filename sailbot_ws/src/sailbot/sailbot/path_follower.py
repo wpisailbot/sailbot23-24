@@ -355,6 +355,9 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("No wind reported yet, cannot path")
             return
         
+        # Reset look-ahead, since previous values are not relevant anymore
+        self.previous_look_ahead_index = 0
+
         self.waypoint_indices = []
         
         grid_points = []
@@ -441,7 +444,6 @@ class PathFollower(LifecycleNode):
     def waypoints_callback(self, msg: WaypointPath):
         self.get_logger().info("Got waypoints!")
         self.waypoints = msg
-        self.previous_look_ahead_index = 0
         self.clear_threats()
         self.recalculate_path_from_waypoints()
         self.find_look_ahead()

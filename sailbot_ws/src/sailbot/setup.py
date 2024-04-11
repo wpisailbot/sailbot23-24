@@ -29,7 +29,7 @@ setup(
             'airmar_reader_non_lifecycle = sailbot.airmar_reader_non_lifecycle:main',
             'pwm_controller = sailbot.pwm_controller:main',
             'control_system = sailbot.control_system:main',
-            'trim_tab_comms = sailbot.trim_tab_comms:main',
+            'esp32_comms = sailbot.esp32_comms:main',
             'battery_monitor = sailbot.batteryMonitor:main',
             'ballast_control = sailbot.ballast_control:main',
             'computer_vision = sailbot.computer_vision:main',

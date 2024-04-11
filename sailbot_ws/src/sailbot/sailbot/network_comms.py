@@ -29,6 +29,8 @@ import cv2
 import re
 import numpy as np
 import traceback
+import types
+from typing import Callable, Any
 
 from sailbot_msgs.srv import RestartNode
 
@@ -236,29 +238,6 @@ class NetworkComms(LifecycleNode):
             self.pitch_callback,
             10)
 
-        self.airmar_reader_lifecycle_subscription = self.create_subscription(
-            TransitionEvent,
-            '/airmar_reader/transition_event',
-            self.airmar_lifecycle_callback,
-            10)
-
-        self.ballast_control_lifecycle_subscription = self.create_subscription(
-            TransitionEvent,
-            '/ballast_control/transition_event',
-            self.ballast_lifecycle_callback,
-            10)
-        
-        self.pwm_controller_lifecycle_subscription = self.create_subscription(
-            TransitionEvent,
-            '/pwm_controller/transition_event',
-            self.pwm_lifecycle_callback,
-            10)
-        
-        self.tt_lifecycle_subscription = self.create_subscription(
-            TransitionEvent,
-            '/trim_tab_comms/transition_event',
-            self.tt_lifecycle_callback,
-            10)
         self.current_path_subscription = self.create_subscription(
             Path,
             'current_path',
@@ -294,9 +273,13 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.pitch = 0
         self.current_boat_state.roll = 0
         self.node_indices = {}
-        node_names = ["airmar_reader", "ballast_control", "battery_monitor", "control_system", "network_comms", "pwm_controller", "trim_tab_comms"]
+        self.declare_parameter('managed_nodes')
+        node_names = self.get_parameter('managed_nodes').get_parameter_value().string_array_value
+        self.get_logger().info(f'Active nodes: {node_names}')
         i=0
         for name in node_names:
+
+            #init state
             node_info = boat_state_pb2.NodeInfo()
             node_info.name = name
             node_info.status = boat_state_pb2.NodeStatus.NODE_STATUS_OK
@@ -304,6 +287,14 @@ class NetworkComms(LifecycleNode):
             self.current_boat_state.node_states.append(node_info)
             self.node_indices[name]=i
             i+=1
+
+            #create lifecycle callback using function generation
+            try:
+                self.setup_node_subscription(node_name=name)
+            except Exception as e:
+                trace = traceback.format_exc()
+                self.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+
         self.current_boat_state.current_autonomous_mode = boat_state_pb2.AutonomousMode.AUTONOMOUS_MODE_NONE
         # a = boat_state_pb2.Point()
         # a.latitude = 5.1
@@ -403,12 +394,12 @@ class NetworkComms(LifecycleNode):
      
     #end lifecycle callbacks
 
-    def target_position_callback(self, msg: GeoPoint):
+    def target_position_callback(self, msg: GeoPoint) -> None:
         self.get_logger().info(f"Sending target point: {msg}")
         self.current_boat_state.current_target_point.latitude = msg.latitude
         self.current_boat_state.current_target_point.longitude = msg.longitude
 
-    def trim_state_callback(self, msg: TrimState):
+    def trim_state_callback(self, msg: TrimState) -> None:
         if(msg.state == TrimState.TRIM_STATE_MIN_LIFT):
             self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MIN_LIFT
         elif(msg.state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
@@ -422,7 +413,7 @@ class NetworkComms(LifecycleNode):
         elif(msg.state == TrimState.TRIM_STATE_MANUAL):
             self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MANUAL
         
-    def current_path_callback(self, msg: Path):
+    def current_path_callback(self, msg: Path) -> None:
         #self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")
         self.current_boat_state.current_path.ClearField("points")# = command.new_path
         #self.get_logger().info("Cleared old path")
@@ -433,7 +424,7 @@ class NetworkComms(LifecycleNode):
 
         #self.get_logger().info(f"length of boatState path is: {len(self.current_boat_state.current_path.points)}")
 
-    def restart_lifecycle_node_by_name(self, node_name):
+    def restart_lifecycle_node_by_name(self, node_name: str) -> bool:
         # Create a service client to send lifecycle state change requests
         client = self.create_client(ChangeState, f'{node_name}/change_state')
 
@@ -457,22 +448,33 @@ class NetworkComms(LifecycleNode):
         client.call_async(activate_request)
         self.get_logger().info(f'Sent activate request to {node_name}')
         return True
-
-    def airmar_lifecycle_callback(self, msg: TransitionEvent):
-        self.get_logger().info("Received airmar update!")
-        self.current_boat_state.node_states[self.node_indices["airmar_reader"]].lifecycle_state = get_state(msg.goal_state.id)
-
-    def ballast_lifecycle_callback(self, msg: TransitionEvent):
-        self.get_logger().info("Received ballast update!")
-        self.current_boat_state.node_states[self.node_indices["ballast_control"]].lifecycle_state = get_state(msg.goal_state.id)
     
-    def pwm_lifecycle_callback(self, msg: TransitionEvent):
-        self.get_logger().info("Received pwm update!")
-        self.current_boat_state.node_states[self.node_indices["pwm_controller"]].lifecycle_state = get_state(msg.goal_state.id)
+    def create_lifecycle_callback(self, node_name: str) -> Callable[[Any, TransitionEvent], None]:
+        def lifecycle_callback(self, msg):
+            msg_details = f"Received {node_name} update! State is: {msg.goal_state.id}"
+            self.get_logger().info(msg_details)
+            self.current_boat_state.node_states[self.node_indices[node_name]].lifecycle_state = get_state(msg.goal_state.id)
+        return lifecycle_callback
     
-    def tt_lifecycle_callback(self, msg: TransitionEvent):
-        self.get_logger().info("Received trimtab update!")
-        self.current_boat_state.node_states[self.node_indices["trim_tab_comms"]].lifecycle_state = get_state(msg.goal_state.id)
+    def setup_node_subscription(self, node_name: str) -> None:
+        callback_method_name = f"{node_name}_lifecycle_callback"
+        # Dynamically create the callback method
+        method = self.create_lifecycle_callback(node_name)
+        # Bind the method to the instance, ensuring it receives `self` properly
+        bound_method = types.MethodType(method, self)
+        # Attach the bound method to the instance
+        setattr(self, callback_method_name, bound_method)
+        
+        # Set up the subscription using the dynamically created and bound callback
+        subscription_name = f"{node_name}_lifecycle_subscription"
+        topic_name = f"/{node_name}/transition_event"
+        subscription = self.create_subscription(
+            TransitionEvent,
+            topic_name,
+            getattr(self, callback_method_name),
+            10)
+        # Attach the subscription to this class instance
+        setattr(self, subscription_name, subscription)
 
     def rate_of_turn_callback(self, msg: Float64):
         self.current_boat_state.rate_of_turn = msg.data

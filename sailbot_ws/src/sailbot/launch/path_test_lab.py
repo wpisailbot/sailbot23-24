@@ -41,8 +41,8 @@ def generate_launch_description():
     # )
     tt_node = LifecycleNode(
         package='sailbot', 
-        executable='trim_tab_comms', 
-        name='trim_tab_comms',
+        executable='esp32_comms', 
+        name='esp32_comms',
         namespace='',
         output='screen'
     )
@@ -72,7 +72,7 @@ def generate_launch_description():
         name='state_manager',
         namespace='',
         output='screen',
-        parameters=[{'managed_nodes': ["wind_smoother", "airmar_reader", "path_follower", "heading_controller", "trim_tab_comms", "ballast_control"]}]
+        parameters=[{'managed_nodes': ["wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms", "ballast_control"]}]
     )
     pathfinder_node = Node(
         package='sailbot_pathfinding', 
