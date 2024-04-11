@@ -20,12 +20,20 @@ class WindSmoother(LifecycleNode):
 
     last_apparent_winds = []
     last_true_winds = []
+    num_wind_readings = 20
 
     def __init__(self):
         self.apparent_wind_subscriber: Optional[Subscription]
 
         self.smooth_apparent_wind_publisher: Optional[Publisher]
-        super().__init__('pwm_controller')
+        super().__init__('wind_smoother')
+
+    
+    def set_parameters(self) -> None:
+        self.declare_parameter('sailbot.pathfinding.num_wind_readings', 20)
+
+    def get_parameters(self) -> None:
+        self.num_wind_readings = self.get_parameter('sailbot.pathfinding.num_wind_readings').get_parameter_value().integer_value
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -74,7 +82,7 @@ class WindSmoother(LifecycleNode):
             return
             # First add wind to running list
         self.last_apparent_winds.append(float(relative_wind_direction))
-        if len(self.last_apparent_winds) > 20:
+        if len(self.last_apparent_winds) > self.num_wind_readings:
             self.last_apparent_winds.pop(0)
     
     def update_true_winds(self, true_wind_direction):
@@ -83,7 +91,7 @@ class WindSmoother(LifecycleNode):
             return
             # First add wind to running list
         self.last_true_winds.append(float(true_wind_direction))
-        if len(self.last_true_winds) > 20:
+        if len(self.last_true_winds) > self.num_wind_readings:
             self.last_true_winds.pop(0)
 
     def apparent_wind_callback(self, msg: Wind):

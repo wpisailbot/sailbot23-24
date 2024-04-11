@@ -17,3 +17,8 @@ path_follower:
         buoy_threat_size_map_units: 1.0
         buoy_threat_guassian_intensity: 1.0
         min_path_recalculation_interval_seconds: 10.0
+
+wind_smoother:
+  ros__parameters:
+    sailbot:
+      num_wind_readings: 20

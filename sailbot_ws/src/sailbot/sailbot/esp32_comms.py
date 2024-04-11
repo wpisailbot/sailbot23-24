@@ -61,7 +61,7 @@ class TrimTabComms(LifecycleNode):
     rudder_angle_limit_deg = None
 
     def __init__(self):
-        super(TrimTabComms, self).__init__('trim_tab_comms')
+        super(TrimTabComms, self).__init__('esp32_comms')
 
         self.set_parameters()
         self.get_parameters()
