@@ -526,6 +526,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
+        boat_state_pb2_rpc.add_StreamBoatStateServiceServicer_to_server(self, self.grpc_server)
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
 
         #connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
@@ -660,6 +661,13 @@ class NetworkComms(LifecycleNode):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest, context):
         return self.current_boat_state
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def StreamBoatState(self, command: boat_state_pb2.BoatStateRequest, context):
+        rate = self.create_rate(1)
+        while context.is_active():
+            yield self.current_boat_state
+            rate.sleep()
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def RestartNode(self, command: node_restart_pb2.RestartNodeRequest, context):
