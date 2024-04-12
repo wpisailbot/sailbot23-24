@@ -37,7 +37,11 @@ class BuoyDetection(Node):
             '/zed/zed_node/rgb/image_rect_color',
             self.listener_callback,
             10)
-        self.subscription  # prevent unused variable warning
+        self.mask_publisher = self.create_publisher(
+            Image,
+            'cv_mask',
+            10
+        )
         self.bridge = CvBridge()
     
         self.get_logger().info("Setup done")
@@ -122,8 +126,9 @@ class BuoyDetection(Node):
                 radius = int(radius)
                 cv2.circle(mask_rgb, center, radius, (0, 255, 0), 2)
 
-
-        cv2.imwrite('/home/sailbot/test_image.jpg', mask_rgb)
+        img_msg = self.bridge.cv2_to_imgmsg(mask_rgb, encoding="rgb8")
+        self.mask_publisher.publish(img_msg)
+        #cv2.imwrite('/home/sailbot/test_image.jpg', mask_rgb)
         return contours_cirles
 
     def calculate_depth(self, contour):

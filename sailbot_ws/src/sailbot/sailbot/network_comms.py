@@ -132,6 +132,7 @@ class NetworkComms(LifecycleNode):
     last_camera_frame_shape = None
     last_camera_frame_time = time.time()
     do_video_encode = False
+    current_video_source = 0
 
     def __init__(self):
         super().__init__('network_comms')
@@ -269,12 +270,17 @@ class NetworkComms(LifecycleNode):
             'trim_state',
             self.trim_state_callback,
             10)
-        self.camera_image_subscriber = self.create_subscription(
+        self.camera_color_image_subscriber = self.create_subscription(
             Image,
             '/zed/zed_node/rgb/image_rect_color',
-            self.camera_image_callback,
+            self.camera_color_image_callback,
             10)
         
+        self.camera_mask_image_subscriber = self.create_subscription(
+            Image,
+            'cv_mask',
+            self.camera_mask_image_callback,
+            10)
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
         # self.current_boat_state.latitude = 42.273822
@@ -534,15 +540,27 @@ class NetworkComms(LifecycleNode):
     def pitch_callback(self, msg: Float64):
         self.current_boat_state.pitch = msg.data
     
-    def camera_image_callback(self, msg: Image):
-        # if(self.do_video_encode == False):
-        #     return
+    def set_current_image(self, msg: Image):
         current_time = time.time()
         if(current_time>self.last_camera_frame_time+0.1):
             frame = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
             self.last_camera_frame_shape = frame.shape
             self.last_camera_frame = encode_frame(frame)
             self.last_camera_frame_time = current_time
+
+    def camera_color_image_callback(self, msg: Image):
+        # if(self.do_video_encode == False):
+        #     return
+        if(self.current_video_source != 0):
+            return
+        self.set_current_image(msg)
+
+    def camera_mask_image_callback(self, msg: Image):
+        # if(self.do_video_encode == False):
+        #     return
+        if(self.current_video_source != 1):
+            return
+        self.set_current_image(msg)
 
     #new server code
     def create_grpc_server(self): 
@@ -569,6 +587,11 @@ class NetworkComms(LifecycleNode):
     def StreamVideo(self, command: video_pb2.VideoRequest, context):
         #self.do_video_encode = True
         rate = self.create_rate(10)
+        if(command.videoSource == 'COLOR'):
+            self.current_video_source = 0
+        elif(command.videoSource == 'MASK'):
+            self.current_video_source = 1
+
         try:
             while context.is_active():
                 yield video_pb2.VideoFrame(data=self.last_camera_frame, width=self.last_camera_frame_shape[1], height=self.last_camera_frame_shape[0], timestamp=int(time.time()))
