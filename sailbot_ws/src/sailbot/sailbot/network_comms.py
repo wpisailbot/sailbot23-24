@@ -14,7 +14,7 @@ from rclpy.subscription import Subscription
 from std_msgs.msg import String,  Int8, Int16, Empty, Float64
 from lifecycle_msgs.msg import TransitionEvent
 from lifecycle_msgs.msg import State as StateMsg
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatFix, Image
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
@@ -25,6 +25,7 @@ import json
 import math
 import time
 import os
+import numpy as np
 import cv2
 import re
 import numpy as np
@@ -40,6 +41,8 @@ import telemetry_messages.python.control_pb2 as control_pb2
 import telemetry_messages.python.control_pb2_grpc as control_pb2_grpc
 import telemetry_messages.python.node_restart_pb2 as node_restart_pb2
 import telemetry_messages.python.node_restart_pb2_grpc as node_restart_pb2_grpc
+import telemetry_messages.python.video_pb2 as video_pb2
+import telemetry_messages.python.video_pb2_grpc as video_pb2_grpc
 
 def find_and_load_image(directory, location):
     """
@@ -82,6 +85,14 @@ def get_resource_dir():
     resource_path = os.path.join(package_path, 'maps')
     return resource_path
 
+def encode_frame(frame):
+    # Convert the frame to JPEG
+    result, encoded_image = cv2.imencode('.jpg', frame)
+    if result:
+        return encoded_image.tobytes()
+    else:
+        return None
+
 def make_json_string(json_msg):
     json_str = json.dumps(json_msg)
     message = String()
@@ -117,6 +128,8 @@ class NetworkComms(LifecycleNode):
 
     current_map: OccupancyGrid = None
     current_boat_state = boat_state_pb2.BoatState()
+    last_camera_frame = None
+    last_camera_frame_shape = None
 
     def __init__(self):
         super().__init__('network_comms')
@@ -144,6 +157,7 @@ class NetworkComms(LifecycleNode):
         self.current_path_subscription: Optional[Subscription]
         self.target_position_subscriber: Optional[Subscription]
         self.trim_state_subscriber: Optional[Subscription]
+        self.camera_image_subscriber: Optional[Subscription]
 
         #receives state updates from other nodes
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
@@ -252,6 +266,11 @@ class NetworkComms(LifecycleNode):
             TrimState,
             'trim_state',
             self.trim_state_callback,
+            10)
+        self.camera_image_subscriber = self.create_subscription(
+            Image,
+            '/zed/zed_node/rgb/image_rect_color',
+            self.camera_image_callback,
             10)
         
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
@@ -512,6 +531,11 @@ class NetworkComms(LifecycleNode):
     
     def pitch_callback(self, msg: Float64):
         self.current_boat_state.pitch = msg.data
+    
+    def camera_image_callback(self, msg: Image):
+        frame = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+        self.last_camera_frame_shape = frame.shape
+        self.last_camera_frame = encode_frame(frame)
 
     #new server code
     def create_grpc_server(self): 
@@ -528,10 +552,22 @@ class NetworkComms(LifecycleNode):
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_StreamBoatStateServiceServicer_to_server(self, self.grpc_server)
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
+        video_pb2_grpc.add_VideoStreamerServicer_to_server(self, self.grpc_server)
 
         #connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
         self.grpc_server.add_insecure_port('[::]:50051')
         self.grpc_server.start()
+
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def StreamVideo(self, command: video_pb2.VideoRequest, context):
+        rate = self.create_rate(10)
+        try:
+            while context.is_active():
+                yield video_pb2.VideoFrame(data=self.last_camera_frame, width=self.last_camera_frame_shape[1], height=self.last_camera_frame_shape[0], timestamp=int(time.time()))
+                rate.sleep()
+        finally:
+            if not context.is_active():
+                self.get_logger().info("Video stream was cancelled or client disconnected.")
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteMarkBuoyCommand(self, command: control_pb2.MarkBuoyCommand, context):
@@ -671,7 +707,7 @@ class NetworkComms(LifecycleNode):
                 rate.sleep()
         finally:
             if not context.is_active():
-                self.get_logger().info("Stream was cancelled or client disconnected.")
+                self.get_logger().info("Boat state stream was cancelled or client disconnected.")
 
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
