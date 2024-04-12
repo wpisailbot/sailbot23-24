@@ -130,6 +130,8 @@ class NetworkComms(LifecycleNode):
     current_boat_state = boat_state_pb2.BoatState()
     last_camera_frame = None
     last_camera_frame_shape = None
+    last_camera_frame_time = time.time()
+    do_video_encode = False
 
     def __init__(self):
         super().__init__('network_comms')
@@ -533,9 +535,14 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.pitch = msg.data
     
     def camera_image_callback(self, msg: Image):
-        frame = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
-        self.last_camera_frame_shape = frame.shape
-        self.last_camera_frame = encode_frame(frame)
+        # if(self.do_video_encode == False):
+        #     return
+        current_time = time.time()
+        if(current_time>self.last_camera_frame_time+0.1):
+            frame = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+            self.last_camera_frame_shape = frame.shape
+            self.last_camera_frame = encode_frame(frame)
+            self.last_camera_frame_time = current_time
 
     #new server code
     def create_grpc_server(self): 
@@ -560,6 +567,7 @@ class NetworkComms(LifecycleNode):
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def StreamVideo(self, command: video_pb2.VideoRequest, context):
+        #self.do_video_encode = True
         rate = self.create_rate(10)
         try:
             while context.is_active():
@@ -567,6 +575,7 @@ class NetworkComms(LifecycleNode):
                 rate.sleep()
         finally:
             if not context.is_active():
+                #self.do_video_encode = False
                 self.get_logger().info("Video stream was cancelled or client disconnected.")
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
