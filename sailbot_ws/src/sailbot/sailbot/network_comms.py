@@ -665,9 +665,14 @@ class NetworkComms(LifecycleNode):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def StreamBoatState(self, command: boat_state_pb2.BoatStateRequest, context):
         rate = self.create_rate(1)
-        while context.is_active():
-            yield self.current_boat_state
-            rate.sleep()
+        try:
+            while context.is_active():
+                yield self.current_boat_state
+                rate.sleep()
+        finally:
+            if not context.is_active():
+                self.get_logger().info("Stream was cancelled or client disconnected.")
+
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def RestartNode(self, command: node_restart_pb2.RestartNodeRequest, context):
