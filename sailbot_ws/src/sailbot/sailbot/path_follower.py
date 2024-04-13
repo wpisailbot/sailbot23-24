@@ -99,9 +99,11 @@ class PathFollower(LifecycleNode):
 
     previous_look_ahead_index = 0
 
-    waypoint_indices = []
+    #waypoint_indices = []
 
     last_recalculation_time = time.time()
+
+    current_buoy_position = None
 
     def __init__(self):
         super().__init__('path_follower')
@@ -172,6 +174,11 @@ class PathFollower(LifecycleNode):
         self.declare_parameter('sailbot.pathfinding.buoy_threat_size_map_units', 1.0)
         self.declare_parameter('sailbot.pathfinding.buoy_threat_guassian_intensity', 1.0)
         self.declare_parameter('sailbot.pathfinding.min_path_recalculation_interval_seconds', 10.0)
+        self.declare_parameter('sailbot.navigation.look_ahead_distance_meters', 5.0)
+        self.declare_parameter('sailbot.navigation.look_ahead_increase_per_knot', 1.0)
+        self.declare_parameter('sailbot.navigation.buoy_snap_distance_meters', 10.0)
+
+
         self.declare_parameter('map_name', 'quinsigamond')
 
     def get_parameters(self) -> None:
@@ -179,7 +186,9 @@ class PathFollower(LifecycleNode):
         self.buoy_threat_size_map_units = self.get_parameter('sailbot.pathfinding.buoy_threat_size_map_units').get_parameter_value().double_value
         self.buoy_threat_guassian_intensity = self.get_parameter('sailbot.pathfinding.buoy_threat_guassian_intensity').get_parameter_value().double_value
         self.min_path_recalculation_interval_seconds = self.get_parameter('sailbot.pathfinding.min_path_recalculation_interval_seconds').get_parameter_value().double_value
-
+        self.look_ahead_distance_meters = self.get_parameter('sailbot.navigation.look_ahead_distance_meters').get_parameter_value().double_value
+        self.look_ahead_increase_per_knot = self.get_parameter('sailbot.navigation.look_ahead_increase_per_knot').get_parameter_value().double_value
+        self.buoy_snap_distance_meters = self.get_parameter('sailbot.navigation.buoy_snap_distance_meters').get_parameter_value().double_value
         self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
 
     #lifecycle node callbacks
@@ -224,6 +233,12 @@ class PathFollower(LifecycleNode):
                 self.true_wind_callback,
                 10,
                 callback_group=self.subscription_callback_group)
+            self.buoy_position_subscriber = self.create_subscription(
+                GeoPoint,
+                'buoy_position',
+                self.buoy_position_callback,
+                10,
+                callback_group = self.subscription_callback_group)
             #self.timer = self.create_timer(0.1, self.control_loop_callback)
             #super().on_configure(state)
         
@@ -346,7 +361,7 @@ class PathFollower(LifecycleNode):
         #This should not happen
         return None
 
-    def get_relevant_square_corners(self, target_point, previous_point, next_point, direction) -> List[Tuple[float, float]]:
+    def get_relevant_square_corners(self, target_point: GeoPoint, previous_point: GeoPoint, next_point: GeoPoint, direction) -> List[Tuple[float, float]]:
         corners = self.get_square_corners((previous_point.latitude, previous_point.longitude), (target_point.latitude, target_point.longitude), self.buoy_rounding_distance_meters, direction)
         self.get_logger().info(f"Target: {target_point}, previous: {previous_point}, next: {next_point}, corners: {corners}")
         if next_point is None:
@@ -363,7 +378,7 @@ class PathFollower(LifecycleNode):
         
         return relevant
 
-
+    waypoint_segment_last_coords = [] 
     def recalculate_path_from_waypoints(self) -> None:
         if self.wind_angle_deg is None:
             self.get_logger().info("No wind reported yet, cannot path")
@@ -372,10 +387,23 @@ class PathFollower(LifecycleNode):
         # Reset look-ahead, since previous values are not relevant anymore
         self.previous_look_ahead_index = 0
 
-        self.waypoint_indices = []
+        #self.waypoint_indices = []
         
         grid_points = []
         exact_points = []
+
+        index=0
+        buoy_snap_index = None
+        if(self.current_buoy_position is not None):
+            closestDistance = float('inf')
+            for waypoint in self.waypoints.waypoints:
+                if (waypoint.type != Waypoint.WAYPOINT_TYPE_INTERSECT):
+                    distance = geodesic((self.current_buoy_position.latitude, self.current_buoy_position.longitude), (waypoint.point.latitude, waypoint.point.longitude)).meters
+                    if(distance<self.buoy_snap_distance_meters and distance<closestDistance):
+                        closestDistance = distance
+                        buoy_snap_index = index
+                index+=1
+        
         waypointIndex = 0
         for waypoint in self.waypoints.waypoints:
             #if we just want to intersect the point, we can add it directly
@@ -383,6 +411,7 @@ class PathFollower(LifecycleNode):
                 self.get_logger().info(f"Intersect")
                 grid_points.append(self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height))
                 exact_points.append(waypoint.point)
+                self.waypoint_segment_last_coords.append(waypoint.point)
             #otherwise, we need to do some math
             else:
                 nextPoint = None
@@ -395,16 +424,21 @@ class PathFollower(LifecycleNode):
                     previousPoint = GeoPoint(latitude=self.latitude, longitude=self.longitude)
 
                 corners = []
+                adjustedPoint = waypoint.point
+                if(buoy_snap_index is not None and buoy_snap_index == waypointIndex):
+                    adjustedPoint = self.current_buoy_position
+                    self.get_logger().info(f"Snapping index {buoy_snap_index} to buoy: {self.current_buoy_position}")
                 if waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT:
-                    corners = self.get_relevant_square_corners(waypoint.point, previousPoint, nextPoint, "right")
+                    corners = self.get_relevant_square_corners(adjustedPoint, previousPoint, nextPoint, "right")
                     self.get_logger().info(f"Circle right {corners}")
                 elif waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
                     self.get_logger().info(f"Circle left {corners}")
-                    corners = self.get_relevant_square_corners(waypoint.point, previousPoint, nextPoint, "left")
-
+                    corners = self.get_relevant_square_corners(adjustedPoint, previousPoint, nextPoint, "left")
                 for corner in corners:
                     grid_points.append(self.latlong_to_grid_proj(corner[0], corner[1], self.bbox, self.image_width, self.image_height))
                     exact_points.append(GeoPoint(latitude = corner[0], longitude = corner[1]))
+                if(len(corners)>0):
+                    self.waypoint_segment_last_coords.append(GeoPoint(latitude = corners[-1][0], longitude=corners[-1][1]))
 
 
             waypointIndex+=1
@@ -447,7 +481,7 @@ class PathFollower(LifecycleNode):
             #append exact final position
             self.get_logger().info(f"num waypoints: {len(exact_points)}, i: {i}")
             final_path.points.append(exact_points[i+1])
-            self.waypoint_indices.append(k)
+            #self.waypoint_indices.append(k)
             i+=1
 
 
@@ -504,42 +538,16 @@ class PathFollower(LifecycleNode):
     def true_wind_callback(self, msg: Wind) -> None:
         self.wind_angle_deg = msg.direction
 
-    def find_look_ahead_point(self, path, current_position, current_speed):
-        base_distance = 10  # Minimum look-ahead distance in meters
-        speed_factor = 1   # How much the look-ahead distance increases per knot of speed
-        
-        look_ahead_distance = base_distance + speed_factor * current_speed
-        
-        total_distance = 0
-        previous_point = None
-        for i, point in enumerate(path):
-            if i == 0:
-                distance = great_circle(current_position, (point.latitude, point.longitude)).meters
-            else:
-                distance = great_circle((previous_point.latitude, previous_point.longitude), (point.latitude, point.longitude)).meters
-            
-            total_distance += distance
-            if total_distance >= look_ahead_distance and previous_point is not None:
-                # Find the excess distance beyond the look-ahead point
-                excess_distance = total_distance - look_ahead_distance
-                # Calculate the fraction of the distance between the last two points where the look-ahead point falls
-                fraction = (distance - excess_distance) / distance
-                # Interpolate between the previous point and the current point to find the exact look-ahead point
-                look_ahead_point = interpolate_point(previous_point, point, fraction)
-                return look_ahead_point
-            
-            previous_point = point
-        
-        # If the loop completes without returning, the look-ahead point is beyond the end of the path
-        return previous_point
+    def buoy_position_callback(self, msg: GeoPoint) -> None:
+        self.current_buoy_position = msg
     
     def find_look_ahead(self) -> None:
         if len(self.current_path.points) == 0:
             #self.get_logger().info("No lookAhead point for zero-length path")
             return
         
-        base_distance = 5  # Minimum look-ahead distance in meters
-        speed_factor = 1   # How much the look-ahead distance increases per knot of speed
+        base_distance = self.look_ahead_distance_meters  # Minimum look-ahead distance in meters
+        speed_factor = self.look_ahead_increase_per_knot   # How much the look-ahead distance increases per knot of speed
         
         look_ahead_distance = base_distance + speed_factor * self.speed_knots
 
@@ -552,9 +560,14 @@ class PathFollower(LifecycleNode):
                 self.target_position_publisher.publish(point)
                 return
             else:
-                if(i==self.waypoint_indices[0]):
-                    self.waypoint_indices.pop(0)
-                    self.waypoints.pop(0)
+                #remove waypoints if we've passed the last point in their segment
+                if(point.latitude == self.waypoint_segment_last_coords[0].latitude and point.longitude == self.waypoint_segment_last_coords.longitude):
+                    self.waypoints.waypoints.pop(0)
+                    self.waypoint_segment_last_coords.pop(0)
+            #     if(i==self.waypoint_indices[0]):
+            #         self.get_logger().info(f"Num waypoint indices: {len(self.waypoint_indices)}, num waypoints: {len(self.waypoints.waypoints)}")
+            #         self.waypoint_indices.pop(0)
+            #         self.waypoints.waypoints.pop(0)
 
     # def find_look_ahead(self):
     #     if len(self.current_path.points) == 0:
@@ -631,6 +644,9 @@ class PathFollower(LifecycleNode):
     
     def insert_intermediate_points(self, path, num_per_unit_distance) -> List[PoseStamped]:
         length = len(path)
+        if(length  == 0):
+            self.get_logger().warn("Called insert_intermediate_points on a zero length segment!")
+            return path
         appended = []
         for i in range(length):
             if i<(length-1):
