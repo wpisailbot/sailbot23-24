@@ -15,8 +15,6 @@ PIXEL_SIZE = 0.002 # In mm
 CAMERA_RESOLUTION = (2208, 1242) # Width, Height
 CAMERA_WORLD_POSITION = np.array([0, 0, 0]) # XYZ in meters
 CAMERA_ORIENTATION = np.array([0, 0, 0]) # Orientation as pitch, yaw, roll
-KNOWN_DIAMETER = 0.5 # Diameter of the sphere in meters
-CIRCULARITY_THRESHOLD = 0.4 # Threshold for circularity (1 is perfect circle)
 
 #Camera calibration for LEFT camera info from ZED application
 CX = 1099.58
@@ -54,6 +52,10 @@ class BuoyDetection(Node):
     heading = 0
     def __init__(self):
         super().__init__('object_detection_node')
+
+        self.set_parameters()
+        self.get_parameters()
+
         self.subscription = self.create_subscription(
             Image,
             '/zed/zed_node/rgb/image_rect_color',
@@ -83,6 +85,35 @@ class BuoyDetection(Node):
         self.bridge = CvBridge()
     
         self.get_logger().info("Setup done")
+
+    def set_parameters(self) -> None:
+        self.declare_parameter('sailbot.cv.lower_h', 3)
+        self.declare_parameter('sailbot.cv.lower_s', 120)
+        self.declare_parameter('sailbot.cv.lower_v', 74)
+        self.declare_parameter('sailbot.cv.upper_h', 15)
+        self.declare_parameter('sailbot.cv.upper_s', 255)
+        self.declare_parameter('sailbot.cv.upper_v', 255)
+        self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.4)
+        self.declare_parameter('sailbot.cv.buoy_diameter_meters', 0.5)
+
+
+
+
+    def get_parameters(self) -> None:
+        self.lower_h = self.get_parameter('sailbot.cv.lower_h').get_parameter_value().integer_value
+        self.lower_s = self.get_parameter('sailbot.cv.lower_s').get_parameter_value().integer_value
+        self.lower_v = self.get_parameter('sailbot.cv.lower_v').get_parameter_value().integer_value
+        self.upper_h = self.get_parameter('sailbot.cv.upper_h').get_parameter_value().integer_value
+        self.upper_s = self.get_parameter('sailbot.cv.upper_s').get_parameter_value().integer_value
+        self.upper_v = self.get_parameter('sailbot.cv.upper_v').get_parameter_value().integer_value
+        self.buoy_circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
+        self.buoy_diameter_meters = self.get_parameter('sailbot.cv.buoy_diameter_meters').get_parameter_value().double_value
+
+
+
+
+
+
 
     def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude
@@ -167,7 +198,7 @@ class BuoyDetection(Node):
             if perimeter == 0:
                 break
             circularity = 4*math.pi*(area/(perimeter*perimeter))
-            if CIRCULARITY_THRESHOLD < circularity < 1.2:
+            if self.buoy_circularity_threshold < circularity < 1.2:
                 contours_cirles.append(con)
                 (x, y), radius = cv2.minEnclosingCircle(con)
                 center = (int(x), int(y))
@@ -185,7 +216,7 @@ class BuoyDetection(Node):
         #self.get_logger().info("radius: "+str(radius))
 
         #depth = (KNOWN_DIAMETER*PIXEL_SIZE*current_x_scaling_factor/2 * FOCAL_LENGTH*current_x_scaling_factor) / radius
-        depth = (KNOWN_DIAMETER*FX)/(radius*2/self.current_x_scaling_factor)
+        depth = (self.buoy_diameter_meters*FX)/(radius*2/self.current_x_scaling_factor)
         return depth
 
     def calculate_object_center(self, contour):

@@ -26,3 +26,16 @@ wind_smoother:
   ros__parameters:
     sailbot:
       num_wind_readings: 20
+
+buoy_detection:
+  ros__parameters:
+    sailbot:
+      cv:
+        lower_h: 3
+        lower_s: 180
+        lower_v: 74
+        upper_h: 15
+        upper_s: 255
+        upper_v: 255
+        buoy_circularity_threshold: 0.4
+        buoy_diameter_meters: 0.5
