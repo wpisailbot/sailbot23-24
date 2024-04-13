@@ -86,7 +86,7 @@ public:
         {
             RCLCPP_WARN(this->get_logger(), "SetThreat failed: Cannot add threats before a map is set");
         }
-        if (request->id != -1)
+        if (request->remove)
         {
             try
             {
@@ -121,12 +121,14 @@ public:
             RCLCPP_INFO(this->get_logger(), "Setting threat at id: (%d)", index);
             if(int(threats.size())>index){
                 threats.at(index) = std::make_pair(threat, gaussian);
+                RCLCPP_INFO(this->get_logger(), "Setting directly:");
             } else {
+                RCLCPP_INFO(this->get_logger(), "Pushing back:");
                 threats.push_back(std::make_pair(threat, gaussian));
             }
-            RCLCPP_WARN(this->get_logger(), "Regenerating threat mask:");
+            RCLCPP_INFO(this->get_logger(), "Regenerating threat mask:");
             regenerateThreatMap();
-            RCLCPP_WARN(this->get_logger(), "Completed threat mask:");
+            RCLCPP_INFO(this->get_logger(), "Completed threat mask:");
 
             response->assigned_id = index;
         }

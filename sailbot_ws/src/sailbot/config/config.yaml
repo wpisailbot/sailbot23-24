@@ -14,8 +14,8 @@ path_follower:
     sailbot:
       pathfinding:
         buoy_rounding_distance_meters: 5.0
-        buoy_threat_size_map_units: 2.5
-        buoy_threat_guassian_intensity: 0.7
+        buoy_threat_size_map_units: 2.0
+        buoy_threat_guassian_intensity: 0.6
         min_path_recalculation_interval_seconds: 10.0
       navigation:
         look_ahead_distance_meters: 3.0

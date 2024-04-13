@@ -109,7 +109,7 @@ class BuoyDetection(Node):
             Z = self.calculate_depth(contour)
             #self.get_logger().info("Depth: "+str(Z))
             world_coordinates = self.pixel_to_world(cX, cY, Z, FX*self.current_x_scaling_factor, FY*self.current_y_scaling_factor, CX*self.current_x_scaling_factor, CY*self.current_y_scaling_factor)
-            self.get_logger().info(f"Object World Coordinates: {world_coordinates}")
+            #self.get_logger().info(f"Object World Coordinates: {world_coordinates}")
             self.buoy_position_publisher.publish(calculate_offset_position(self.latitude, self.longitude, self.heading, world_coordinates[2], world_coordinates[0]))
 
 
@@ -182,7 +182,7 @@ class BuoyDetection(Node):
     def calculate_depth(self, contour):
 
         (x, y), radius = cv2.minEnclosingCircle(contour)
-        self.get_logger().info("radius: "+str(radius))
+        #self.get_logger().info("radius: "+str(radius))
 
         #depth = (KNOWN_DIAMETER*PIXEL_SIZE*current_x_scaling_factor/2 * FOCAL_LENGTH*current_x_scaling_factor) / radius
         depth = (KNOWN_DIAMETER*FX)/(radius*2/self.current_x_scaling_factor)

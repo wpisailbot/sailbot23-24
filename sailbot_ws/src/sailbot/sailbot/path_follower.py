@@ -105,6 +105,8 @@ class PathFollower(LifecycleNode):
 
     current_buoy_position = None
 
+    waypoint_threat_id_map = {}
+
     def __init__(self):
         super().__init__('path_follower')
         # Using different callback groups for subscription and service client
@@ -427,6 +429,9 @@ class PathFollower(LifecycleNode):
                 adjustedPoint = waypoint.point
                 if(buoy_snap_index is not None and buoy_snap_index == waypointIndex):
                     adjustedPoint = self.current_buoy_position
+                    threat_id = self.waypoint_threat_id_map[(waypoint.point.latitude, waypoint.point.longitude)]
+                    self.get_logger().info(f"Threat of id {threat_id} being modified")
+                    self.add_threat(Waypoint(point=self.current_buoy_position, type=waypoint.type), id=threat_id)
                     self.get_logger().info(f"Snapping index {buoy_snap_index} to buoy: {self.current_buoy_position}")
                 if waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT:
                     corners = self.get_relevant_square_corners(adjustedPoint, previousPoint, nextPoint, "right")
@@ -508,7 +513,7 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("Threat removed")
 
 
-    def add_threat(self, waypoint) -> None:
+    def add_threat(self, waypoint, id=-1) -> None:
         threat = GaussianThreat()
         threat.size = self.buoy_threat_size_map_units
         threat.intensity = 1.0
@@ -517,12 +522,15 @@ class PathFollower(LifecycleNode):
         threat.center.y = float(y)
         
         req = SetThreat.Request()
+        req.id = id
         req.threat = threat
         
         self.get_logger().info("Setting threat")
         #synchronous service call because ROS2 async doesn't work in callbacks
         result = self.set_threat_cli.call(req)
         self.get_logger().info(f"Threat id returned: {result.assigned_id}")
+        if(id == -1): # for position adjustment later
+            self.waypoint_threat_id_map[(waypoint.point.latitude, waypoint.point.longitude)] = result.assigned_id
         self.threat_ids.append(result.assigned_id)
 
     def single_waypoint_callback(self, msg: Waypoint) -> None:
