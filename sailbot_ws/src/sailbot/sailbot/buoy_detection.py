@@ -1,10 +1,15 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from std_msgs.msg import Float64
+from sensor_msgs.msg import Image, NavSatFix
+from geographic_msgs.msg import GeoPoint
 from cv_bridge import CvBridge
+
 import cv2
 import numpy as np
 import math
+
+from geopy.distance import geodesic
 
 PIXEL_SIZE = 0.002 # In mm
 CAMERA_RESOLUTION = (2208, 1242) # Width, Height
@@ -27,9 +32,26 @@ camera_matrix = np.array([[FX, 0, CX],
 K1, K2, P1, P2, K3 = -0.0393, 0.0085, 0.0001, 0.0004, -0.0045
 distortion_coefficients = np.array([K1, K2, P1, P2, K3])
 
+def calculate_offset_position(lat, lon, heading, z_distance, x_distance):
+    heading_rad = math.radians(heading)
+
+    # Calculate the effective heading by considering the forward (Z) and rightward (X) distances
+    angle_from_heading = math.atan2(x_distance, z_distance)
+
+    # Calculate angle of the resultant vector relative to the heading direction
+    total_angle = heading_rad + angle_from_heading
+
+    resultant_distance = (z_distance**2 + x_distance**2)**0.5
+
+    new_location = geodesic(meters=resultant_distance).destination((lat, lon), math.degrees(total_angle))
+    return GeoPoint(latitude=new_location.latitude, longitude=new_location.longitude)
+
 class BuoyDetection(Node):
     current_x_scaling_factor = 1.0
     current_y_scaling_factor = 1.0
+    latitude = 42.276842
+    longitude = -71.756035
+    heading = 0
     def __init__(self):
         super().__init__('object_detection_node')
         self.subscription = self.create_subscription(
@@ -37,14 +59,37 @@ class BuoyDetection(Node):
             '/zed/zed_node/rgb/image_rect_color',
             self.listener_callback,
             10)
+        self.airmar_position_subscription = self.create_subscription(
+                NavSatFix,
+                '/airmar_data/lat_long',
+                self.airmar_position_callback,
+                10)
+        self.airmar_heading_subscription = self.create_subscription(
+            Float64,
+            '/airmar_data/heading',
+            self.airmar_heading_callback,
+            10)
+
         self.mask_publisher = self.create_publisher(
             Image,
             'cv_mask',
             10
         )
+        self.buoy_position_publisher = self.create_publisher(
+            GeoPoint,
+            'buoy_position',
+            10
+        )
         self.bridge = CvBridge()
     
         self.get_logger().info("Setup done")
+
+    def airmar_position_callback(self, msg: NavSatFix) -> None:
+        self.latitude = msg.latitude
+        self.longitude = msg.longitude
+    
+    def airmar_heading_callback(self, msg: Float64) -> None:
+        self.heading = msg.data
 
     def listener_callback(self, data):
         # Convert ROS Image message to OpenCV image
@@ -65,6 +110,8 @@ class BuoyDetection(Node):
             #self.get_logger().info("Depth: "+str(Z))
             world_coordinates = self.pixel_to_world(cX, cY, Z, FX*self.current_x_scaling_factor, FY*self.current_y_scaling_factor, CX*self.current_x_scaling_factor, CY*self.current_y_scaling_factor)
             self.get_logger().info(f"Object World Coordinates: {world_coordinates}")
+            self.buoy_position_publisher.publish(calculate_offset_position(self.latitude, self.longitude, self.heading, world_coordinates[2], world_coordinates[0]))
+
 
     def fill_holes(self, image):
         # Find contours
@@ -90,7 +137,8 @@ class BuoyDetection(Node):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
         # Define range for orange color and create a mask
-        lower_orange = np.array([3, 205, 74])
+        #lower_orange = np.array([3, 205, 74])
+        lower_orange = np.array([3, 120, 74])
         upper_orange = np.array([15, 255, 255])
         mask = cv2.inRange(hsv, lower_orange, upper_orange)
         mask = self.fill_holes(mask)

@@ -39,6 +39,13 @@ def generate_launch_description():
         namespace='',
         output='screen'
     )
+    cv_node = Node(
+        package='sailbot',
+        executable='buoy_detection',
+        name='buoy_detection',
+        namespace='',
+        output='screen',
+    )
     # pwm_node = LifecycleNode(
     #     package='sailbot', 
     #     executable='pwm_controller', 
@@ -108,6 +115,7 @@ def generate_launch_description():
     ld.add_action(ballast_node) 
     #ld.add_action(pwm_node)
     ld.add_action(airmar_node)
+    ld.add_action(cv_node)
     ld.add_action(wind_smoother_node)
 
     ld.add_action(esp_node)

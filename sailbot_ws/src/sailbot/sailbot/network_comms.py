@@ -281,6 +281,11 @@ class NetworkComms(LifecycleNode):
             'cv_mask',
             self.camera_mask_image_callback,
             10)
+        self.buoy_position_subscriber = self.create_subscription(
+            GeoPoint,
+            'buoy_position',
+            self.buoy_position_callback,
+            10)
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
         # self.current_boat_state.latitude = 42.273822
@@ -561,6 +566,12 @@ class NetworkComms(LifecycleNode):
         if(self.current_video_source != 1):
             return
         self.set_current_image(msg)
+
+    def buoy_position_callback(self, msg: GeoPoint):
+        self.current_boat_state.ClearField("buoy_positions")# = command.new_path
+        #self.get_logger().info("Cleared old path")
+        point_msg = boat_state_pb2.Point(latitude=msg.latitude, longitude = msg.longitude)
+        self.current_boat_state.buoy_positions.append(point_msg)
 
     #new server code
     def create_grpc_server(self): 
