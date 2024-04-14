@@ -87,13 +87,13 @@ class BuoyDetection(Node):
         self.get_logger().info("Setup done")
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.cv.lower_h', 3)
-        self.declare_parameter('sailbot.cv.lower_s', 120)
-        self.declare_parameter('sailbot.cv.lower_v', 74)
-        self.declare_parameter('sailbot.cv.upper_h', 15)
+        self.declare_parameter('sailbot.cv.lower_h', 5)
+        self.declare_parameter('sailbot.cv.lower_s', 49)
+        self.declare_parameter('sailbot.cv.lower_v', 120)
+        self.declare_parameter('sailbot.cv.upper_h', 110)
         self.declare_parameter('sailbot.cv.upper_s', 255)
         self.declare_parameter('sailbot.cv.upper_v', 255)
-        self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.4)
+        self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
         self.declare_parameter('sailbot.cv.buoy_diameter_meters', 0.5)
 
 
@@ -186,7 +186,7 @@ class BuoyDetection(Node):
         # calculate area and filter into new array
         for con in contours:
             area = cv2.contourArea(con)
-            if 1000 < area < 10000:
+            if 100 < area < 10000:
                 contours_area.append(con)
         
         contours_cirles = []

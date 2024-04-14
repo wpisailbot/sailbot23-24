@@ -579,6 +579,7 @@ class PathFollower(LifecycleNode):
             #         self.waypoint_indices.pop(0)
             #         self.waypoints.waypoints.pop(0)
 
+
     # def find_look_ahead(self):
     #     if len(self.current_path.points) == 0:
     #         #self.get_logger().info("No lookAhead point for zero-length path")
@@ -586,6 +587,20 @@ class PathFollower(LifecycleNode):
     #     look_ahead_point = self.find_look_ahead_point(self.current_path.points, (self.latitude, self.longitude), self.speed_knots)
     #     self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
     #     self.target_position_publisher.publish(look_ahead_point)
+
+    def vector_to_heading(self, dx, dy):
+        """
+        Convert vector components (dx, dy) at a grid position to a navigation heading.
+
+        Parameters:
+        - dx, dy: Changes in x and y grid coordinates.
+
+        Returns:
+        - Navigation bearing in degrees from north.
+        """
+        theta = math.atan2(dy, dx)  # Angle in radians
+        bearing = (90 - math.degrees(theta)) % 360
+        return bearing
 
     def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
         """
