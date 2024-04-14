@@ -40,8 +40,10 @@ def normalRelativeAngle(angle):
 class HeadingController(LifecycleNode):
 
     heading = 0
-    latitude = 42.273822
-    longitude = -71.805967
+    #latitude = 42.273822
+    #longitude = -71.805967
+    latitude = 42.276842
+    longitude = -71.756035
     target_position = None
     wind_direction_deg = None
     autonomous_mode = 0
@@ -202,6 +204,13 @@ class HeadingController(LifecycleNode):
         self.get_logger().info(f"Got autonomous mode: {msg.mode}")
         self.autonomous_mode = msg.mode
 
+        #if we're going into a manual rudder mode, reset it to 0 first
+        if(msg.mode == AutonomousMode.AUTONOMOUS_MODE_NONE or msg.mode == AutonomousMode.AUTONOMOUS_MODE_TRIMTAB):
+            self.get_logger().info("Resetting rudder angle")
+            msg = Int16()
+            msg.data = int(0)
+            self.rudder_angle_publisher.publish(msg)
+
     def timer_callback(self) -> None:
         self.compute_rudder_angle()
 
@@ -252,7 +261,7 @@ class HeadingController(LifecycleNode):
             return
         
         heading_error = self.getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
-        #self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} pos: {self.latitude}, {self.longitude} to pos: {self.target_position.latitude}, {self.target_position.longitude}")
+        self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} pos: {self.latitude}, {self.longitude} to pos: {self.target_position.latitude}, {self.target_position.longitude}")
         #self.rudder_simulator.input['heading_error'] = heading_error
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         #self.rudder_simulator.compute()

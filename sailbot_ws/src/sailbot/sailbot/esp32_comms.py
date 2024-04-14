@@ -14,7 +14,7 @@ from rclpy.subscription import Subscription
 from enum import Enum
 from time import time as get_time
 
-from std_msgs.msg import Int8, Int16, Float32, Empty
+from std_msgs.msg import Int8, Int16, Empty, Float64
 from sailbot_msgs.msg import Wind, AutonomousMode, Path, TrimState
 
 import serial
@@ -23,6 +23,7 @@ import time
 import traceback
 import serial.tools.list_ports
 import subprocess
+import math
 
 serial_port = '/dev/ttyTHS0'
 baud_rate = 115200 
@@ -66,7 +67,6 @@ class TrimTabComms(LifecycleNode):
         self.set_parameters()
         self.get_parameters()
 
-        self.tt_telemetry_publisher: Optional[Publisher]
         self.tt_battery_publisher: Optional[Publisher]
         self.ballast_pos_publisher: Optional[Publisher]
         self.trim_state_debug_publisher: Optional[Publisher]
@@ -78,6 +78,7 @@ class TrimTabComms(LifecycleNode):
         self.autonomous_mode_subscriber: Optional[Subscription]
         self.current_path_subscription: Optional[Subscription]
         self.apparent_wind_subscriber: Optional[Subscription]
+        self.roll_subscription: Optional[Subscription]
 
         self.timer_pub: Optional[Publisher]
 
@@ -104,7 +105,6 @@ class TrimTabComms(LifecycleNode):
         else:
             self.get_logger().warn("No ESP32 ports found!")
 
-        self.tt_telemetry_publisher = self.create_lifecycle_publisher(Float32, 'tt_telemetry', 10)
         self.ballast_pos_publisher = self.create_lifecycle_publisher(Int16, 'current_ballast_position', 10)
 
         self.tt_battery_publisher = self.create_lifecycle_publisher(Int8, 'tt_battery', 10)  # Battery level
@@ -123,6 +123,13 @@ class TrimTabComms(LifecycleNode):
             'current_path',
             self.current_path_callback,
             10)
+        
+        self.roll_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/roll',
+            self.roll_callback,
+            10)
+        
 
         self.timer_pub = self.create_lifecycle_publisher(Empty, '/heartbeat/trim_tab_comms', 1)
         
@@ -148,7 +155,6 @@ class TrimTabComms(LifecycleNode):
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Cleaning up...")
         # Destroy subscribers, publishers, and timers
-        self.destroy_lifecycle_publisher(self.tt_telemetry_publisher)
         self.destroy_lifecycle_publisher(self.tt_battery_publisher)
         self.destroy_lifecycle_publisher(self.ballast_pos_publisher)
         self.destroy_lifecycle_publisher(self.timer_pub)
@@ -323,6 +329,13 @@ class TrimTabComms(LifecycleNode):
             "ballast_pwm": pwm
         }
         message_string = json.dumps(message)+'\n'
+        self.ser.write(message_string.encode())
+    
+    def roll_callback(self, msg: Float64):
+        msg = {
+                "roll": msg.data*(180/math.pi)
+        }
+        message_string = json.dumps(msg)+'\n'
         self.ser.write(message_string.encode())
 
     def ballast_timer_callback(self) -> None:

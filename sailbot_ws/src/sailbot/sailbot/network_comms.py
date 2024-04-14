@@ -286,6 +286,12 @@ class NetworkComms(LifecycleNode):
             'buoy_position',
             self.buoy_position_callback,
             10)
+        self.rudder_angle_subscriber = self.create_subscription(
+            Int16,
+            'rudder_angle',
+            self.rudder_angle_callback,
+            10
+        )
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
         # self.current_boat_state.latitude = 42.273822
@@ -572,6 +578,9 @@ class NetworkComms(LifecycleNode):
         #self.get_logger().info("Cleared old path")
         point_msg = boat_state_pb2.Point(latitude=msg.latitude, longitude = msg.longitude)
         self.current_boat_state.buoy_positions.append(point_msg)
+
+    def rudder_angle_callback(self, msg: Int16):
+        self.current_boat_state.rudder_position = msg.data
 
     #new server code
     def create_grpc_server(self): 
