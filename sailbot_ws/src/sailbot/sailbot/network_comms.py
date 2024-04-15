@@ -18,7 +18,7 @@ from sensor_msgs.msg import NavSatFix, Image
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
-from sailbot_msgs.msg import Wind, Path, AutonomousMode, TrimState, Waypoint, WaypointPath
+from sailbot_msgs.msg import Wind, GeoPath, AutonomousMode, TrimState, Waypoint, WaypointPath, GeoPathSegment
 import grpc
 from concurrent import futures
 import json
@@ -256,7 +256,7 @@ class NetworkComms(LifecycleNode):
             10)
 
         self.current_path_subscription = self.create_subscription(
-            Path,
+            GeoPath,
             'current_path',
             self.current_path_callback,
             10)
@@ -292,6 +292,12 @@ class NetworkComms(LifecycleNode):
             self.rudder_angle_callback,
             10
         )
+        self.path_segment_debug_subscriber = self.create_subscription(
+            GeoPathSegment,
+            'current_segment_debug',
+            self.path_segment_debug_callback,
+            10
+        )
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
         # self.current_boat_state.latitude = 42.273822
@@ -310,6 +316,7 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.apparent_wind.direction = 0
         self.current_boat_state.pitch = 0
         self.current_boat_state.roll = 0
+        self.current_boat_state.has_current_path_segment = False
         self.node_indices = {}
         self.declare_parameter('managed_nodes')
         node_names = self.get_parameter('managed_nodes').get_parameter_value().string_array_value
@@ -451,7 +458,7 @@ class NetworkComms(LifecycleNode):
         elif(msg.state == TrimState.TRIM_STATE_MANUAL):
             self.current_boat_state.current_trim_state = boat_state_pb2.TrimState.TRIM_STATE_MANUAL
         
-    def current_path_callback(self, msg: Path) -> None:
+    def current_path_callback(self, msg: GeoPath) -> None:
         #self.get_logger().info(f"Updating boat state with new path of length: {len(msg.points)}")
         self.current_boat_state.current_path.ClearField("points")# = command.new_path
         #self.get_logger().info("Cleared old path")
@@ -582,6 +589,13 @@ class NetworkComms(LifecycleNode):
     def rudder_angle_callback(self, msg: Int16):
         self.current_boat_state.rudder_position = msg.data
 
+    def path_segment_debug_callback(self, msg: GeoPathSegment):
+        self.current_boat_state.has_current_path_segment = True
+        self.current_boat_state.current_path_segment.start.latitude = msg.start.latitude
+        self.current_boat_state.current_path_segment.start.longitude = msg.start.longitude
+        self.current_boat_state.current_path_segment.end.latitude = msg.end.latitude
+        self.current_boat_state.current_path_segment.end.longitude = msg.end.longitude
+        
     #new server code
     def create_grpc_server(self): 
         self.get_logger().info("Creating gRPC server")

@@ -15,7 +15,7 @@ from enum import Enum
 from time import time as get_time
 
 from std_msgs.msg import Int8, Int16, Empty, Float64
-from sailbot_msgs.msg import Wind, AutonomousMode, Path, TrimState
+from sailbot_msgs.msg import Wind, AutonomousMode, GeoPath, TrimState
 
 import serial
 import json
@@ -119,7 +119,7 @@ class TrimTabComms(LifecycleNode):
 
         self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
         self.current_path_subscription = self.create_subscription(
-            Path,
+            GeoPath,
             'current_path',
             self.current_path_callback,
             10)
@@ -176,7 +176,7 @@ class TrimTabComms(LifecycleNode):
     
     #end callbacks
 
-    def current_path_callback(self, msg: Path) -> None:
+    def current_path_callback(self, msg: GeoPath) -> None:
         if len(msg.points) == 0:
             self.force_neutral_position = True
         else:

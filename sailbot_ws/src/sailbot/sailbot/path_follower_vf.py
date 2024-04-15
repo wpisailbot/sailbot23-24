@@ -5,7 +5,7 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
-from sailbot_msgs.msg import Path, Waypoint, WaypointPath, Wind, GaussianThreat, PathSegment
+from sailbot_msgs.msg import GeoPath, Waypoint, WaypointPath, Wind, GaussianThreat, PathSegment, GeoPathSegment
 from sailbot_msgs.srv import SetMap, GetPath, SetThreat
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -86,7 +86,7 @@ class PathFollower(LifecycleNode):
     longitude = -71.756035
     speed_knots = 0
     waypoints = WaypointPath()
-    current_path = Path()
+    current_path = GeoPath()
     current_grid_path = []
     segment_endpoint_indices = []
     #current_grid_cell = (16, 51)
@@ -115,7 +115,9 @@ class PathFollower(LifecycleNode):
         self.subscription_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
         self.service_client_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
 
-        self.current_segment_publisher: Optional[Publisher]
+        self.current_grid_segment_publisher: Optional[Publisher]
+        self.current_segment_debug_publisher: Optional[Publisher]
+        self.target_position_publisher: Optional[Publisher]
         self.current_path_publisher: Optional[Publisher]
         self.current_grid_cell_publisher: Optional[Publisher]
 
@@ -201,8 +203,10 @@ class PathFollower(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
         try:
-            self.current_segment_publisher = self.create_lifecycle_publisher(PathSegment, 'current_path_segment', 10)
-            self.current_path_publisher = self.create_lifecycle_publisher(Path, 'current_path', 10)
+            self.current_grid_segment_publisher = self.create_lifecycle_publisher(PathSegment, 'current_path_segment', 10)
+            self.current_segment_debug_publisher = self.create_lifecycle_publisher(GeoPathSegment, 'current_segment_debug', 10)
+            self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
+            self.current_path_publisher = self.create_lifecycle_publisher(GeoPath, 'current_path', 10)
             self.current_grid_cell_publisher = self.create_lifecycle_publisher(Point, 'current_grid_cell', 10)
 
             self.airmar_heading_subscription = self.create_subscription(
@@ -460,7 +464,7 @@ class PathFollower(LifecycleNode):
 
         if len(grid_points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
-            self.current_path = Path()
+            self.current_path = GeoPath()
             self.current_path_publisher.publish(self.current_path)
             return
         path_segments = []
@@ -471,7 +475,7 @@ class PathFollower(LifecycleNode):
         for segment in path_segments:
            segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
 
-        final_path = Path()
+        final_path = GeoPath()
         final_grid_path = []
         i=-1
         k=0
@@ -583,24 +587,38 @@ class PathFollower(LifecycleNode):
         look_ahead_distance = base_distance + speed_factor * self.speed_knots
         self.get_logger().info(f"Grid path length: {len(self.current_grid_path)}")
         num_points = len(self.current_path.points) 
-        for i in range(self.previous_look_ahead_index, num_points):
+        for i in range(self.previous_look_ahead_index, num_points-1):
             point = self.current_path.points[i]
             distance = great_circle((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
             # Check if the next point is closer. If so, we probably skipped some points. Don't target them. 
             next_is_closer = False if i>=num_points else (True if great_circle((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
             self.get_logger().info(f"next_is_closer: {next_is_closer}")
             if(not next_is_closer):
-                self.previous_look_ahead_index = i
+                self.previous_look_ahead_index = i+1
                 self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
-                for j, segment_endpoint_index in enumerate(self.segment_endpoint_indices):
-                    self.get_logger().info(f"Endpoint index: {segment_endpoint_index}")
-                    # Whichever endpoint index is greater than the current i, we are between that and the previous index
-                    if(segment_endpoint_index>i):
-                        segment = PathSegment()
-                        segment.start = self.current_grid_path[segment_endpoint_index-1]
-                        segment.end = self.current_grid_path[segment_endpoint_index]
-                        self.current_segment_publisher.publish(segment)
-                        break
+                self.target_position_publisher.publish(point) # In this version, this is just for display in the UI. This is NOT an input to heading_controller_vf 
+                segment = PathSegment()
+                segment.start = self.current_grid_path[i+1]
+                segment.end = self.current_grid_path[i+2]
+                self.current_grid_segment_publisher.publish(segment)
+                geoSegment = GeoPathSegment()
+                geoSegment.start = self.current_path.points[i+1]
+                geoSegment.end = self.current_path.points[i+2]
+                self.current_segment_debug_publisher.publish(geoSegment)
+
+                # for j, segment_endpoint_index in enumerate(self.segment_endpoint_indices):
+                #     self.get_logger().info(f"Endpoint index: {segment_endpoint_index}")
+                #     # Whichever endpoint index is greater than the current i, we are between that and the previous index
+                #     if(segment_endpoint_index>i):
+                #         segment = PathSegment()
+                #         segment.start = self.current_grid_path[self.segment_endpoint_indices[j-1]]
+                #         segment.end = self.current_grid_path[segment_endpoint_index]
+                #         self.current_grid_segment_publisher.publish(segment)
+                #         geoSegment = GeoPathSegment()
+                #         geoSegment.start = self.current_path.points[self.segment_endpoint_indices[j-1]]
+                #         geoSegment.end = self.current_path.points[segment_endpoint_index]
+                #         self.current_segment_debug_publisher.publish(geoSegment)
+                #         break
 
                 #self.target_position_publisher.publish(point)
                 return

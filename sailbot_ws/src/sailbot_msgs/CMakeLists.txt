@@ -18,7 +18,8 @@ find_package(geographic_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Wind.msg"
-  "msg/Path.msg"
+  "msg/GeoPath.msg"
+  "msg/GeoPathSegment.msg"
   "msg/AutonomousMode.msg"
   "msg/TrimState.msg"
   "msg/Waypoint.msg"

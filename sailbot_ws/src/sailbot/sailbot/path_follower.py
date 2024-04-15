@@ -5,7 +5,7 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
-from sailbot_msgs.msg import Path, Waypoint, WaypointPath, Wind, GaussianThreat
+from sailbot_msgs.msg import GeoPath, Waypoint, WaypointPath, Wind, GaussianThreat
 from sailbot_msgs.srv import SetMap, GetPath, SetThreat
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -86,7 +86,7 @@ class PathFollower(LifecycleNode):
     longitude = -71.756035
     speed_knots = 0
     waypoints = WaypointPath()
-    current_path = Path()
+    current_path = GeoPath()
     #current_grid_cell = (16, 51)
     current_grid_cell = (16, 16)
 
@@ -450,7 +450,7 @@ class PathFollower(LifecycleNode):
 
         if len(grid_points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
-            self.current_path = Path()
+            self.current_path = GeoPath()
             self.current_path_publisher.publish(self.current_path)
             return
         path_segments = []
@@ -461,7 +461,7 @@ class PathFollower(LifecycleNode):
         for segment in path_segments:
            segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
 
-        final_path = Path()
+        final_path = GeoPath()
         
         i=-1
         k=0

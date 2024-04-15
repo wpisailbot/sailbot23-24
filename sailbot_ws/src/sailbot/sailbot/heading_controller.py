@@ -18,7 +18,7 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 
-from sailbot_msgs.msg import AutonomousMode, Path, Wind
+from sailbot_msgs.msg import AutonomousMode, GeoPath, Wind
 
 PI = math.pi
 TWO_PI = PI*2
@@ -95,7 +95,7 @@ class HeadingController(LifecycleNode):
             self.airmar_position_callback,
             10)
         self.current_path_subscription = self.create_subscription(
-            Path,
+            GeoPath,
             'current_path',
             self.current_path_callback,
             10)
@@ -196,7 +196,7 @@ class HeadingController(LifecycleNode):
     
     #end callbacks
 
-    def current_path_callback(self, msg: Path) -> None:
+    def current_path_callback(self, msg: GeoPath) -> None:
         if len(msg.points) == 0:
             self.target_position = None
 
