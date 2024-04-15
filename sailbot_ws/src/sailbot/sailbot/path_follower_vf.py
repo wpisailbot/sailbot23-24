@@ -5,7 +5,7 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
-from sailbot_msgs.msg import Path, Waypoint, WaypointPath, Wind, GaussianThreat
+from sailbot_msgs.msg import Path, Waypoint, WaypointPath, Wind, GaussianThreat, PathSegment
 from sailbot_msgs.srv import SetMap, GetPath, SetThreat
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -87,6 +87,8 @@ class PathFollower(LifecycleNode):
     speed_knots = 0
     waypoints = WaypointPath()
     current_path = Path()
+    current_grid_path = []
+    segment_endpoint_indices = []
     #current_grid_cell = (16, 51)
     current_grid_cell = (16, 16)
 
@@ -113,8 +115,10 @@ class PathFollower(LifecycleNode):
         self.subscription_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
         self.service_client_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
 
-        self.target_position_publisher: Optional[Publisher]
+        self.current_segment_publisher: Optional[Publisher]
         self.current_path_publisher: Optional[Publisher]
+        self.current_grid_cell_publisher: Optional[Publisher]
+
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
         self.airmar_speed_knots_subscription: Optional[Subscription]
@@ -197,8 +201,10 @@ class PathFollower(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
         try:
-            self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
+            self.current_segment_publisher = self.create_lifecycle_publisher(PathSegment, 'current_path_segment', 10)
             self.current_path_publisher = self.create_lifecycle_publisher(Path, 'current_path', 10)
+            self.current_grid_cell_publisher = self.create_lifecycle_publisher(Point, 'current_grid_cell', 10)
+
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/heading',
@@ -265,7 +271,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Cleaning up...")
         # Destroy subscribers, publishers, and timers
         self.destroy_timer(self.timer)
-        self.destroy_lifecycle_publisher(self.target_position_publisher)
+        self.destroy_lifecycle_publisher(self.current_grid_cell_publisher)
         self.destroy_subscription(self.airmar_heading_subscription)
         self.destroy_subscription(self.airmar_position_subscription)
 
@@ -292,6 +298,10 @@ class PathFollower(LifecycleNode):
         current_time = time.time()
         if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
             self.current_grid_cell = new_grid_cell
+            grid_cell_msg = Point()
+            grid_cell_msg.x = float(new_grid_cell[0])
+            grid_cell_msg.y = float(new_grid_cell[1])
+            self.current_grid_cell_publisher.publish(grid_cell_msg)
             self.get_logger().info("Recalculating path")
             self.recalculate_path_from_waypoints()
             self.last_recalculation_time = time.time()
@@ -462,17 +472,19 @@ class PathFollower(LifecycleNode):
            segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
 
         final_path = Path()
-        
+        final_grid_path = []
         i=-1
         k=0
+        final_grid_path.append(Point(x=float(self.current_grid_cell[0]), y=float(self.current_grid_cell[1])))
         final_path.points.append(GeoPoint(latitude=self.latitude, longitude=self.longitude))
+
+        # Track the indices in the current path which correspond to endpoints of straight-line path segments
+        segment_endpoint_indices = [0]
         for segment in path_segments:
             #skip failed waypoints
             if(len(segment.poses)==0):
                 continue 
-            #append exact start position
-            # if i!=-1:
-            #     final_path.points.append(exact_points[i])
+
             for j in range(1, len(segment.poses)-1):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
@@ -481,11 +493,15 @@ class PathFollower(LifecycleNode):
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
                 geopoint.longitude = lon
+                #append latlon position to global path, and grid point to grid path
                 final_path.points.append(geopoint)
+                final_grid_path.append(point)
                 k+=1
             #append exact final position
             self.get_logger().info(f"num waypoints: {len(exact_points)}, i: {i}")
             final_path.points.append(exact_points[i+1])
+            final_grid_path.append(segment.poses[len(segment.poses)-1].pose.position)
+            segment_endpoint_indices.append(len(segment.poses)-1)
             #self.waypoint_indices.append(k)
             i+=1
 
@@ -493,6 +509,8 @@ class PathFollower(LifecycleNode):
         self.get_logger().info(f"New path: {final_path.points}")
         self.current_path_publisher.publish(final_path)
         self.current_path = final_path
+        self.current_grid_path = final_grid_path
+        self.segment_endpoint_indices = segment_endpoint_indices
 
     def waypoints_callback(self, msg: WaypointPath) -> None:
         self.get_logger().info("Got waypoints!")
@@ -550,6 +568,11 @@ class PathFollower(LifecycleNode):
         self.current_buoy_position = msg
     
     def find_look_ahead(self) -> None:
+        grid_cell_msg = Point()
+        grid_cell_msg.x = float(self.current_grid_cell[0])
+        grid_cell_msg.y = float(self.current_grid_cell[1])
+        self.current_grid_cell_publisher.publish(grid_cell_msg)
+
         if len(self.current_path.points) == 0:
             #self.get_logger().info("No lookAhead point for zero-length path")
             return
@@ -558,16 +581,28 @@ class PathFollower(LifecycleNode):
         speed_factor = self.look_ahead_increase_per_knot   # How much the look-ahead distance increases per knot of speed
         
         look_ahead_distance = base_distance + speed_factor * self.speed_knots
+        self.get_logger().info(f"Grid path length: {len(self.current_grid_path)}")
         num_points = len(self.current_path.points) 
         for i in range(self.previous_look_ahead_index, num_points):
             point = self.current_path.points[i]
             distance = great_circle((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
             # Check if the next point is closer. If so, we probably skipped some points. Don't target them. 
             next_is_closer = False if i>=num_points else (True if great_circle((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
-            if(distance>look_ahead_distance and not next_is_closer):
+            self.get_logger().info(f"next_is_closer: {next_is_closer}")
+            if(not next_is_closer):
                 self.previous_look_ahead_index = i
-                self.get_logger().info(f"Calulated lookAhead point: {point.latitude}, {point.longitude}")
-                self.target_position_publisher.publish(point)
+                self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
+                for j, segment_endpoint_index in enumerate(self.segment_endpoint_indices):
+                    self.get_logger().info(f"Endpoint index: {segment_endpoint_index}")
+                    # Whichever endpoint index is greater than the current i, we are between that and the previous index
+                    if(segment_endpoint_index>i):
+                        segment = PathSegment()
+                        segment.start = self.current_grid_path[segment_endpoint_index-1]
+                        segment.end = self.current_grid_path[segment_endpoint_index]
+                        self.current_segment_publisher.publish(segment)
+                        break
+
+                #self.target_position_publisher.publish(point)
                 return
             else:
                 #remove waypoints if we've passed the last point in their segment

@@ -24,6 +24,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Waypoint.msg"
   "msg/WaypointPath.msg"
   "msg/GaussianThreat.msg"
+  "msg/PathSegment.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
   "srv/RestartNode.srv"
