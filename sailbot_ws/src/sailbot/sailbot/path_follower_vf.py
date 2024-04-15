@@ -594,7 +594,7 @@ class PathFollower(LifecycleNode):
             next_is_closer = False if i>=num_points else (True if great_circle((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
             self.get_logger().info(f"next_is_closer: {next_is_closer}")
             if(not next_is_closer):
-                self.previous_look_ahead_index = i+1
+                self.previous_look_ahead_index = i
                 self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
                 self.target_position_publisher.publish(point) # In this version, this is just for display in the UI. This is NOT an input to heading_controller_vf 
                 segment = PathSegment()
