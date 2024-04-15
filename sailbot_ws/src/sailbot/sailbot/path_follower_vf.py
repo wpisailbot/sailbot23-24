@@ -598,12 +598,12 @@ class PathFollower(LifecycleNode):
                 self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
                 self.target_position_publisher.publish(point) # In this version, this is just for display in the UI. This is NOT an input to heading_controller_vf 
                 segment = PathSegment()
-                segment.start = self.current_grid_path[i+1]
-                segment.end = self.current_grid_path[i+2]
+                segment.start = self.current_grid_path[i]
+                segment.end = self.current_grid_path[i+1]
                 self.current_grid_segment_publisher.publish(segment)
                 geoSegment = GeoPathSegment()
-                geoSegment.start = self.current_path.points[i+1]
-                geoSegment.end = self.current_path.points[i+2]
+                geoSegment.start = self.current_path.points[i]
+                geoSegment.end = self.current_path.points[i+1]
                 self.current_segment_debug_publisher.publish(geoSegment)
 
                 # for j, segment_endpoint_index in enumerate(self.segment_endpoint_indices):
