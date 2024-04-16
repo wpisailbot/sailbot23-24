@@ -256,18 +256,21 @@ class TrimTabComms(LifecycleNode):
                     trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
                     self.get_logger().info("Switching from starboard to port")
                     msg = {
+                        "clear_winds": True,
                         "state": "max_lift_port"
                     }
                 elif (self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
                     self.get_logger().info("Switching from port to starboard")
                     trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
                     msg = {
+                        "clear_winds": True,
                         "state": "max_lift_starboard"
                     }
                 else:
                     #how did we get here?
                     self.get_logger().warn("Went into min lift in tack mode, but previous state was not max lift. Did the wind change suddenly?")
                     msg = {
+                        "clear_winds": True,
                         "state": "min_lift"
                     }
                     trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT

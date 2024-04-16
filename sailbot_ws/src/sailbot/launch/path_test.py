@@ -23,7 +23,7 @@ def generate_launch_description():
         name='network_comms',
         namespace='',
         output='screen',
-        parameters=[{'map_name': LaunchConfiguration('map_name'), 'managed_nodes': ["wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms"]}]
+        parameters=[{'map_name': LaunchConfiguration('map_name'), 'managed_nodes': ["ballast_control", "wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms"]}]
     )
     ballast_node = LifecycleNode(
         package='sailbot', 
@@ -88,7 +88,7 @@ def generate_launch_description():
         name='state_manager',
         namespace='',
         output='screen',
-        parameters=[{'managed_nodes': ["wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms"]}]
+        parameters=[{'managed_nodes': ["ballast_control", "wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms"]}]
     )
     pathfinder_node = Node(
         package='sailbot_pathfinding', 

@@ -29,9 +29,12 @@ class BallastControl(LifecycleNode):
     
     MOTOR_FAST_STARBOARD = 130
     MOTOR_FAST_PORT = 60
+    MOTOR_STOP = 95
 
     CONTROL_FAST_PORT=-1.0
     CONTROL_FAST_STARBOARD=1.0
+
+    ERROR_MIN_MAGNITUDE = 20
 
     Kp = 0.005
     Kd = 0.1
@@ -40,6 +43,8 @@ class BallastControl(LifecycleNode):
 
     current_target = (ADC_FULL_PORT-ADC_FULL_STARBOARD)/2+ADC_FULL_STARBOARD
     current_ballast_position = current_target
+
+    move = False
 
     def __init__(self):
         super().__init__('ballast_control')
@@ -113,6 +118,7 @@ class BallastControl(LifecycleNode):
     def ballast_position_callback(self, msg: Float64):
         self.get_logger().info("Received ballast setpoint: "+str(msg.data))
         self.current_target = self.ADC_FULL_PORT + ((self.ADC_FULL_STARBOARD - self.ADC_FULL_PORT) / (1.0 - -1.0)) * (msg.data - -1.0)
+        self.move = True
 
     def current_ballast_position_callback(self, msg: Int16):
         #self.get_logger().info("Got current ballast position")
@@ -123,10 +129,21 @@ class BallastControl(LifecycleNode):
         #self.get_logger().info("Got roll data!")
 
     def control_loop_callback(self):
+        if(self.move == False):
+            return
         if(self.current_ballast_position == 0):
             #self.get_logger().info("Ballast position is 0, assuming it's broken")
             return
         current_error = self.current_ballast_position - self.current_target
+        self.get_logger().info(f"Current target: {self.current_target}, current position: {self.current_ballast_position}")
+        if abs(current_error)<self.ERROR_MIN_MAGNITUDE:
+            self.get_logger().info("Error is small, stopping")
+            msg = Int16()
+            msg.data = int(95)
+            self.ballast_pwm_publisher.publish(msg)
+            self.move=False
+            return
+        
         current_time = get_time()
         delta_time = current_time-self.previous_time
         error_derivative = (current_error - self.previous_error) / delta_time

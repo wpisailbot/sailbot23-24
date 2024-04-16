@@ -198,7 +198,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("In configure")
         try:
             self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
-            self.current_path_publisher = self.create_lifecycle_publisher(Path, 'current_path', 10)
+            self.current_path_publisher = self.create_lifecycle_publisher(GeoPath, 'current_path', 10)
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
                 '/airmar_data/heading',
@@ -247,6 +247,7 @@ class PathFollower(LifecycleNode):
         except Exception as e:
             self.get_logger().info("Error in configure")
             self.get_logger().info(str(e))
+            raise(e)
         
         self.get_logger().info("Path following node configured")
         
