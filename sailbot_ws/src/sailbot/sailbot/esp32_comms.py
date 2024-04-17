@@ -101,7 +101,11 @@ class TrimTabComms(LifecycleNode):
             self.get_logger().info("ESP32 may be connected to the following ports:")
             for port in esp32_ports:
                 print(port)
-                subprocess.run(['python3', '-m', 'esptool', '--port', port, 'run'], check=True)
+                try:
+                    subprocess.run(['python3', '-m', 'esptool', '--port', port, 'run'], check=True)
+                except Exception as e:
+                    self.get_logger().error(f"ESP is not responding!")
+                    raise(e)
         else:
             self.get_logger().warn("No ESP32 ports found!")
 
@@ -336,7 +340,7 @@ class TrimTabComms(LifecycleNode):
     
     def roll_callback(self, msg: Float64):
         msg = {
-                "roll": msg.data*(180/math.pi)
+                "roll": msg.data
         }
         message_string = json.dumps(msg)+'\n'
         self.ser.write(message_string.encode())

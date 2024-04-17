@@ -13,8 +13,8 @@ path_follower:
   ros__parameters:
     sailbot:
       pathfinding:
-        buoy_rounding_distance_meters: 5.0
-        buoy_threat_size_map_units: 2.0
+        buoy_rounding_distance_meters: 10.0
+        buoy_threat_size_map_units: 1.0
         buoy_threat_guassian_intensity: 0.6
         min_path_recalculation_interval_seconds: 10.0
       navigation:
@@ -25,7 +25,9 @@ path_follower:
 wind_smoother:
   ros__parameters:
     sailbot:
-      num_wind_readings: 20
+      num_true_wind_readings: 20
+      num_apparent_wind_readings: 10
+
 
 buoy_detection:
   ros__parameters:

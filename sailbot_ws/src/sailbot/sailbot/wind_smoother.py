@@ -20,7 +20,8 @@ class WindSmoother(LifecycleNode):
 
     last_apparent_winds = []
     last_true_winds = []
-    num_wind_readings = 20
+    num_true_wind_readings = 20
+    num_apparent_wind_readings = 10
 
     def __init__(self):
         self.apparent_wind_subscriber: Optional[Subscription]
@@ -30,10 +31,13 @@ class WindSmoother(LifecycleNode):
 
     
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.pathfinding.num_wind_readings', 20)
+        self.declare_parameter('sailbot.pathfinding.num_true_wind_readings', 20)
+        self.declare_parameter('sailbot.pathfinding.num_apparent_wind_readings', 10)
 
     def get_parameters(self) -> None:
-        self.num_wind_readings = self.get_parameter('sailbot.pathfinding.num_wind_readings').get_parameter_value().integer_value
+        self.num_true_wind_readings = self.get_parameter('sailbot.pathfinding.num_true_wind_readings').get_parameter_value().integer_value
+        self.num_apparent_wind_readings = self.get_parameter('sailbot.pathfinding.num_apparent_wind_readings').get_parameter_value().integer_value
+
 
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -78,20 +82,20 @@ class WindSmoother(LifecycleNode):
     
     def update_apparent_winds(self, relative_wind_direction):
         # Check we have new wind
-        if len(self.last_apparent_winds) != 0 and relative_wind_direction == self.last_apparent_winds[len(self.last_apparent_winds) - 1]:
-            return
+        # if len(self.last_apparent_winds) != 0 and relative_wind_direction == self.last_apparent_winds[len(self.last_apparent_winds) - 1]:
+        #     return
             # First add wind to running list
         self.last_apparent_winds.append(float(relative_wind_direction))
-        if len(self.last_apparent_winds) > self.num_wind_readings:
+        if len(self.last_apparent_winds) > self.num_apparent_wind_readings:
             self.last_apparent_winds.pop(0)
     
     def update_true_winds(self, true_wind_direction):
         # Check we have new wind
-        if len(self.last_true_winds) != 0 and true_wind_direction == self.last_true_winds[len(self.last_true_winds) - 1]:
-            return
+        # if len(self.last_true_winds) != 0 and true_wind_direction == self.last_true_winds[len(self.last_true_winds) - 1]:
+        #     return
             # First add wind to running list
         self.last_true_winds.append(float(true_wind_direction))
-        if len(self.last_true_winds) > self.num_wind_readings:
+        if len(self.last_true_winds) > self.num_true_wind_readings:
             self.last_true_winds.pop(0)
 
     def apparent_wind_callback(self, msg: Wind):

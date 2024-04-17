@@ -78,6 +78,8 @@ class HeadingController(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
 
+        self.ballast_position_publisher = self.create_lifecycle_publisher(Float64, 'ballast_position', 10)
+
         self.rudder_angle_publisher = self.create_lifecycle_publisher(Int16, 'rudder_angle', 10)
 
         self.path_Segment_subscription = self.create_subscription(
@@ -235,7 +237,7 @@ class HeadingController(LifecycleNode):
     def true_wind_callback(self, msg: Wind) -> None:
         self.wind_direction_deg = msg.direction
     
-    def needs_to_tack(boat_heading, target_heading, wind_direction) -> bool:
+    def needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
         # Normalize angles
         boat_heading %= 360
         target_heading %= 360
@@ -246,10 +248,16 @@ class HeadingController(LifecycleNode):
         if clockwise:
             if boat_heading <= wind_direction < target_heading or \
             (target_heading < boat_heading and (wind_direction > boat_heading or wind_direction < target_heading)):
+                position_msg = Float64()
+                position_msg.data = 0.5
+                self.ballast_position_publisher.publish(position_msg)
                 return True
         else:
             if target_heading <= wind_direction < boat_heading or \
             (boat_heading < target_heading and (wind_direction < boat_heading or wind_direction > target_heading)):
+                position_msg = Float64()
+                position_msg.data = -0.5
+                self.ballast_position_publisher.publish(position_msg)
                 return True
         
         return False

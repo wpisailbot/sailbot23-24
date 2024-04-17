@@ -47,8 +47,7 @@ def calculate_offset_position(lat, lon, heading, z_distance, x_distance):
 class BuoyDetection(Node):
     current_x_scaling_factor = 1.0
     current_y_scaling_factor = 1.0
-    latitude = 42.276842
-    longitude = -71.756035
+    latitude, longitude = 42.0396766107111, -71.84585650616927
     heading = 0
     def __init__(self):
         super().__init__('object_detection_node')

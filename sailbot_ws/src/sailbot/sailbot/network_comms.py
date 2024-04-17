@@ -302,8 +302,10 @@ class NetworkComms(LifecycleNode):
         #initial dummy values, for testing
         # self.current_boat_state.latitude = 42.273822
         # self.current_boat_state.longitude = -71.805967
-        self.current_boat_state.latitude = 42.276842
-        self.current_boat_state.longitude = -71.756035
+        # self.current_boat_state.latitude = 42.276842
+        # self.current_boat_state.longitude = -71.756035
+        self.current_boat_state.latitude = 42.0396766107111
+        self.current_boat_state.longitude = -71.84585650616927
         self.current_boat_state.current_heading = 0
         self.current_boat_state.track_degrees_true = 0
         self.current_boat_state.track_degrees_magnetic = 0

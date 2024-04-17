@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import rclpy
 from std_msgs.msg import String, Float64, Int16
+from sailbot_msgs.msg import Wind, AutonomousMode
+
 import json
 import board
 import busio
@@ -24,8 +26,14 @@ def bound(low, high, value):
     return max(low, min(high, value))
 
 class BallastControl(LifecycleNode):
+
+    roll_errors = []
+    num_error_readings = 20
+
     ADC_FULL_STARBOARD = 700
     ADC_FULL_PORT = 2300
+    ADC_MAX = ADC_FULL_PORT
+    ADC_MIN = ADC_FULL_STARBOARD
     
     MOTOR_FAST_STARBOARD = 130
     MOTOR_FAST_PORT = 60
@@ -38,6 +46,8 @@ class BallastControl(LifecycleNode):
 
     Kp = 0.005
     Kd = 0.1
+
+    roll_kp = 20
     previous_error = 0
     previous_time = get_time()
 
@@ -45,6 +55,9 @@ class BallastControl(LifecycleNode):
     current_ballast_position = current_target
 
     move = False
+    current_wind_dir = None
+
+    autonomous_mode = 0
 
     def __init__(self):
         super().__init__('ballast_control')
@@ -58,7 +71,7 @@ class BallastControl(LifecycleNode):
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
 
-        self.ballast_pwm_publisher = self.create_lifecycle_publisher(Int16, 'ballast_pwm', 10)
+        self.ballast_pwm_publisher = self.create_lifecycle_publisher(Int16, 'ballast_pwm', 1)
 
         self.position_subscription = self.create_subscription(
             Float64,
@@ -75,7 +88,21 @@ class BallastControl(LifecycleNode):
             '/airmar_data/roll',
             self.airmar_roll_callback,
             10)
+        self.apparent_wind_subscription = self.create_subscription(
+            Wind,
+            "apparent_wind_smoothed",
+            self.apparent_wind_callback,
+            10)
+        self.airmar_heading_subscription = self.create_subscription(
+            Float64,
+            "/airmar_data/heading",
+            self.airmar_heading_callback,
+            10
+        )
+        self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
+
         self.timer = self.create_timer(0.1, self.control_loop_callback)
+        self.roll_correction_timer = self.create_timer(1, self.roll_correction_callback)
         self.get_logger().info("Ballast node configured")
         #super().on_configure(state)
         return TransitionCallbackReturn.SUCCESS
@@ -109,6 +136,15 @@ class BallastControl(LifecycleNode):
     
     #end callbacks
     
+    def autonomous_mode_callback(self, msg: AutonomousMode) -> None:
+        self.get_logger().info(f"Got autonomous mode: {msg.mode}")
+        self.autonomous_mode = msg.mode
+
+    def median(self, lst):
+        n = len(lst)
+        s = sorted(lst)
+        return (sum(s[n // 2 - 1:n // 2 + 1]) / 2.0, s[n // 2])[n % 2] if n else None
+
     def constrain_control(self, control):
         return bound(self.CONTROL_FAST_PORT, self.CONTROL_FAST_STARBOARD, control)
     
@@ -125,8 +161,55 @@ class BallastControl(LifecycleNode):
         self.current_ballast_position = msg.data
 
     def airmar_roll_callback(self, msg: Float64):
-        pass
+        roll_target = 0
+
+        if(self.current_wind_dir is None):
+            self.get_logger().info("No apparent wind yet.")
+            return
+
+        relative_wind_angle = (self.current_wind_dir - self.current_heading + 360) % 360
+        if relative_wind_angle == 180:
+            pass # Directly from behind
+        elif relative_wind_angle == 0:
+            pass # Directly ahead
+        elif relative_wind_angle < 180:
+            roll_target = 20 # Starboard
+        else:
+            roll_target = -20 # Port
+        
+        roll_error = msg.data-roll_target
+        self.roll_errors.append(float(roll_error))
+        if len(self.roll_errors) > self.num_error_readings:
+            self.roll_errors.pop(0)
+
         #self.get_logger().info("Got roll data!")
+
+    def airmar_heading_callback(self, msg: Float64):
+        self.current_heading = msg.data
+
+    def apparent_wind_callback(self, msg: Wind):
+        self.current_wind_dir = msg.direction
+
+    def roll_correction_callback(self):
+        if(self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_FULL and self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_BALLAST):
+            return
+        
+        if(len(self.roll_errors) == 0):
+            self.get_logger().info("No roll errors yet")
+            return
+        avg_roll_err = self.median(self.roll_errors)
+
+        move = self.roll_kp*avg_roll_err
+        new_target = self.current_target+move
+
+        if(new_target < self.ADC_MIN):
+            new_target = self.ADC_MIN
+        elif(new_target > self.ADC_MAX):
+            new_target = self.ADC_MAX
+
+        self.current_target = new_target
+        self.move = True
+
 
     def control_loop_callback(self):
         if(self.move == False):

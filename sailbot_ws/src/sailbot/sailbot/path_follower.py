@@ -82,8 +82,7 @@ class PathFollower(LifecycleNode):
     heading = 0
     # latitude = 42.273822
     # longitude = -71.805967
-    latitude = 42.276842
-    longitude = -71.756035
+    latitude, longitude = 42.0396766107111, -71.84585650616927
     speed_knots = 0
     waypoints = WaypointPath()
     current_path = GeoPath()
@@ -126,7 +125,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info(f'Map name: {self.map_name}')
         self.get_logger().info("Getting map image")
         image, self.bbox = find_and_load_image(get_maps_dir(), self.map_name)
-        cv2.imwrite("/home/sailbot/after_load.jpg", image)
+        #cv2.imwrite("/home/sailbot/after_load.jpg", image)
 
 
         occupancy_grid_values = np.clip(image, 0, 1)
