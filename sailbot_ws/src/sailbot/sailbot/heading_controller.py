@@ -285,7 +285,7 @@ class HeadingController(LifecycleNode):
         # If we are tacking, turn as hard as possible.
         # Trim tab controller will see this and skip over min_lift
         if(self.wind_direction_deg is not None):
-            if(self.needs_to_tack(self.heading, self.wind_direction_deg)):
+            if(self.needs_to_tack(self.heading, self.heading+heading_error ,self.wind_direction_deg)):
                 if(rudder_angle>0):
                     rudder_angle = 90
                 else:
