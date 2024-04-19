@@ -249,14 +249,14 @@ class HeadingController(LifecycleNode):
             if boat_heading <= wind_direction < target_heading or \
             (target_heading < boat_heading and (wind_direction > boat_heading or wind_direction < target_heading)):
                 position_msg = Float64()
-                position_msg.data = 0.5
+                position_msg.data = -0.5
                 self.ballast_position_publisher.publish(position_msg)
                 return True
         else:
             if target_heading <= wind_direction < boat_heading or \
             (boat_heading < target_heading and (wind_direction < boat_heading or wind_direction > target_heading)):
                 position_msg = Float64()
-                position_msg.data = -0.5
+                position_msg.data = 0.5
                 self.ballast_position_publisher.publish(position_msg)
                 return True
         
@@ -292,12 +292,16 @@ class HeadingController(LifecycleNode):
     def compute_rudder_angle(self) -> None:
         autonomous_modes = AutonomousMode()
         if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL):
+            #self.get_logger().info("Not in auto")
+
             return
         
         if(self.path_segment is None):
             msg = Int16()
             msg.data = int(0)
             self.rudder_angle_publisher.publish(msg)
+            self.get_logger().info("No target segment")
+
             return
         
         if(self.current_grid_cell is None):
@@ -323,7 +327,7 @@ class HeadingController(LifecycleNode):
         # If we are tacking, turn as hard as possible.
         # Trim tab controller will see this and skip over min_lift
         if(self.wind_direction_deg is not None):
-            if(self.needs_to_tack(self.heading, self.wind_direction_deg)):
+            if(self.needs_to_tack(self.heading, target_heading, self.wind_direction_deg)):
                 if(rudder_angle>0):
                     rudder_angle = 90
                 else:
@@ -332,6 +336,8 @@ class HeadingController(LifecycleNode):
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
         msg.data = int(rudder_angle)
+        self.get_logger().info(f"Rudder angle: {rudder_angle}")
+
         self.rudder_angle_publisher.publish(msg)
 
     #gets necessary rotation from an lat, long, theta pose to face a point

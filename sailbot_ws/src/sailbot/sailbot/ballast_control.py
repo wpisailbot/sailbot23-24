@@ -230,7 +230,7 @@ class BallastControl(LifecycleNode):
         current_time = get_time()
         delta_time = current_time-self.previous_time
         error_derivative = (current_error - self.previous_error) / delta_time
-        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*current_error))
+        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*500))
         #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         
         self.previous_error = current_error
