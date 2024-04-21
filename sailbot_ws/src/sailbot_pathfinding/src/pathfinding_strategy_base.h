@@ -3,5 +3,5 @@
 #include "map.h"
 #include "node.h"
 class PathfindingStrategyBase {
-	virtual std::vector<std::pair<double, double>> solve(Sailbot::Map& map, Sailbot::Node* start, Sailbot::Node* goal, double wind_angle_rad, double no_go_angle) = 0;
+	virtual std::vector<std::pair<double, double>> solve(Map& map, MapNode* start, MapNode* goal, double wind_angle_rad, double no_go_angle) = 0;
 };

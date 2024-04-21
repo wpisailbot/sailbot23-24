@@ -1,6 +1,7 @@
 #include "utilities.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <opencv2/opencv.hpp>
 #include <random>
 #include "raycast.h"
 
@@ -15,7 +16,7 @@ double double_equals(double x, double y, double absTol, double relTol) {
     return (abs(x - y) <= std::max(absTol, relTol * std::max(abs(x), abs(y))));
 }
 
-std::pair<double, double> rotateAndScale(Sailbot::Node* pt, double radians, uint32_t h, uint32_t w, uint32_t h_new, uint32_t w_new) {
+std::pair<double, double> rotateAndScale(MapNode* pt, double radians, uint32_t h, uint32_t w, uint32_t h_new, uint32_t w_new) {
     double x = pt->x;
     double y = pt->y;
     double offset_x = h / 2;
@@ -33,34 +34,34 @@ std::pair<double, double> rotateAndScale(Sailbot::Node* pt, double radians, uint
     return std::make_pair(x1_new, y1_new);
 }
 
-std::vector<std::pair<double, double>> rotate_path_doubles(std::vector<Sailbot::Node*> path, uint32_t oldHeight, uint32_t oldWidth, uint32_t newHeight, uint32_t newWidth, double angle_deg) {
+std::vector<std::pair<double, double>> rotate_path_doubles(std::vector<MapNode*> path, uint32_t oldHeight, uint32_t oldWidth, uint32_t newHeight, uint32_t newWidth, double angle_deg) {
     std::vector<std::pair<double, double>> transformed_path;
-    for (Sailbot::Node* n : path) {
+    for (MapNode* n : path) {
         auto transformed_doubles = rotateAndScale(n, -angle_deg * (M_PI / 180), oldHeight, oldWidth, newHeight, newWidth);
         transformed_path.push_back(std::make_pair(transformed_doubles.first, transformed_doubles.second));
     }
     return transformed_path;
 }
 
-std::vector<std::pair<double, double>> path_to_doubles(std::vector<Sailbot::Node*> path) {
+std::vector<std::pair<double, double>> path_to_doubles(std::vector<MapNode*> path) {
     std::vector<std::pair<double, double>> doubles;
-    for (Sailbot::Node* n : path) {
+    for (MapNode* n : path) {
         doubles.push_back(std::make_pair(n->x, n->y));
     }
     return doubles;
 }
 
-std::vector<std::pair<double, double>> simplify_path(std::vector<std::pair<double, double>> originalPath, double wind_angle_deg, Sailbot::Map& map) {
+std::vector<std::pair<double, double>> simplify_path(std::vector<std::pair<double, double>> originalPath, double wind_angle_deg, Map& map) {
     double wind_angle_rad = wind_angle_deg * (M_PI / 180);
     double nogo_angle_rad = NOGO_ANGLE_DEGREES * (M_PI / 180);
-    std::set<long unsigned int> removedIndices;
-    for (long unsigned int i = 0; i < originalPath.size(); i++) {
+    std::set<uint> removedIndices;
+    for (uint32_t i = 0; i < originalPath.size(); i++) {
         auto current = originalPath[i];
         bool foundBlocker = false;
-        long unsigned int j = 2;
-        long unsigned int jump = 0;
+        int j = 2;
+        int jump = 0;
         while (!foundBlocker && (i+j)<originalPath.size()) {
-            long unsigned int index = i + j;
+            int index = i + j;
             auto next = originalPath[index];
             if (!is_in_nogo(current, next, wind_angle_rad, nogo_angle_rad) && raycast(map, current.first, current.second, next.first, next.second)) {
                 removedIndices.insert(index - 1);
@@ -71,7 +72,7 @@ std::vector<std::pair<double, double>> simplify_path(std::vector<std::pair<doubl
         i += jump;
     }
     std::vector<std::pair<double, double>> newPath;
-    for (long unsigned int i = 0; i < originalPath.size(); i++) {
+    for (uint32_t i = 0; i < originalPath.size(); i++) {
         if (!removedIndices.contains(i)) {
             newPath.push_back(originalPath[i]);
         }
@@ -86,7 +87,7 @@ int randomAngleDeg() {
     return distr(eng);
 }
 
-bool is_in_nogo(Sailbot::Node* start, Sailbot::Node* goal, float wind_angle_rad, float nogo_angle_rad) {
+bool is_in_nogo(MapNode* start, MapNode* goal, float wind_angle_rad, float nogo_angle_rad) {
     auto a = goal->x - start->x;
     auto b = goal->y - start->y;
     double angle_a_b = fmod(atan2(b, a) + M_TAU, M_TAU);
@@ -165,9 +166,64 @@ void displayGrid(std::shared_ptr<std::vector<float>> grid, int width, int height
         gridCenter.y - arrowLength * sin(windAngle) // Negative because y-coordinates increase downwards
     );
     cv::arrowedLine(image, gridCenter, arrowEnd, cv::Scalar(0, 255, 0), 2, 8, 0, 0.2);
+
+    int maxWinWidth = 1200;
+    int maxWinHeight = 1200;
+
+    // Calculate scaling factor to maintain aspect ratio
+    double scaleX = (double)maxWinWidth / image.cols;
+    double scaleY = (double)maxWinHeight / image.rows;
+    double scale = std::min(scaleX, scaleY);
+
+    // New dimensions
+    int newWidth = (int)(image.cols * scale);
+    int newHeight = (int)(image.rows * scale);
+
+    // Resize the image
+    cv::Mat resizedImage;
+    cv::resize(image, resizedImage, cv::Size(newWidth, newHeight));
     cv::Mat flipped;
-    cv::flip(image, flipped, 0);
+    cv::flip(resizedImage, flipped, 0);
     cv::imshow(name, flipped);
+}
+
+void drawPRM(std::shared_ptr<std::vector<MapNode*>> PRMMapNodes, int maxX, int maxY) {
+    // Define image size and padding
+    int imageWidth = 800;
+    int imageHeight = 800;
+    int padding = 0;
+
+    // Scale factors
+    float scaleX = float(imageWidth) / float(maxX);
+    float scaleY = float(imageHeight) / float(maxY);
+    std::cout << "X: " + std::to_string(maxX) << std::endl;
+    std::cout << "scale: " + std::to_string(scaleX) << std::endl;
+
+    // Create a white image
+    cv::Mat image = cv::Mat::zeros(imageHeight, imageWidth, CV_8UC3);
+    image.setTo(cv::Scalar(255, 255, 255));
+
+    // Draw nodes and connections
+    for (const auto& node : *PRMMapNodes) {
+        // Scale and translate the node position
+        int scaledX = static_cast<int>((node->x) * scaleX) + padding;
+        int scaledY = static_cast<int>((node->y) * scaleY) + padding;
+
+        // Draw the node
+        cv::circle(image, cv::Point(scaledX, scaledY), 5, cv::Scalar(0, 0, 255), -1);
+
+        // Draw lines to the neighbors
+        for (const auto& neighbor : node->neighbors) {
+            int neighborX = static_cast<int>((neighbor->x) * scaleX) + padding;
+            int neighborY = static_cast<int>((neighbor->y) * scaleY) + padding;
+            cv::line(image, cv::Point(scaledX, scaledY), cv::Point(neighborX, neighborY), cv::Scalar(0, 255, 0));
+        }
+    }
+
+    // Display the image
+    cv::imshow("MapNodes and Connections", image);
+    // Optionally, save the image
+    // cv::imwrite("nodes_connections.png", image);
 }
 
 cv::Mat createLocalizedGaussianThreat(const Threat& threat, int& offsetX, int& offsetY) {

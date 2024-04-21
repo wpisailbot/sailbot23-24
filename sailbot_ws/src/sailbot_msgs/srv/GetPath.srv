@@ -1,3 +1,6 @@
+uint8 PATHFINDING_STRATEGY_ASTAR = 0
+uint8 PATHFINDING_STRATEGY_PRMSTAR = 1
+uint8 pathfinding_strategy
 geometry_msgs/Point start
 geometry_msgs/Point end
 float64 wind_angle_deg

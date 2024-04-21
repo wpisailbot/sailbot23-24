@@ -4,7 +4,9 @@
 #include "raycast.h"
 #include "utilities.h"
 
-std::vector<std::pair<double, double>> OneTackPathfindingStrategy::solve(Sailbot::Map& map, Sailbot::Node* start, Sailbot::Node* goal, double wind_angle_rad, double no_go_angle_rad) {
+std::vector<std::pair<double, double>> OneTackPathfindingStrategy::solve(Map& map, MapNode* start, MapNode* goal, double wind_angle_rad, double no_go_angle_rad) {
+	uint32_t h = map.height;
+	uint32_t w = map.width;
 	double distAtoB = sqrt(pow(goal->x - start->x, 2) + pow(goal->y - start->y, 2));
 	double angleAtoB = atan2(goal->y - start->y, goal->x - start->x);
 	double angle_nogo_1 = wind_angle_rad - M_PI - no_go_angle_rad;
@@ -24,12 +26,12 @@ std::vector<std::pair<double, double>> OneTackPathfindingStrategy::solve(Sailbot
 
 	if (raycast(map, start->x, start->y, C1_x, C1_y)) {
 		if (raycast(map, C1_x, C1_y, goal->x, goal->y)) {
-			return path_to_doubles({ start, map.getNode(C1_x, C1_y), goal });
+			return path_to_doubles({ start, map.getMapNode(C1_x, C1_y), goal });
 		}
 	}
 	if (raycast(map, start->x, start->y, C2_x, C2_y)) {
 		if (raycast(map, C2_x, C2_y, goal->x, goal->y)) {
-			return path_to_doubles({ start, map.getNode(C2_x, C2_y), goal });
+			return path_to_doubles({ start, map.getMapNode(C2_x, C2_y), goal });
 		}
 	}
 	return {};

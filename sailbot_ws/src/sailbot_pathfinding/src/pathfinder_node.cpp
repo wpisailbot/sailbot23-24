@@ -24,7 +24,7 @@ class Pathfinder : public rclcpp::Node
 public:
     std::vector<std::pair<Threat, cv::Mat>> threats;
     cv::Mat threatsMap;
-    std::unique_ptr<Sailbot::Map> pMap = nullptr;
+    std::unique_ptr<Map> pMap = nullptr;
     rclcpp::Service<sailbot_msgs::srv::SetMap>::SharedPtr pSetMapService;
     rclcpp::Service<sailbot_msgs::srv::GetPath>::SharedPtr pGetPathService;
     rclcpp::Service<sailbot_msgs::srv::SetThreat>::SharedPtr pSetThreatService;
@@ -56,7 +56,7 @@ public:
         uint x2 = request->end.x + pMap->half_width_diff;
         uint y2 = request->end.y + pMap->half_height_diff;
         RCLCPP_INFO(this->get_logger(), "Adjusted cells: (%d, %d), (%d, %d)", x1, y1, x2, y2);
-        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getNode(x1, y1), pMap->getNode(x2, y2));
+        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getMapNode(x1, y1), pMap->getMapNode(x2, y2));
         RCLCPP_INFO(this->get_logger(), "Solution complete");
         for (auto p : path)
         {
@@ -72,7 +72,7 @@ public:
         const std::shared_ptr<sailbot_msgs::srv::SetMap::Request> request,
         [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetMap::Response> response)
     {
-        pMap = std::make_unique<Sailbot::Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height), request->map.data);
+        pMap = std::make_unique<Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height), request->map.data);
         threatsMap = cv::Mat::zeros(pMap->max_dim, pMap->max_dim, CV_32FC1);
         // pMap->data = pMap->data;
         RCLCPP_INFO(this->get_logger(), "Map set successfully");
@@ -151,7 +151,7 @@ public:
         pMap->apply_threat_mask(threatsMap);
     }
 
-    std::vector<std::pair<double, double>> find_solution(Sailbot::Map &map, double wind_angle_deg, Sailbot::Node *start_node, Sailbot::Node *goal_node)
+    std::vector<std::pair<double, double>> find_solution(Map &map, double wind_angle_deg, ::MapNode *start_node, ::MapNode *goal_node)
     {
         cv::Mat mat = cv::Mat(map.max_dim, map.max_dim, CV_32FC1, map.data->data());
         cv::Mat scaledImage;

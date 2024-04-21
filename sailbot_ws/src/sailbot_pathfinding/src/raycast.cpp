@@ -1,5 +1,5 @@
 #include "raycast.h"
-bool raycast(Sailbot::Map& map, int y1, int x1, int y2, int x2)
+bool raycast(Map& map, int y1, int x1, int y2, int x2)
 {
 http://eugen.dedu.free.fr/projects/bresenham/
     int i;               // loop counter
