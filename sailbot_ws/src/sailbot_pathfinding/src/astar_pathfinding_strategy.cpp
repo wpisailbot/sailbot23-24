@@ -146,7 +146,6 @@ std::vector<std::pair<double, double>> AStarPathfindingStrategy::solve(Map& map,
 	}
 
 	auto path = AStar(*rotated_map, rotated_map->getMapNode(transformed_start_cell.first, transformed_start_cell.second), rotated_map->getMapNode(transformed_goal_cell.first, transformed_goal_cell.second));
-	displayGrid(rotated_map->data, rotated_map->max_dim, rotated_map->max_dim, path_to_doubles(path), 90, "rotated grid");
 	delete(rotated_map);
 	return rotate_path_doubles(path, map.max_dim, map.max_dim, map.max_dim, map.max_dim, map_angle_deg);
 }

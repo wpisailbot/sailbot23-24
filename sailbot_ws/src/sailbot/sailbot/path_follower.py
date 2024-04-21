@@ -152,6 +152,8 @@ class PathFollower(LifecycleNode):
             self.get_logger().info('set_map service not available, waiting again...')
         set_map_req = SetMap.Request()
         set_map_req.map = grid_msg
+        set_map_req.num_prm_nodes = 3000
+        set_map_req.prm_connection_distance_percent = 5
         self.grid_msg = grid_msg
         self.get_logger().info("Setting map")
         future = self.set_map_cli.call_async(set_map_req)
@@ -317,6 +319,7 @@ class PathFollower(LifecycleNode):
         end_point.y = float(goal[1])
         req.start = start_point
         req.end = end_point
+        req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_PRMSTAR
         
         #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along +y axis.
         wind_angle_adjusted = self.wind_angle_deg-90

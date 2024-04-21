@@ -12,25 +12,21 @@ float PRMPathfindingStrategy::turn_penalty(MapNode* previous, MapNode* current, 
 	float dx2 = next->x - current->x;
 	float dy2 = next->y - current->y;
 
-	// Calculate the dot product of the vectors
 	float dotProduct = dx1 * dx2 + dy1 * dy2;
 
-	// Calculate the magnitudes of the vectors
 	float magnitude1 = sqrt(dx1 * dx1 + dy1 * dy1);
 	float magnitude2 = sqrt(dx2 * dx2 + dy2 * dy2);
 
 	// Calculate the cosine of the angle between the vectors
 	float cosTheta = dotProduct / (magnitude1 * magnitude2);
 
-	// Clamp the cosine value to the range [-1,1] to avoid any precision issues
 	cosTheta = std::max(-1.0f, std::min(1.0f, cosTheta));
 
 	// Calculate the actual angle in radians
 	float angle = acos(cosTheta);
 
-	// float angle_degrees = angle * 180.0 / M_PI;
 
-	return angle * TURN_WEIGHT; // Scale the penalty by the angle
+	return angle * PRM_TURN_WEIGHT;
 }
 
 std::vector<MapNode*> PRMPathfindingStrategy::AStar(Map& map, MapNode* start, MapNode* goal, double wind_angle_rad, double no_go_angle_rad) {

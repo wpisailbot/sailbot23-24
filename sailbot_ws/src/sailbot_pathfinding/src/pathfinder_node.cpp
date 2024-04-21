@@ -14,10 +14,14 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/utils/logger.hpp>
 #include "map.h"
+#include "pathfinding_strategy_base.h"
 #include "linear_raycast_pathfinding_strategy.h"
 #include "one_tack_pathfinding_strategy.h"
 #include "astar_pathfinding_strategy.h"
+#include "prm_pathfinding_strategy.h"
 #include "utilities.h"
+
+#define NOGO_ANGLE_DEGREES 45
 
 class Pathfinder : public rclcpp::Node
 {
@@ -56,7 +60,7 @@ public:
         uint x2 = request->end.x + pMap->half_width_diff;
         uint y2 = request->end.y + pMap->half_height_diff;
         RCLCPP_INFO(this->get_logger(), "Adjusted cells: (%d, %d), (%d, %d)", x1, y1, x2, y2);
-        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getMapNode(x1, y1), pMap->getMapNode(x2, y2));
+        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getMapNode(x1, y1), pMap->getMapNode(x2, y2), request->pathfinding_strategy);
         RCLCPP_INFO(this->get_logger(), "Solution complete");
         for (auto p : path)
         {
@@ -73,6 +77,7 @@ public:
         [[maybe_unused]] std::shared_ptr<sailbot_msgs::srv::SetMap::Response> response)
     {
         pMap = std::make_unique<Map>(uint32_t(request->map.info.width), uint32_t(request->map.info.height), request->map.data);
+        pMap->initPRM(request->num_prm_nodes, request->prm_connection_distance_percent);
         threatsMap = cv::Mat::zeros(pMap->max_dim, pMap->max_dim, CV_32FC1);
         // pMap->data = pMap->data;
         RCLCPP_INFO(this->get_logger(), "Map set successfully");
@@ -151,7 +156,7 @@ public:
         pMap->apply_threat_mask(threatsMap);
     }
 
-    std::vector<std::pair<double, double>> find_solution(Map &map, double wind_angle_deg, ::MapNode *start_node, ::MapNode *goal_node)
+    std::vector<std::pair<double, double>> find_solution(Map &map, double wind_angle_deg, ::MapNode *start_node, ::MapNode *goal_node, uint8_t pathfinding_strategy)
     {
         cv::Mat mat = cv::Mat(map.max_dim, map.max_dim, CV_32FC1, map.data->data());
         cv::Mat scaledImage;
@@ -201,12 +206,29 @@ public:
         // if both fail, fall back to pathfinding
         RCLCPP_INFO(this->get_logger(), "Falling back to A-star");
         // create solver and solve
-        AStarPathfindingStrategy solver;
-
+        
+        PathfindingStrategyBase* solver = nullptr;
+        std::vector<std::pair<double, double>> path;
+        
         auto time_start = std::chrono::high_resolution_clock::now();
-        auto path = solver.solve(map, start_node, goal_node, wind_angle_rad);
+        
+        switch(pathfinding_strategy){
+            case sailbot_msgs::srv::GetPath::Request::PATHFINDING_STRATEGY_ASTAR:{
+                    AStarPathfindingStrategy solver;
+                    path = solver.solve(map, start_node, goal_node, wind_angle_rad, nogo_angle_rad);
+                    RCLCPP_INFO(this->get_logger(), "Got A-star path");
+                }
+                break;
+            case sailbot_msgs::srv::GetPath::Request::PATHFINDING_STRATEGY_PRMSTAR:{
+                    PRMPathfindingStrategy solver;
+                    path = solver.solve(map, start_node, goal_node, wind_angle_rad, nogo_angle_rad);
+                    RCLCPP_INFO(this->get_logger(), "Got PRM-star path");
+                }
+                break;
+            default:
+                RCLCPP_ERROR(this->get_logger(), "Invalid pathfinding strategy id");
+        }
 
-        RCLCPP_INFO(this->get_logger(), "Got A-star path");
         path = simplify_path(path, wind_angle_deg, map);
         auto time_stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_stop - time_start);
@@ -221,6 +243,7 @@ public:
             RCLCPP_INFO(this->get_logger(), start_string.c_str());
             RCLCPP_INFO(this->get_logger(), goal_string.c_str());
         }
+        delete(solver);
         return path;
     }
 
