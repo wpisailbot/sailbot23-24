@@ -273,17 +273,21 @@ Map* Map::rotate(double map_angle_deg) {
     return new Map(max_dim, rotated_vector, neighbors_grid);
 }
 
-bool Map::isWalkable(float x, float y) {
-    if (x >= 0 and y >= 0 and x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < 0.5)
+bool Map::isWalkable(float x, float y, float blockedCutoff) {
+    if (x >= 0 and y >= 0 and x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < blockedCutoff)
         return true;
     return false;
 }
 
-bool Map::isBlocked(float x, float y) {
-    if (x >= 0 and y >= 0 and x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < 0.5)
+bool Map::isBlocked(float x, float y, float blockedCutoff) {
+    if (x >= 0 and y >= 0 and x < max_dim and y < max_dim and data->at(gridToIndex(x, y)) < blockedCutoff)
         return false;
     return true;
 }
 int Map::gridToIndex(float x, float y) {
     return (uint)y * max_dim + (uint)x;
+}
+
+float Map::valueAt(float x, float y) {
+    return data->at(gridToIndex(x, y));
 }

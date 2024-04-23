@@ -28,8 +28,8 @@ public:
 	void addNeighbors(int x, int y);
 	MapNode* getMapNode(int x, int y);
 	void generate_obstacles(int num_obstacles, int max_blob_size);
-	bool isWalkable(float x, float y);
-	bool isBlocked(float x, float y);
+	bool isWalkable(float x, float y, float blockedCutoff = 0.5);
+	bool isBlocked(float x, float y, float blockedCutoff = 0.5);
 	int gridToIndex(float x, float y);
 	MapNode* randomMapNode();
 	void initPRM(float num_samples, float connection_radius_percent);
@@ -38,6 +38,7 @@ public:
 	void addPRMMapNodes(std::vector<MapNode*> sampled_nodes);
 	MapNode* addSinglePRMMapNode(float x, float y, float connection_radius);
 	void apply_threat_mask(cv::Mat threat_mask);
+	float valueAt(float x, float y);
 	//std::vector<MapNode*> getNeighbors(MapNode* node);
 	uint32_t width;
 	uint32_t height;

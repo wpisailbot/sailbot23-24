@@ -130,6 +130,8 @@ public:
             } else {
                 RCLCPP_INFO(this->get_logger(), "Pushing back:");
                 threats.push_back(std::make_pair(threat, gaussian));
+                pMap->sampleGaussian(100, threat.center.x+pMap->half_width_diff, threat.center.y+pMap->half_height_diff, 1);
+                drawPRM(pMap->PRMMapNodes, pMap->max_dim, pMap->max_dim);
             }
             RCLCPP_INFO(this->get_logger(), "Regenerating threat mask:");
             regenerateThreatMap();

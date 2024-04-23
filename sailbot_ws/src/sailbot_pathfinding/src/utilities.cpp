@@ -221,7 +221,7 @@ void drawPRM(std::shared_ptr<std::vector<MapNode*>> PRMMapNodes, int maxX, int m
     }
 
     // Display the image
-    cv::imshow("MapNodes and Connections", image);
+    cv::imwrite("/home/sailbot/MapNodes.png", image);
     // Optionally, save the image
     // cv::imwrite("nodes_connections.png", image);
 }

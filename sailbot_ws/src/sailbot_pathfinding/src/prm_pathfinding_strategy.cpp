@@ -62,7 +62,7 @@ std::vector<MapNode*> PRMPathfindingStrategy::AStar(Map& map, MapNode* start, Ma
 
 		closedSet.insert(currentMapNode);
 		for (MapNode* neighbor : currentMapNode->neighbors) {
-			if (closedSet.contains(neighbor) || !map.isWalkable(neighbor->x, neighbor->y) || is_in_nogo(currentMapNode, neighbor, wind_angle_rad, no_go_angle_rad)) {
+			if (closedSet.contains(neighbor) || !map.isWalkable(neighbor->x, neighbor->y, PATHFINDING_BLOCKED_CUTOFF) || is_in_nogo(currentMapNode, neighbor, wind_angle_rad, no_go_angle_rad)) {
 				continue;
 			}
 			float currentTurnPenalty = 0;
@@ -71,6 +71,7 @@ std::vector<MapNode*> PRMPathfindingStrategy::AStar(Map& map, MapNode* start, Ma
 			}
 			float tentativeGCost = currentMapNode->gCost + heuristic(currentMapNode, neighbor)+currentTurnPenalty;
 			if (tentativeGCost < neighbor->gCost) {
+				visitedCells.push_back(std::make_pair(neighbor->x, neighbor->y));
 				neighbor->parent = currentMapNode;
 				neighbor->gCost = tentativeGCost;
 				neighbor->hCost = heuristic(neighbor, goal);
@@ -87,5 +88,8 @@ std::vector<std::pair<double, double>> PRMPathfindingStrategy::solve(Map& map, M
 	MapNode* prmStart = map.addSinglePRMMapNode(start->x, start->y, map.prm_connection_radius);
 	MapNode* prmGoal = map.addSinglePRMMapNode(goal->x, goal->y, map.prm_connection_radius);
 	auto path = AStar(map, prmStart, prmGoal, wind_angle_rad, no_go_angle_rad);
+	for(auto coord : visitedCells){
+		map.getMapNode(coord.first, coord.second)->reset();
+	}
 	return path_to_doubles(path);
 }

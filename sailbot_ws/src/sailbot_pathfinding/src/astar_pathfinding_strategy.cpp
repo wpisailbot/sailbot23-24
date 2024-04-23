@@ -51,24 +51,24 @@ std::vector<MapNode*> AStarPathfindingStrategy::AStar(Map& map, MapNode* start, 
 				currentMapNode = currentMapNode->parent;
 			}
 			std::reverse(path.begin(), path.end());
-			originalCurrent->reset();
-			for (MapNode* node : closedSet) {
-				node->reset();
-			}
-			for (uint32_t i = 0; i < openSet.size(); i++) {
-				MapNode* node = openSet.top();
-				openSet.pop();
-				node->reset();
-			}
-			//reset nodes
-			while (!openSet.empty()) {
-				auto node = openSet.top();
-				openSet.pop();
-				node->gCost = INFINITY;
-			}
-			for (auto node : closedSet) {
-				node->gCost = INFINITY;
-			}
+			// originalCurrent->reset();
+			// for (MapNode* node : closedSet) {
+			// 	node->reset();
+			// }
+			// for (uint32_t i = 0; i < openSet.size(); i++) {
+			// 	MapNode* node = openSet.top();
+			// 	openSet.pop();
+			// 	node->reset();
+			// }
+			// //reset nodes
+			// while (!openSet.empty()) {
+			// 	auto node = openSet.top();
+			// 	openSet.pop();
+			// 	node->gCost = INFINITY;
+			// }
+			// for (auto node : closedSet) {
+			// 	node->gCost = INFINITY;
+			// }
 			return path;
 		}
 
@@ -76,7 +76,7 @@ std::vector<MapNode*> AStarPathfindingStrategy::AStar(Map& map, MapNode* start, 
 		for (MapNode* neighbor : currentMapNode->neighbors) {
 			float x = neighbor->x;
 			float y = neighbor->y;
-			if (closedSet.contains(neighbor) || !map.isWalkable(x, y)) {
+			if (closedSet.contains(neighbor) || !map.isWalkable(x, y, PATHFINDING_BLOCKED_CUTOFF)) {
 				continue;
 			}
 			float currentTurnPenalty = 0;
@@ -85,6 +85,7 @@ std::vector<MapNode*> AStarPathfindingStrategy::AStar(Map& map, MapNode* start, 
 			}
 			float tentativeGCost = currentMapNode->gCost + heuristic(currentMapNode, neighbor) + currentTurnPenalty;
 			if (tentativeGCost < neighbor->gCost) {
+				visitedCells.push_back(std::make_pair(neighbor->x, neighbor->y));
 				neighbor->parent = currentMapNode;
 				neighbor->gCost = tentativeGCost;
 				neighbor->hCost = heuristic(neighbor, goal);
@@ -146,6 +147,9 @@ std::vector<std::pair<double, double>> AStarPathfindingStrategy::solve(Map& map,
 	}
 
 	auto path = AStar(*rotated_map, rotated_map->getMapNode(transformed_start_cell.first, transformed_start_cell.second), rotated_map->getMapNode(transformed_goal_cell.first, transformed_goal_cell.second));
+	for(auto coord : visitedCells){
+		map.getMapNode(coord.first, coord.second)->reset();
+	}
 	delete(rotated_map);
 	return rotate_path_doubles(path, map.max_dim, map.max_dim, map.max_dim, map.max_dim, map_angle_deg);
 }

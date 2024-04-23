@@ -30,8 +30,8 @@ class BallastControl(LifecycleNode):
     roll_errors = []
     num_error_readings = 20
 
-    ADC_FULL_STARBOARD = 700
-    ADC_FULL_PORT = 2300
+    ADC_FULL_STARBOARD = 1070
+    ADC_FULL_PORT = 2670
     ADC_MAX = ADC_FULL_PORT
     ADC_MIN = ADC_FULL_STARBOARD
     
@@ -230,7 +230,7 @@ class BallastControl(LifecycleNode):
         current_time = get_time()
         delta_time = current_time-self.previous_time
         error_derivative = (current_error - self.previous_error) / delta_time
-        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*500))
+        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*current_error))
         #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         
         self.previous_error = current_error

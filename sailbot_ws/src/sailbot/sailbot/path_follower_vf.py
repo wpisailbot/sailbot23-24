@@ -181,7 +181,7 @@ class PathFollower(LifecycleNode):
     def set_parameters(self) -> None:
         self.declare_parameter('sailbot.pathfinding.buoy_rounding_distance_meters', 5.0)
         self.declare_parameter('sailbot.pathfinding.buoy_threat_size_map_units', 1.0)
-        self.declare_parameter('sailbot.pathfinding.buoy_threat_guassian_intensity', 1.0)
+        self.declare_parameter('sailbot.pathfinding.buoy_threat_guassian_intensity', 0.6)
         self.declare_parameter('sailbot.pathfinding.min_path_recalculation_interval_seconds', 10.0)
         self.declare_parameter('sailbot.navigation.look_ahead_distance_meters', 5.0)
         self.declare_parameter('sailbot.navigation.look_ahead_increase_per_knot', 1.0)
@@ -540,7 +540,7 @@ class PathFollower(LifecycleNode):
     def add_threat(self, waypoint, id=-1) -> None:
         threat = GaussianThreat()
         threat.size = self.buoy_threat_size_map_units
-        threat.intensity = 1.0
+        threat.intensity = self.buoy_threat_guassian_intensity
         x, y = self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height)
         threat.center.x = float(x)
         threat.center.y = float(y)
