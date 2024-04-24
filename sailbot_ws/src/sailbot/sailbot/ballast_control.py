@@ -30,10 +30,8 @@ class BallastControl(LifecycleNode):
     roll_errors = []
     num_error_readings = 20
 
-    # ADC_FULL_STARBOARD = 924
-    # ADC_FULL_PORT = 2524
-    ADC_FULL_STARBOARD = 924
-    ADC_FULL_PORT = 2524
+    ADC_FULL_STARBOARD = 1313
+    ADC_FULL_PORT = 2913
     ADC_MAX = ADC_FULL_PORT
     ADC_MIN = ADC_FULL_STARBOARD
     
@@ -193,7 +191,7 @@ class BallastControl(LifecycleNode):
         self.current_wind_dir = msg.direction
 
     def roll_correction_callback(self):
-        if(self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_FULL and self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_BALLAST):
+        if(self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_FULL and self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_BALLAST and self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_TRIMTAB):
             return
         
         if(len(self.roll_errors) == 0):
@@ -210,14 +208,16 @@ class BallastControl(LifecycleNode):
             new_target = self.ADC_MAX
 
         self.current_target = new_target
+        self.get_logger().info(f"Set target from roll: {self.current_target}")
         self.move = True
 
 
     def control_loop_callback(self):
         if(self.move == False):
             return
-        if(self.current_ballast_position == 0):
+        if(self.current_ballast_position <1000 or self.current_ballast_position > 3500):
             #self.get_logger().info("Ballast position is 0, assuming it's broken")
+            self.get_logger().info("Ballast out of range!")
             return
         current_error = self.current_ballast_position - self.current_target
         self.get_logger().info(f"Current target: {self.current_target}, current position: {self.current_ballast_position}")
