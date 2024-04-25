@@ -13,7 +13,7 @@ from geopy.distance import geodesic
 
 PIXEL_SIZE = 0.002 # In mm
 CAMERA_RESOLUTION = (2208, 1242) # Width, Height
-CAMERA_WORLD_POSITION = np.array([0, 0, 0]) # XYZ in meters
+CAMERA_WORLD_POSITION = np.array([0, 0, -1.8]) # XYZ in meters
 CAMERA_ORIENTATION = np.array([0, 0, 0]) # Orientation as pitch, yaw, roll
 
 #Camera calibration for LEFT camera info from ZED application

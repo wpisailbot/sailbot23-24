@@ -216,7 +216,7 @@ class TrimTabComms(LifecycleNode):
 
         msg = None
         trim_state_msg = TrimState()
-        if 45.0 <= relative_wind < 135:
+        if 25.0 <= relative_wind < 100:
             # Max lift port
             msg = {
                 "state": "max_lift_port"
@@ -224,24 +224,24 @@ class TrimTabComms(LifecycleNode):
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
             self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_PORT
             self.get_logger().info("Max lift port")
-        elif 135 <= relative_wind < 180:
+        elif 100 <= relative_wind < 180:
             # Max drag port
             msg = {
-                "state": "max_drag_port"
+                "state": "max_drag_starboard" # switched for testing
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_PORT
             #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_PORT
             self.get_logger().info("Max drag port")
 
-        elif 180 <= relative_wind < 200:
+        elif 180 <= relative_wind < 260:
             # Max drag starboard
             msg = {
-                "state": "max_drag_starboard"
+                "state": "max_drag_port"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
             #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
             self.get_logger().info("Max drag starboard")
-        elif 200 <= relative_wind < 315:
+        elif 260 <= relative_wind < 335:
             # Max lift starboard
             msg = {
                 "state": "max_lift_starboard"

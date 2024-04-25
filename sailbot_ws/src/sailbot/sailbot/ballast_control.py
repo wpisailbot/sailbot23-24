@@ -30,8 +30,8 @@ class BallastControl(LifecycleNode):
     roll_errors = []
     num_error_readings = 20
 
-    ADC_FULL_STARBOARD = 1313
-    ADC_FULL_PORT = 2913
+    ADC_FULL_STARBOARD = 963
+    ADC_FULL_PORT = 2563
     ADC_MAX = ADC_FULL_PORT
     ADC_MIN = ADC_FULL_STARBOARD
     
@@ -102,7 +102,7 @@ class BallastControl(LifecycleNode):
         self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
         self.timer = self.create_timer(0.1, self.control_loop_callback)
-        self.roll_correction_timer = self.create_timer(1, self.roll_correction_callback)
+        self.roll_correction_timer = self.create_timer(10, self.roll_correction_callback)
         self.get_logger().info("Ballast node configured")
         #super().on_configure(state)
         return TransitionCallbackReturn.SUCCESS
@@ -215,7 +215,7 @@ class BallastControl(LifecycleNode):
     def control_loop_callback(self):
         if(self.move == False):
             return
-        if(self.current_ballast_position <1000 or self.current_ballast_position > 3500):
+        if(self.current_ballast_position < 500 or self.current_ballast_position > 3000):
             #self.get_logger().info("Ballast position is 0, assuming it's broken")
             self.get_logger().info("Ballast out of range!")
             return

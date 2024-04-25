@@ -1,7 +1,7 @@
 heading_controller:
   ros__parameters:
     sailbot:
-      heading_kp: 0.5
+      heading_kp: 0.1
     
 esp32_comms:
   ros__parameters:
