@@ -302,6 +302,13 @@ class NetworkComms(LifecycleNode):
             self.path_segment_debug_callback,
             10
         )
+
+        self.target_heading_debug_subscriber = self.create_subscription(
+            Float64,
+            'target_heading',
+            self.target_heading_debug_callback,
+            10
+        )
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
         # self.current_boat_state.latitude = 42.273822
@@ -608,6 +615,11 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.current_path_segment.start.longitude = msg.start.longitude
         self.current_boat_state.current_path_segment.end.latitude = msg.end.latitude
         self.current_boat_state.current_path_segment.end.longitude = msg.end.longitude
+        
+    def target_heading_debug_callback(self, msg: Float64):
+        self.current_boat_state.has_target_heading = True
+        self.current_boat_state.target_heading = msg.data
+        self.get_logger().info("Got target theading")
         
     #new server code
     def create_grpc_server(self): 

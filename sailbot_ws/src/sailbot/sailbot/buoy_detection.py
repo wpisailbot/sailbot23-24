@@ -8,6 +8,8 @@ from cv_bridge import CvBridge
 import cv2
 import numpy as np
 import math
+from filterpy.kalman import KalmanFilter
+from scipy.optimize import linear_sum_assignment
 
 from geopy.distance import geodesic
 
@@ -29,6 +31,32 @@ camera_matrix = np.array([[FX, 0, CX],
 
 K1, K2, P1, P2, K3 = -0.0393, 0.0085, 0.0001, 0.0004, -0.0045
 distortion_coefficients = np.array([K1, K2, P1, P2, K3])
+
+def create_kalman_filter():
+    kf = KalmanFilter(dim_x=4, dim_z=2)
+    dt = 1  # time step
+
+    # State transition matrix (models physics: x and z positions and velocities)
+    kf.F = np.array([[1, dt, 0,  0],
+                     [0,  1, 0,  0],
+                     [0,  0, 1, dt],
+                     [0,  0, 0,  1]])
+
+    # Measurement function (we only measure positions)
+    kf.H = np.array([[1, 0, 0, 0],
+                     [0, 0, 1, 0]])
+
+    # Measurement uncertainty
+    kf.R = np.array([[10, 0],
+                     [0, 10]])
+
+    # Initial state covariance
+    kf.P *= 1000
+
+    # Process noise
+    kf.Q = np.eye(4)
+
+    return kf
 
 def calculate_offset_position(lat, lon, heading, z_distance, x_distance):
     heading_rad = math.radians(heading)

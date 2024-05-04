@@ -310,7 +310,7 @@ class TrimTabComms(LifecycleNode):
         self.ser.write(message_string.encode())
 
     def rudder_angle_callback(self, msg: Int16) -> None:
-        self.get_logger().info(f"Got rudder position: {msg.data}")
+        #self.get_logger().info(f"Got rudder position: {msg.data}")
         degrees = msg.data
         # If rudder angles are high, limit them, and note that we could be tacking
         # This lets find_trim_tab_state adjust its behavior accordingly, if it would enter min_lift.
@@ -362,9 +362,9 @@ class TrimTabComms(LifecycleNode):
             try:
                 message = json.loads(line)
 
-                #self.get_logger().info("Received position:", message["ballast_pos"])
                 pos = Int16()
                 pos.data = message["ballast_pos"]
+                #self.get_logger().info(f"Received position: {pos.data}")
                 if(pos.data == 0):
                     #self.get_logger().info("Ballast potentiometer is not working!")
                     pass

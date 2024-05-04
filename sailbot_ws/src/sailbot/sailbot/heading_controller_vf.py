@@ -85,6 +85,9 @@ class HeadingController(LifecycleNode):
 
         self.rudder_angle_publisher = self.create_lifecycle_publisher(Int16, 'rudder_angle', 10)
 
+        self.target_heading_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_heading', 10)
+
+
         self.path_Segment_subscription = self.create_subscription(
             PathSegment,
             'current_path_segment',
@@ -118,7 +121,7 @@ class HeadingController(LifecycleNode):
 
         heading_error = ctrl.Antecedent(np.arange(-180, 181, 1), 'heading_error')
         rate_of_change = ctrl.Antecedent(np.arange(-90, 91, 1), 'rate_of_change')
-        rudder_angle = ctrl.Consequent(np.arange(-90, 91, 1), 'rudder_angle')
+        rudder_adjustment = ctrl.Consequent(np.arange(-90, 91, 1), 'rudder_adjustment')
 
         #Negative Large (NL), Negative Medium (NM), Zero (ZE), Positive Medium (PM), and Positive Large (PL)
         # Membership functions for heading error
@@ -136,34 +139,34 @@ class HeadingController(LifecycleNode):
         rate_of_change['Large Positive'] = fuzz.smf(rate_of_change.universe, 30, 90)
 
         # Membership functions for rudder angle
-        rudder_angle['Large Negative'] = fuzz.gaussmf(rudder_angle.universe, 90, 10)  # mean = -45, std = 10
-        rudder_angle['Small Negative'] = fuzz.gaussmf(rudder_angle.universe, 60, 10)  # mean = -15, std = 10
-        rudder_angle['Zero'] = fuzz.gaussmf(rudder_angle.universe, 0, 10)              # mean = 0, std = 10
-        rudder_angle['Small Positive'] = fuzz.gaussmf(rudder_angle.universe, -60, 10)   # mean = 15, std = 10
-        rudder_angle['Large Positive'] = fuzz.gaussmf(rudder_angle.universe, -90, 10)   # mean = 45, std = 10
+        rudder_adjustment['Large Negative'] = fuzz.gaussmf(rudder_adjustment.universe, 90, 10)  # mean = -45, std = 10
+        rudder_adjustment['Small Negative'] = fuzz.gaussmf(rudder_adjustment.universe, 60, 10)  # mean = -15, std = 10
+        rudder_adjustment['Zero'] = fuzz.gaussmf(rudder_adjustment.universe, 0, 10)              # mean = 0, std = 10
+        rudder_adjustment['Small Positive'] = fuzz.gaussmf(rudder_adjustment.universe, -60, 10)   # mean = 15, std = 10
+        rudder_adjustment['Large Positive'] = fuzz.gaussmf(rudder_adjustment.universe, -90, 10)   # mean = 45, std = 10
 
         # Define the rules
-        rule1 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Large Negative'], rudder_angle['Large Positive'])
-        rule2 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Small Negative'], rudder_angle['Small Positive'])
-        rule3 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Zero'], rudder_angle['Zero'])
-        rule4 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Small Positive'], rudder_angle['Small Negative'])
-        rule5 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Large Positive'], rudder_angle['Large Negative'])
+        rule1 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Large Negative'], rudder_adjustment['Large Positive'])
+        rule2 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Small Negative'], rudder_adjustment['Small Positive'])
+        rule3 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Zero'], rudder_adjustment['Zero'])
+        rule4 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Small Positive'], rudder_adjustment['Small Negative'])
+        rule5 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Large Positive'], rudder_adjustment['Large Negative'])
 
-        rule6 = ctrl.Rule(heading_error['PM'] & rate_of_change['Large Negative'], rudder_angle['Small Negative'])
-        rule7 = ctrl.Rule(heading_error['PM'] & rate_of_change['Small Negative'], rudder_angle['Small Negative'])
-        rule8 = ctrl.Rule(heading_error['PM'] & rate_of_change['Zero'], rudder_angle['Small Negative'])
-        rule9 = ctrl.Rule(heading_error['PM'] & rate_of_change['Small Positive'], rudder_angle['Large Negative'])
-        rule10 = ctrl.Rule(heading_error['PM'] & rate_of_change['Large Positive'], rudder_angle['Large Negative'])
+        rule6 = ctrl.Rule(heading_error['PM'] & rate_of_change['Large Negative'], rudder_adjustment['Small Negative'])
+        rule7 = ctrl.Rule(heading_error['PM'] & rate_of_change['Small Negative'], rudder_adjustment['Small Negative'])
+        rule8 = ctrl.Rule(heading_error['PM'] & rate_of_change['Zero'], rudder_adjustment['Small Negative'])
+        rule9 = ctrl.Rule(heading_error['PM'] & rate_of_change['Small Positive'], rudder_adjustment['Large Negative'])
+        rule10 = ctrl.Rule(heading_error['PM'] & rate_of_change['Large Positive'], rudder_adjustment['Large Negative'])
 
-        rule11 = ctrl.Rule(heading_error['PL'], rudder_angle['Large Negative'])
+        rule11 = ctrl.Rule(heading_error['PL'], rudder_adjustment['Large Negative'])
 
-        rule12 = ctrl.Rule(heading_error['NM'] & rate_of_change['Large Positive'], rudder_angle['Small Positive'])
-        rule13 = ctrl.Rule(heading_error['NM'] & rate_of_change['Small Positive'], rudder_angle['Small Positive'])
-        rule14 = ctrl.Rule(heading_error['NM'] & rate_of_change['Zero'], rudder_angle['Small Positive'])
-        rule15 = ctrl.Rule(heading_error['NM'] & rate_of_change['Small Negative'], rudder_angle['Large Positive'])
-        rule16 = ctrl.Rule(heading_error['NM'] & rate_of_change['Large Negative'], rudder_angle['Large Positive'])
+        rule12 = ctrl.Rule(heading_error['NM'] & rate_of_change['Large Positive'], rudder_adjustment['Small Positive'])
+        rule13 = ctrl.Rule(heading_error['NM'] & rate_of_change['Small Positive'], rudder_adjustment['Small Positive'])
+        rule14 = ctrl.Rule(heading_error['NM'] & rate_of_change['Zero'], rudder_adjustment['Small Positive'])
+        rule15 = ctrl.Rule(heading_error['NM'] & rate_of_change['Small Negative'], rudder_adjustment['Large Positive'])
+        rule16 = ctrl.Rule(heading_error['NM'] & rate_of_change['Large Negative'], rudder_adjustment['Large Positive'])
 
-        rule17 = ctrl.Rule(heading_error['NL'], rudder_angle['Large Positive'])
+        rule17 = ctrl.Rule(heading_error['NL'], rudder_adjustment['Large Positive'])
 
         self.rudder_control = ctrl.ControlSystem([rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12, rule13, rule14, rule15, rule16, rule17])
         self.rudder_simulator = ctrl.ControlSystemSimulation(self.rudder_control)
@@ -314,6 +317,10 @@ class HeadingController(LifecycleNode):
         grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=1, lambda_base=0.1)
         self.get_logger().info(f"Direction vector: {grid_direction_vector}")
         target_heading = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
+        target_heading_msg = Float64()
+        target_heading_msg.data = target_heading
+        self.target_heading_debug_publisher.publish(target_heading_msg)
+        
         self.get_logger().info(f"Target heading: {target_heading}")
         heading_error = math.degrees(normalRelativeAngle(math.radians(self.heading-target_heading)))
         delta_heading_error = heading_error - self.last_heading_error
@@ -322,8 +329,8 @@ class HeadingController(LifecycleNode):
         self.rudder_simulator.input['heading_error'] = heading_error
         self.rudder_simulator.input['rate_of_change'] = delta_heading_error
         self.rudder_simulator.compute()
-        rudder_value = self.rudder_simulator.output['rudder_angle']
-        self.rudder_angle += rudder_value*self.heading_kp # Scale
+        rudder_value = self.rudder_simulator.output['rudder_adjustment']
+        self.rudder_angle += rudder_value#*self.heading_kp # Scale
 
         if(self.rudder_angle>30):
             self.rudder_angle = 30
