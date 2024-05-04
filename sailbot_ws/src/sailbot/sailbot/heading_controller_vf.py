@@ -73,10 +73,15 @@ class HeadingController(LifecycleNode):
         # self.target_position.longitude = -71.805049
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_kp', 0.1)
+        self.declare_parameter('sailbot.heading_control.heading_kp', 0.1)
+        self.declare_parameter('sailbot.heading_control.vector_field_crosstrack_weight', 1.0)
+        self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 1.0)
 
     def get_parameters(self) -> None:
-        self.heading_kp = self.get_parameter('sailbot.heading_kp').get_parameter_value().double_value
+        self.heading_kp = self.get_parameter('sailbot.heading_control.heading_kp').get_parameter_value().double_value
+        self.k_base = self.get_parameter('sailbot.heading_control.vector_field_crosstrack_weight').get_parameter_value().double_value
+        self.lambda_base = self.get_parameter('sailbot.heading_control.vector_field_path_dir_weight').get_parameter_value().double_value
+        
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
@@ -116,7 +121,7 @@ class HeadingController(LifecycleNode):
         self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
         
-        self.timer = self.create_timer(0.5, self.timer_callback)
+        self.timer = self.create_timer(0.1, self.timer_callback)
         self.get_logger().info("Heading controller node configured")
 
         heading_error = ctrl.Antecedent(np.arange(-180, 181, 1), 'heading_error')
@@ -234,6 +239,7 @@ class HeadingController(LifecycleNode):
 
     def current_grid_cell_callback(self, msg: Point) -> None:
         self.current_grid_cell = msg
+        self.get_logger().info("Got new grid cell!")
         #self.compute_rudder_angle()
     
     def path_segment_callback(self, msg: PathSegment) -> None:
@@ -314,7 +320,7 @@ class HeadingController(LifecycleNode):
             self.get_logger().info("Current grid cell is none, cannot operate")
             return
         
-        grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=1, lambda_base=0.1)
+        grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=self.k_base, lambda_base=self.lambda_base)
         self.get_logger().info(f"Direction vector: {grid_direction_vector}")
         target_heading = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
         target_heading_msg = Float64()

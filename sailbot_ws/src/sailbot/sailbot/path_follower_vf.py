@@ -308,17 +308,18 @@ class PathFollower(LifecycleNode):
         new_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
         current_time = time.time()
         self.get_logger().info("Got new position")
+
         if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
-            self.current_grid_cell = new_grid_cell
-            grid_cell_msg = Point()
-            grid_cell_msg.x = float(new_grid_cell[0])
-            grid_cell_msg.y = float(new_grid_cell[1])
-            self.current_grid_cell_publisher.publish(grid_cell_msg)
             self.get_logger().info("Recalculating path")
             self.recalculate_path_from_exact_points()
             self.last_recalculation_time = time.time()
             
         self.find_look_ahead()
+        self.current_grid_cell = new_grid_cell
+        grid_cell_msg = Point()
+        grid_cell_msg.x = float(new_grid_cell[0])
+        grid_cell_msg.y = float(new_grid_cell[1])
+        self.current_grid_cell_publisher.publish(grid_cell_msg)
 
 
     def airmar_speed_knots_callback(self, msg: Float64) -> None:
