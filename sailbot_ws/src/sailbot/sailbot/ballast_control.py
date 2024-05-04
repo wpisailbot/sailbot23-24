@@ -30,8 +30,8 @@ class BallastControl(LifecycleNode):
     roll_errors = []
     num_error_readings = 20
 
-    ADC_FULL_STARBOARD = 1070
-    ADC_FULL_PORT = 2670
+    ADC_FULL_STARBOARD = 700
+    ADC_FULL_PORT = 2300
     ADC_MAX = ADC_FULL_PORT
     ADC_MIN = ADC_FULL_STARBOARD
     
@@ -43,6 +43,10 @@ class BallastControl(LifecycleNode):
     CONTROL_FAST_STARBOARD=1.0
 
     ERROR_MIN_MAGNITUDE = 20
+
+    RAMP_UP_TIME = 2.0
+    start_time = None
+    in_ramp_up = False
 
     Kp = 0.005
     Kd = 0.1
@@ -102,7 +106,7 @@ class BallastControl(LifecycleNode):
         self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
         self.timer = self.create_timer(0.1, self.control_loop_callback)
-        self.roll_correction_timer = self.create_timer(1, self.roll_correction_callback)
+        self.roll_correction_timer = self.create_timer(10, self.roll_correction_callback)
         self.get_logger().info("Ballast node configured")
         #super().on_configure(state)
         return TransitionCallbackReturn.SUCCESS
@@ -155,6 +159,8 @@ class BallastControl(LifecycleNode):
         self.get_logger().info("Received ballast setpoint: "+str(msg.data))
         self.current_target = self.ADC_FULL_PORT + ((self.ADC_FULL_STARBOARD - self.ADC_FULL_PORT) / (1.0 - -1.0)) * (msg.data - -1.0)
         self.move = True
+        self.in_ramp_up = True
+        self.start_time = get_time()
 
     def current_ballast_position_callback(self, msg: Int16):
         #self.get_logger().info("Got current ballast position")
@@ -191,7 +197,7 @@ class BallastControl(LifecycleNode):
         self.current_wind_dir = msg.direction
 
     def roll_correction_callback(self):
-        if(self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_FULL and self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_BALLAST):
+        if(self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_FULL and self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_BALLAST and self.autonomous_mode != AutonomousMode.AUTONOMOUS_MODE_TRIMTAB):
             return
         
         if(len(self.roll_errors) == 0):
@@ -208,17 +214,21 @@ class BallastControl(LifecycleNode):
             new_target = self.ADC_MAX
 
         self.current_target = new_target
+        #self.get_logger().info(f"Set target from roll: {self.current_target}")
         self.move = True
+        self.in_ramp_up = True
+        self.start_time = get_time()
 
 
     def control_loop_callback(self):
         if(self.move == False):
             return
-        if(self.current_ballast_position == 0):
-            #self.get_logger().info("Ballast position is 0, assuming it's broken")
-            return
+        # if(self.current_ballast_position < 500 or self.current_ballast_position > 3000):
+        #     #self.get_logger().info("Ballast position is 0, assuming it's broken")
+        #     self.get_logger().info("Ballast out of range!")
+        #     return
         current_error = self.current_ballast_position - self.current_target
-        self.get_logger().info(f"Current target: {self.current_target}, current position: {self.current_ballast_position}")
+        #self.get_logger().info(f"Current target: {self.current_target}, current position: {self.current_ballast_position}")
         if abs(current_error)<self.ERROR_MIN_MAGNITUDE:
             self.get_logger().info("Error is small, stopping")
             msg = Int16()
@@ -229,8 +239,16 @@ class BallastControl(LifecycleNode):
         
         current_time = get_time()
         delta_time = current_time-self.previous_time
+        ramp_factor = 1
+        if self.in_ramp_up:
+            elapsed_time = current_time - self.start_time
+            if elapsed_time >= self.RAMP_UP_TIME:
+                self.in_ramp_up = False
+            else:
+                ramp_factor = elapsed_time / self.RAMP_UP_TIME
+
         error_derivative = (current_error - self.previous_error) / delta_time
-        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*current_error))
+        motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*current_error*ramp_factor))
         #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         
         self.previous_error = current_error

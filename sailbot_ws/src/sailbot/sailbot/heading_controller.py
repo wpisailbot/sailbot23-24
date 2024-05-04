@@ -47,6 +47,7 @@ class HeadingController(LifecycleNode):
     wind_direction_deg = None
     autonomous_mode = 0
     heading_kp = None
+    rudder_angle = 0
 
     def __init__(self):
         super().__init__('heading_controller')
@@ -68,7 +69,7 @@ class HeadingController(LifecycleNode):
         # self.target_position.longitude = -71.805049
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_kp', 0.5)
+        self.declare_parameter('sailbot.heading_kp', 0.1)
 
     def get_parameters(self) -> None:
         self.heading_kp = self.get_parameter('sailbot.heading_kp').get_parameter_value().double_value
@@ -276,25 +277,25 @@ class HeadingController(LifecycleNode):
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         #self.rudder_simulator.compute()
         #rudder_angle = self.rudder_simulator.output['rudder_angle']
-        rudder_angle = heading_error*self.heading_kp # P controller for now
-        if(rudder_angle>90):
-            rudder_angle = 90
-        elif rudder_angle<-90:
-            rudder_angle = -90
+        self.rudder_angle + heading_error*self.heading_kp # P controller for now
+        if(self.rudder_angle>30):
+            self.rudder_angle = 30
+        elif self.rudder_angle<-30:
+            self.rudder_angle = -30
 
         # If we are tacking, turn as hard as possible.
         # Trim tab controller will see this and skip over min_lift
         if(self.wind_direction_deg is not None):
             if(self.needs_to_tack(self.heading, self.heading+heading_error ,self.wind_direction_deg)):
-                if(rudder_angle>0):
-                    rudder_angle = 90
+                if(self.rudder_angle>0):
+                    self.rudder_angle = 31
                 else:
-                    rudder_angle = -90
+                    self.rudder_angle = -31
 
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
-        msg.data = int(rudder_angle)
-        self.get_logger().info(f"Rudder angle: {rudder_angle}")
+        msg.data = int(self.rudder_angle)
+        self.get_logger().info(f"Rudder angle: {self.rudder_angle}")
         self.rudder_angle_publisher.publish(msg)
 
     #gets necessary rotation from an lat, long, theta pose to face a point

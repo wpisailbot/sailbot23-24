@@ -43,6 +43,7 @@ setup(
             'main_behavior = sailbot.behaviors.sailbot_behavior:main',
             'wind_smoother = sailbot.wind_smoother:main',
             'buoy_detection = sailbot.buoy_detection:main',
+            'fake_movement = sailbot.fake_movement:main',
         ],
     },
 )

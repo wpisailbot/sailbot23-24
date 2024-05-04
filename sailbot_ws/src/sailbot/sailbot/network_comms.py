@@ -275,7 +275,11 @@ class NetworkComms(LifecycleNode):
             '/zed/zed_node/rgb/image_rect_color',
             self.camera_color_image_callback,
             10)
-        
+        self.camera_depth_image_subscriber = self.create_subscription(
+            Image,
+            '/zed/zed_node/depth/depth_registered',
+            self.camera_depth_image_callback,
+            10)
         self.camera_mask_image_subscriber = self.create_subscription(
             Image,
             'cv_mask',
@@ -296,6 +300,13 @@ class NetworkComms(LifecycleNode):
             GeoPathSegment,
             'current_segment_debug',
             self.path_segment_debug_callback,
+            10
+        )
+
+        self.target_heading_debug_subscriber = self.create_subscription(
+            Float64,
+            'target_heading',
+            self.target_heading_debug_callback,
             10
         )
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
@@ -582,6 +593,13 @@ class NetworkComms(LifecycleNode):
             return
         self.set_current_image(msg)
 
+    def camera_depth_image_callback(self, msg: Image):
+        # if(self.do_video_encode == False):
+        #     return
+        if(self.current_video_source != 2):
+            return
+        self.set_current_image(msg)
+
     def buoy_position_callback(self, msg: GeoPoint):
         self.current_boat_state.ClearField("buoy_positions")# = command.new_path
         #self.get_logger().info("Cleared old path")
@@ -597,6 +615,11 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.current_path_segment.start.longitude = msg.start.longitude
         self.current_boat_state.current_path_segment.end.latitude = msg.end.latitude
         self.current_boat_state.current_path_segment.end.longitude = msg.end.longitude
+        
+    def target_heading_debug_callback(self, msg: Float64):
+        self.current_boat_state.has_target_heading = True
+        self.current_boat_state.target_heading = msg.data
+        self.get_logger().info("Got target theading")
         
     #new server code
     def create_grpc_server(self): 
@@ -627,6 +650,8 @@ class NetworkComms(LifecycleNode):
             self.current_video_source = 0
         elif(command.videoSource == 'MASK'):
             self.current_video_source = 1
+        elif(command.videoSource == 'DEPTH'):
+            self.current_video_source = 2
 
         try:
             while context.is_active():
