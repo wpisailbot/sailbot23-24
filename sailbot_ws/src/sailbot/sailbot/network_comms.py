@@ -18,7 +18,7 @@ from sensor_msgs.msg import NavSatFix, Image
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
-from sailbot_msgs.msg import Wind, GeoPath, AutonomousMode, TrimState, Waypoint, WaypointPath, GeoPathSegment
+from sailbot_msgs.msg import Wind, GeoPath, AutonomousMode, TrimState, Waypoint, WaypointPath, GeoPathSegment, BuoyDetectionStamped
 import grpc
 from concurrent import futures
 import json
@@ -133,6 +133,7 @@ class NetworkComms(LifecycleNode):
     last_camera_frame_time = time.time()
     do_video_encode = False
     current_video_source = 0
+    current_buoy_positions = {}
 
     def __init__(self):
         super().__init__('network_comms')
@@ -286,7 +287,7 @@ class NetworkComms(LifecycleNode):
             self.camera_mask_image_callback,
             10)
         self.buoy_position_subscriber = self.create_subscription(
-            GeoPoint,
+            BuoyDetectionStamped,
             'buoy_position',
             self.buoy_position_callback,
             10)
@@ -600,11 +601,14 @@ class NetworkComms(LifecycleNode):
             return
         self.set_current_image(msg)
 
-    def buoy_position_callback(self, msg: GeoPoint):
+    def buoy_position_callback(self, msg: BuoyDetectionStamped):
+        self.current_buoy_positions[msg.id] = msg
         self.current_boat_state.ClearField("buoy_positions")# = command.new_path
         #self.get_logger().info("Cleared old path")
-        point_msg = boat_state_pb2.Point(latitude=msg.latitude, longitude = msg.longitude)
-        self.current_boat_state.buoy_positions.append(point_msg)
+        for key in self.current_buoy_positions.keys():
+            point = self.current_buoy_positions[key].position
+            point_msg = boat_state_pb2.Point(latitude=point.latitude, longitude = point.longitude)
+            self.current_boat_state.buoy_positions.append(point_msg)
 
     def rudder_angle_callback(self, msg: Int16):
         self.current_boat_state.rudder_position = msg.data

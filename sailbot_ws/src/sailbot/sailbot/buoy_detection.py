@@ -5,11 +5,15 @@ from sensor_msgs.msg import Image, NavSatFix
 from geographic_msgs.msg import GeoPoint
 from cv_bridge import CvBridge
 
+from sailbot_msgs.msg import BuoyDetectionStamped
+
 import cv2
 import numpy as np
 import math
 from filterpy.kalman import KalmanFilter
 from scipy.optimize import linear_sum_assignment
+import pyproj
+from pyproj import Transformer
 
 from geopy.distance import geodesic
 
@@ -32,17 +36,39 @@ camera_matrix = np.array([[FX, 0, CX],
 K1, K2, P1, P2, K3 = -0.0393, 0.0085, 0.0001, 0.0004, -0.0045
 distortion_coefficients = np.array([K1, K2, P1, P2, K3])
 
-def create_kalman_filter():
+# Define geographic coordinate system (WGS84)
+geographic = pyproj.CRS('EPSG:4326')  # WGS 84
+
+# Define local ENU coordinate system based on a specific zone
+local_enu = pyproj.CRS('EPSG:32619')  # UTM Zone 19N, North Hemisphere
+
+# Create a transformer to convert from geographic to local ENU coordinates
+geo_to_enu_transformer = Transformer.from_crs(geographic, local_enu, always_xy=True)
+
+# Create a transformer to convert from local ENU back to geographic coordinates
+enu_to_geo_transformer = Transformer.from_crs(local_enu, geographic, always_xy=True)
+
+def geodetic_to_enu(lat, lon):
+    """Transform from lat, lon to ENU coordinates."""
+    x, y = geo_to_enu_transformer.transform(lon, lat)
+    return x, y
+
+def enu_to_geodetic(x, y):
+    """Transform from ENU coordinates back to geodetic."""
+    lon, lat = enu_to_geo_transformer.transform(x, y)
+    return lat, lon
+
+def create_kalman_filter(initial_x, initial_y):
     kf = KalmanFilter(dim_x=4, dim_z=2)
     dt = 1  # time step
 
-    # State transition matrix (models physics: x and z positions and velocities)
+    # State transition matrix
     kf.F = np.array([[1, dt, 0,  0],
                      [0,  1, 0,  0],
                      [0,  0, 1, dt],
                      [0,  0, 0,  1]])
 
-    # Measurement function (we only measure positions)
+    # Measurement function
     kf.H = np.array([[1, 0, 0, 0],
                      [0, 0, 1, 0]])
 
@@ -56,7 +82,33 @@ def create_kalman_filter():
     # Process noise
     kf.Q = np.eye(4)
 
+    # Initialize state
+    kf.x = np.array([initial_x, 0, initial_y, 0])  # Positions and velocities
+
     return kf
+
+class Track:
+    id_counter = 0
+
+    def __init__(self, initial_e, initial_n):
+        self.id = Track.id_counter
+        Track.id_counter += 1 
+        self.kf = create_kalman_filter(initial_e, initial_n)
+        self.time_since_update = 0
+        self.history = [(self.kf.x[0], self.kf.x[2])]
+
+    def predict(self):
+        self.kf.predict()
+        self.time_since_update += 1
+        return (self.kf.x[0], self.kf.x[2])
+
+    def update(self, detection_enu):
+        self.kf.update(detection_enu)
+        self.time_since_update = 0
+        self.history.append((self.kf.x[0], self.kf.x[2]))
+    
+    def get_position(self):
+        return (self.kf.x[0], self.kf.x[2])
 
 def calculate_offset_position(lat, lon, heading, z_distance, x_distance):
     heading_rad = math.radians(heading)
@@ -77,6 +129,7 @@ class BuoyDetection(Node):
     current_y_scaling_factor = 1.0
     latitude, longitude = 42.0396766107111, -71.84585650616927
     heading = 0
+    tracks = []
     def __init__(self):
         super().__init__('object_detection_node')
 
@@ -105,7 +158,7 @@ class BuoyDetection(Node):
             10
         )
         self.buoy_position_publisher = self.create_publisher(
-            GeoPoint,
+            BuoyDetectionStamped,
             'buoy_position',
             10
         )
@@ -149,7 +202,50 @@ class BuoyDetection(Node):
     def airmar_heading_callback(self, msg: Float64) -> None:
         self.heading = msg.data
 
-    def listener_callback(self, data):
+    def publish_tracks(self) -> None:
+        #self.get_logger().info(f"Num tracks: {len(self.tracks)}")
+        for track in self.tracks:
+            if track.time_since_update == 0:  # Publish only for tracks updated in the last frame
+                enu_position = track.get_position()
+                latlon = enu_to_geodetic(enu_position[0], enu_position[1])
+                #self.get_logger().info(f"Publishing detection with position: {latlon}")
+                detection = BuoyDetectionStamped()
+                detection.position.latitude = latlon[0]
+                detection.position.longitude = latlon[1]
+                detection.id = track.id
+                self.buoy_position_publisher.publish(detection)
+
+    def associate_detections_to_tracks(self, tracks, detections_enu, max_distance=3):
+        if len(tracks) == 0:
+            return [], set(range(len(detections_enu)))
+        
+        if len(detections_enu) == 0:
+            return [], []
+
+        cost_matrix = np.zeros((len(tracks), len(detections_enu)), dtype=np.float32)
+        for t, track in enumerate(tracks):
+            predicted_enu = track.predict()
+            #self.get_logger().info(f"Predicted enu: {predicted_enu}")
+            for d, detection_enu in enumerate(detections_enu):
+                # Now we use ENU coordinates directly here
+                cost_matrix[t, d] = np.linalg.norm(np.array(predicted_enu) - np.array(detection_enu))
+        
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+        matches = []
+        unmatched_detections = set(range(len(detections_enu)))
+        unmatched_tracks = set(range(len(tracks)))
+
+        for r, c in zip(row_ind, col_ind):
+            #self.get_logger().info(f"Cost matrix: {cost_matrix[r, c]}")
+            if cost_matrix[r, c] < max_distance:
+                matches.append((r, c))
+                unmatched_detections.remove(c)
+                unmatched_tracks.remove(r)
+
+        return matches, list(unmatched_detections)#, list(unmatched_tracks)
+
+    def listener_callback(self, data) -> None:
         # Convert ROS Image message to OpenCV image
         current_frame = self.bridge.imgmsg_to_cv2(data, 'bgr8')
         #self.get_logger().info("frame width: "+str(current_frame.shape))
@@ -161,14 +257,29 @@ class BuoyDetection(Node):
         image = cv2.undistort(current_frame, camera_matrix, distortion_coefficients)
 
         contours = self.detect_orange_objects(image)
+        detections = [self.calculate_object_center(contour) for contour in contours]
+        #self.get_logger().info(f"detections: {detections}")
 
-        for contour in contours:
-            cX, cY = self.calculate_object_center(contour)
-            Z = self.calculate_depth(contour)
-            #self.get_logger().info("Depth: "+str(Z))
-            world_coordinates = self.pixel_to_world(cX, cY, Z, FX*self.current_x_scaling_factor, FY*self.current_y_scaling_factor, CX*self.current_x_scaling_factor, CY*self.current_y_scaling_factor)
-            #self.get_logger().info(f"Object World Coordinates: {world_coordinates}")
-            self.buoy_position_publisher.publish(calculate_offset_position(self.latitude, self.longitude, self.heading, world_coordinates[2], world_coordinates[0]))
+        detections_latlon = []
+        for triplet in detections:
+            world_coords = self.pixel_to_world(triplet[0], triplet[1], triplet[2], FX*self.current_x_scaling_factor, FY*self.current_y_scaling_factor, CX*self.current_x_scaling_factor, CY*self.current_y_scaling_factor)
+            latlon = calculate_offset_position(self.latitude, self.longitude, self.heading, world_coords[2], world_coords[0])
+            detections_latlon.append((latlon.latitude, latlon.longitude))
+        #self.get_logger().info(f"detections_latlon: {detections_latlon}")
+
+        detections_enu = [geodetic_to_enu(lat, lon) for lat, lon in detections_latlon]
+        #self.get_logger().info(f"detections_enu: {detections_enu}")
+        
+        matches, unmatched_detections = self.associate_detections_to_tracks(self.tracks, detections_enu)
+        
+        for track_idx, detection_idx in matches:
+            self.tracks[track_idx].update(detections_enu[detection_idx])
+
+        for idx in unmatched_detections:
+            enu = detections_enu[idx]
+            self.tracks.append(Track(enu[0], enu[1]))
+
+        self.publish_tracks()
 
 
     def fill_holes(self, image):
@@ -254,7 +365,9 @@ class BuoyDetection(Node):
             cY = int(M["m01"] / M["m00"])
         else:
             cX, cY = 0, 0
-        return cX, cY
+        
+        cZ = self.calculate_depth(contour)
+        return cX, cY, cZ
 
     def pixel_to_world(self, x_pixel, y_pixel, depth, f_x, f_y, c_x, c_y):
         """
