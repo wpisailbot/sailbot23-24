@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     map_name = DeclareLaunchArgument(
         'map_name',
-        default_value="quinsigamond",
+        default_value="webster_medres",
         description="The text before the first ':' in the map file name"
     )
     config_file_path = os.path.join(
@@ -106,7 +106,13 @@ def generate_launch_description():
         output='screen'
     )
     
-    
+    fake_movement_node = Node(
+        package='sailbot',
+        executable='fake_movement',
+        name='fake_movement',
+        namespace='',
+        output='screen'
+    )
     # Launch Description
     ld = launch.LaunchDescription()
     #ld.add_action(managed_node_names)
@@ -124,4 +130,5 @@ def generate_launch_description():
 
     ld.add_action(state_manager_node)
     ld.add_action(pathfinder_node)
+    ld.add_action(fake_movement_node)
     return ld

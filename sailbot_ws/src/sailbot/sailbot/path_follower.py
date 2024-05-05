@@ -5,7 +5,7 @@ from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from geographic_msgs.msg import GeoPoint
-from sailbot_msgs.msg import GeoPath, Waypoint, WaypointPath, Wind, GaussianThreat
+from sailbot_msgs.msg import GeoPath, Waypoint, WaypointPath, Wind, GaussianThreat, BuoyDetectionStamped
 from sailbot_msgs.srv import SetMap, GetPath, SetThreat
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -98,19 +98,23 @@ class PathFollower(LifecycleNode):
 
     previous_look_ahead_index = 0
 
-    #waypoint_indices = []
+    waypoint_segment_last_coords = [] 
+    grid_points = []
+    exact_points = []
 
     last_recalculation_time = time.time()
 
-    current_buoy_position = None
+    current_buoy_positions = {}
+    buoy_snap_latlongs = {}
+    last_waypoint_was_rounding_type = False
 
     waypoint_threat_id_map = {}
 
     def __init__(self):
         super().__init__('path_follower')
         # Using different callback groups for subscription and service client
-        self.subscription_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
-        self.service_client_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
+        self.subscription_callback_group = rclpy.callback_groups.MutuallyExclusiveCallbackGroup()
+        self.service_client_callback_group = rclpy.callback_groups.MutuallyExclusiveCallbackGroup()
 
         self.target_position_publisher: Optional[Publisher]
         self.current_path_publisher: Optional[Publisher]
@@ -237,7 +241,7 @@ class PathFollower(LifecycleNode):
                 10,
                 callback_group=self.subscription_callback_group)
             self.buoy_position_subscriber = self.create_subscription(
-                GeoPoint,
+                BuoyDetectionStamped,
                 'buoy_position',
                 self.buoy_position_callback,
                 10,
@@ -295,7 +299,7 @@ class PathFollower(LifecycleNode):
         if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
             self.current_grid_cell = new_grid_cell
             self.get_logger().info("Recalculating path")
-            self.recalculate_path_from_waypoints()
+            self.recalculate_path_from_exact_points()
             self.last_recalculation_time = time.time()
             
         self.find_look_ahead()
@@ -319,7 +323,7 @@ class PathFollower(LifecycleNode):
         end_point.y = float(goal[1])
         req.start = start_point
         req.end = end_point
-        req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_PRMSTAR
+        req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_ASTAR
         
         #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along +y axis.
         wind_angle_adjusted = self.wind_angle_deg-90
@@ -329,7 +333,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Getting path")
         #synchronous service call because ROS2 async doesn't work in callbacks
         result = self.get_path_cli.call(req)
-        #rclpy.spin_until_future_complete(self, future)
+
         self.get_logger().info("Path returned!")
         return result
     
@@ -383,8 +387,80 @@ class PathFollower(LifecycleNode):
         
         return relevant
 
-    waypoint_segment_last_coords = [] 
-    def recalculate_path_from_waypoints(self) -> None:
+    def remove_last_points_if_necessary(self, next_point):
+        # Remove points from last rounding waypoint if necessary
+        if(self.last_waypoint_was_rounding_type):
+            num_points = len(self.exact_points)
+            if(num_points>1):
+                p1 = self.exact_points[num_points-2]
+                if(num_points>2):
+                    p0 = self.exact_points[num_points-3]
+                    d0 = great_circle((p0.latitude, p0.longitude), next_point).meters
+                d1 = great_circle((p1.latitude, p1.longitude), next_point).meters
+                if(num_points>2 and d0<d1):
+                    self.exact_points.pop()
+                    self.exact_points.pop()
+                    self.grid_points.pop()
+                    self.grid_points.pop()
+                else:
+                    p2 = self.exact_points[num_points-1]
+                    d2 = great_circle((p2.latitude, p2.longitude), next_point).meters
+                    if(d1<d2):
+                        self.exact_points.pop()
+                        self.grid_points.pop()
+
+    def calculate_exact_points_from_waypoint(self, waypoint_msg) -> None:
+        #self.waypoint_indices = []
+        
+        self.grid_points = []
+        self.exact_points = []
+        closestDistance = float('inf')
+        closestBuoyKey = None
+        for key in self.current_buoy_positions.keys():
+            buoy_detection = self.current_buoy_positions[key]
+            distance = geodesic((buoy_detection.position.latitude, buoy_detection.position.longitude), (waypoint_msg.point.latitude, waypoint_msg.point.longitude)).meters
+            if(distance<self.buoy_snap_distance_meters and distance<closestDistance):
+                closestDistance = distance
+                closestBuoyKey = key
+        
+        if (waypoint_msg.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
+            self.get_logger().info(f"Intersect")
+            self.grid_points.append(self.latlong_to_grid_proj(waypoint_msg.point.latitude, waypoint_msg.point.longitude, self.bbox, self.image_width, self.image_height))
+            self.remove_last_points_if_necessary(next_point=(waypoint_msg.point.latitude, waypoint_msg.point.longitude))
+            self.last_waypoint_was_rounding_type = False
+            self.exact_points.append(waypoint_msg.point)
+        else:
+
+            previousPoint = None
+            if(len(self.exact_points) != 0):
+                previousPoint = self.exact_points[-1]
+            else:
+                previousPoint = GeoPoint(latitude=self.latitude, longitude=self.longitude)
+
+            corners = []
+            adjustedPoint = waypoint_msg.point
+            if(closestBuoyKey is not None):
+                adjustedPoint = self.current_buoy_positions[closestBuoyKey]
+                threat_id = self.waypoint_threat_id_map[(waypoint_msg.point.latitude, waypoint_msg.point.longitude)]
+                self.get_logger().info(f"Threat of id {threat_id} being modified")
+                self.add_threat(Waypoint(point=self.current_buoy_positions[closestBuoyKey], type=waypoint_msg.type), id=threat_id)
+                self.get_logger().info(f"Snapping point to buoy: {self.current_buoy_positions[closestBuoyKey]}")
+            if waypoint_msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT:
+                corners = self.get_square_corners((previousPoint.latitude, previousPoint.longitude), (adjustedPoint.latitude, adjustedPoint.longitude), self.buoy_rounding_distance_meters, "right")
+                self.get_logger().info(f"Circle right {corners}")
+            elif waypoint_msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
+                self.get_logger().info(f"Circle left {corners}")
+                corners = self.get_square_corners((previousPoint.latitude, previousPoint.longitude), (adjustedPoint.latitude, adjustedPoint.longitude), self.buoy_rounding_distance_meters, "left")
+
+            self.remove_last_points_if_necessary(next_point=corners[0])
+
+            for corner in corners:
+                self.grid_points.append(self.latlong_to_grid_proj(corner[0], corner[1], self.bbox, self.image_width, self.image_height))
+                self.exact_points.append(GeoPoint(latitude = corner[0], longitude = corner[1]))
+
+            self.last_waypoint_was_rounding_type = True
+
+    def recalculate_path_from_exact_points(self) -> None:
         if self.wind_angle_deg is None:
             self.get_logger().info("No wind reported yet, cannot path")
             return
@@ -392,90 +468,34 @@ class PathFollower(LifecycleNode):
         # Reset look-ahead, since previous values are not relevant anymore
         self.previous_look_ahead_index = 0
 
-        #self.waypoint_indices = []
-        
-        grid_points = []
-        exact_points = []
-
-        index=0
-        buoy_snap_index = None
-        if(self.current_buoy_position is not None):
-            closestDistance = float('inf')
-            for waypoint in self.waypoints.waypoints:
-                if (waypoint.type != Waypoint.WAYPOINT_TYPE_INTERSECT):
-                    distance = geodesic((self.current_buoy_position.latitude, self.current_buoy_position.longitude), (waypoint.point.latitude, waypoint.point.longitude)).meters
-                    if(distance<self.buoy_snap_distance_meters and distance<closestDistance):
-                        closestDistance = distance
-                        buoy_snap_index = index
-                index+=1
-        
-        waypointIndex = 0
-        for waypoint in self.waypoints.waypoints:
-            #if we just want to intersect the point, we can add it directly
-            if (waypoint.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
-                self.get_logger().info(f"Intersect")
-                grid_points.append(self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height))
-                exact_points.append(waypoint.point)
-                self.waypoint_segment_last_coords.append(waypoint.point)
-            #otherwise, we need to do some math
-            else:
-                nextPoint = None
-                if(len(self.waypoints.waypoints)>waypointIndex+1):
-                    nextPoint = self.waypoints.waypoints[waypointIndex+1].point
-                previousPoint = None
-                if(waypointIndex != 0):
-                    previousPoint = self.waypoints.waypoints[waypointIndex-1].point
-                else:
-                    previousPoint = GeoPoint(latitude=self.latitude, longitude=self.longitude)
-
-                corners = []
-                adjustedPoint = waypoint.point
-                if(buoy_snap_index is not None and buoy_snap_index == waypointIndex):
-                    adjustedPoint = self.current_buoy_position
-                    threat_id = self.waypoint_threat_id_map[(waypoint.point.latitude, waypoint.point.longitude)]
-                    self.get_logger().info(f"Threat of id {threat_id} being modified")
-                    self.add_threat(Waypoint(point=self.current_buoy_position, type=waypoint.type), id=threat_id)
-                    self.get_logger().info(f"Snapping index {buoy_snap_index} to buoy: {self.current_buoy_position}")
-                if waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT:
-                    corners = self.get_relevant_square_corners(adjustedPoint, previousPoint, nextPoint, "right")
-                    self.get_logger().info(f"Circle right {corners}")
-                elif waypoint.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
-                    self.get_logger().info(f"Circle left {corners}")
-                    corners = self.get_relevant_square_corners(adjustedPoint, previousPoint, nextPoint, "left")
-                for corner in corners:
-                    grid_points.append(self.latlong_to_grid_proj(corner[0], corner[1], self.bbox, self.image_width, self.image_height))
-                    exact_points.append(GeoPoint(latitude = corner[0], longitude = corner[1]))
-                if(len(corners)>0):
-                    self.waypoint_segment_last_coords.append(GeoPoint(latitude = corners[-1][0], longitude=corners[-1][1]))
-
-
-            waypointIndex+=1
-
-        if len(grid_points) == 0:
+        if len(self.grid_points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
             self.current_path = GeoPath()
             self.current_path_publisher.publish(self.current_path)
             return
         path_segments = []
-        path_segments.append(self.get_path(self.current_grid_cell, grid_points[0]).path)
-        for i in range(len(grid_points)-1):
-            path_segments.append(self.get_path(grid_points[i], grid_points[i+1]).path)
+        path_segments.append(self.get_path(self.current_grid_cell, self.grid_points[0]).path)
+        for i in range(len(self.grid_points)-1):
+            path_segments.append(self.get_path(self.grid_points[i], self.grid_points[i+1]).path)
         
+        self.get_logger().info("Calculated all path segments")
         for segment in path_segments:
            segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
 
         final_path = GeoPath()
-        
+        final_grid_path = []
         i=-1
         k=0
+        final_grid_path.append(Point(x=float(self.current_grid_cell[0]), y=float(self.current_grid_cell[1])))
         final_path.points.append(GeoPoint(latitude=self.latitude, longitude=self.longitude))
+
+        # Track the indices in the current path which correspond to endpoints of straight-line path segments
+        segment_endpoint_indices = [0]
         for segment in path_segments:
             #skip failed waypoints
             if(len(segment.poses)==0):
                 continue 
-            #append exact start position
-            # if i!=-1:
-            #     final_path.points.append(exact_points[i])
+
             for j in range(1, len(segment.poses)-1):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
@@ -484,11 +504,15 @@ class PathFollower(LifecycleNode):
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
                 geopoint.longitude = lon
+                #append latlon position to global path, and grid point to grid path
                 final_path.points.append(geopoint)
+                final_grid_path.append(point)
                 k+=1
             #append exact final position
-            self.get_logger().info(f"num waypoints: {len(exact_points)}, i: {i}")
-            final_path.points.append(exact_points[i+1])
+            self.get_logger().info(f"num exact points: {len(self.exact_points)}, i: {i}")
+            final_path.points.append(self.exact_points[i+1])
+            final_grid_path.append(segment.poses[len(segment.poses)-1].pose.position)
+            segment_endpoint_indices.append(len(segment.poses)-1)
             #self.waypoint_indices.append(k)
             i+=1
 
@@ -496,12 +520,17 @@ class PathFollower(LifecycleNode):
         self.get_logger().info(f"New path: {final_path.points}")
         self.current_path_publisher.publish(final_path)
         self.current_path = final_path
+        self.current_grid_path = final_grid_path
+        self.segment_endpoint_indices = segment_endpoint_indices
 
+    #currently only used to clear points.
     def waypoints_callback(self, msg: WaypointPath) -> None:
         self.get_logger().info("Got waypoints!")
         self.waypoints = msg
         self.clear_threats()
-        self.recalculate_path_from_waypoints()
+        self.exact_points = []
+        self.grid_points = []
+        self.recalculate_path_from_exact_points()
         self.find_look_ahead()
         self.get_logger().info("Ending waypoints callback")
     
@@ -519,7 +548,7 @@ class PathFollower(LifecycleNode):
     def add_threat(self, waypoint, id=-1) -> None:
         threat = GaussianThreat()
         threat.size = self.buoy_threat_size_map_units
-        threat.intensity = 1.0
+        threat.intensity = self.buoy_threat_guassian_intensity
         x, y = self.latlong_to_grid_proj(waypoint.point.latitude, waypoint.point.longitude, self.bbox, self.image_width, self.image_height)
         threat.center.x = float(x)
         threat.center.y = float(y)
@@ -541,7 +570,8 @@ class PathFollower(LifecycleNode):
         self.waypoints.waypoints.append(msg)
         if msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT or msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
             self.add_threat(msg)
-        self.recalculate_path_from_waypoints()
+        self.calculate_exact_points_from_waypoint(msg)
+        self.recalculate_path_from_exact_points()
         self.find_look_ahead()
         self.get_logger().info("Ending single waypoint callback")
 
@@ -549,8 +579,8 @@ class PathFollower(LifecycleNode):
     def true_wind_callback(self, msg: Wind) -> None:
         self.wind_angle_deg = msg.direction
 
-    def buoy_position_callback(self, msg: GeoPoint) -> None:
-        self.current_buoy_position = msg
+    def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
+        self.current_buoy_positions[msg.id] = msg
     
     def find_look_ahead(self) -> None:
         if len(self.current_path.points) == 0:
@@ -574,21 +604,12 @@ class PathFollower(LifecycleNode):
                 return
             else:
                 #remove waypoints if we've passed the last point in their segment
-                if(point.latitude == self.waypoint_segment_last_coords[0].latitude and point.longitude == self.waypoint_segment_last_coords.longitude):
-                    self.waypoints.waypoints.pop(0)
-                    self.waypoint_segment_last_coords.pop(0)
-            #     if(i==self.waypoint_indices[0]):
-            #         self.get_logger().info(f"Num waypoint indices: {len(self.waypoint_indices)}, num waypoints: {len(self.waypoints.waypoints)}")
-            #         self.waypoint_indices.pop(0)
-            #         self.waypoints.waypoints.pop(0)
+                self.get_logger().info(f"Point is: {point}")
+                if(point.latitude == self.exact_points[0].latitude and point.longitude == self.exact_points[0].longitude):
+                    self.get_logger().info("Removing passed exact point")
+                    self.grid_points.pop(0)
+                    self.exact_points.pop(0)
 
-    # def find_look_ahead(self):
-    #     if len(self.current_path.points) == 0:
-    #         #self.get_logger().info("No lookAhead point for zero-length path")
-    #         return
-    #     look_ahead_point = self.find_look_ahead_point(self.current_path.points, (self.latitude, self.longitude), self.speed_knots)
-    #     self.get_logger().info(f"Calulated lookAhead point: {look_ahead_point.latitude}, {look_ahead_point.longitude}")
-    #     self.target_position_publisher.publish(look_ahead_point)
 
     def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
         """

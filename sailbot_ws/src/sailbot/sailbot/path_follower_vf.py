@@ -350,11 +350,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Getting path")
         #synchronous service call because ROS2 async doesn't work in callbacks
         result = self.get_path_cli.call(req)
-        # while rclpy.ok():
-        #     rclpy.spin_once(self)
-        #     if future.done():
-        #         break
-        # result = future.result()
+
         self.get_logger().info("Path returned!")
         return result
     
@@ -600,7 +596,7 @@ class PathFollower(LifecycleNode):
     def true_wind_callback(self, msg: Wind) -> None:
         self.wind_angle_deg = msg.direction
 
-    def buoy_position_callback(self, msg: GeoPoint) -> None:
+    def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg
     
     def find_look_ahead(self) -> None:

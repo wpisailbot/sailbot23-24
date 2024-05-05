@@ -81,6 +81,9 @@ class HeadingController(LifecycleNode):
 
         self.rudder_angle_publisher = self.create_lifecycle_publisher(Int16, 'rudder_angle', 10)
 
+        self.target_heading_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_heading', 10)
+
+
         self.target_position_subscription = self.create_subscription(
             GeoPoint,
             'target_position',
@@ -272,6 +275,11 @@ class HeadingController(LifecycleNode):
             return
         
         heading_error = self.getRotationToPointLatLong(self.heading, self.latitude, self.longitude, self.target_position.latitude, self.target_position.longitude)
+        target_heading = self.heading-heading_error
+        target_heading_msg = Float64()
+        target_heading_msg.data = target_heading
+        self.target_heading_debug_publisher.publish(target_heading_msg)
+
         self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} pos: {self.latitude}, {self.longitude} to pos: {self.target_position.latitude}, {self.target_position.longitude}")
         #self.rudder_simulator.input['heading_error'] = heading_error
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
@@ -286,7 +294,7 @@ class HeadingController(LifecycleNode):
         # If we are tacking, turn as hard as possible.
         # Trim tab controller will see this and skip over min_lift
         if(self.wind_direction_deg is not None):
-            if(self.needs_to_tack(self.heading, self.heading+heading_error ,self.wind_direction_deg)):
+            if(self.needs_to_tack(self.heading, target_heading ,self.wind_direction_deg)):
                 if(self.rudder_angle>0):
                     self.rudder_angle = 31
                 else:
