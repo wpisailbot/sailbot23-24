@@ -190,6 +190,8 @@ class NetworkComms(LifecycleNode):
 
         self.autonomous_mode_publisher = self.create_lifecycle_publisher(AutonomousMode, 'autonomous_mode', 10)
 
+        self.vf_forward_magnitude_publisher = self.create_lifecycle_publisher(Float64, 'vf_forward_magnitude', 10)
+
         self.rot_subscription = self.create_subscription(
             Float64,
             'airmar_data/rate_of_turn',
@@ -636,6 +638,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteSetWaypointsCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteAddWaypointCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteSetVFForwardMagnitudeCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_StreamBoatStateServiceServicer_to_server(self, self.grpc_server)
@@ -776,6 +779,19 @@ class NetworkComms(LifecycleNode):
         self.get_logger().info("Publishing single waypoint")
         self.single_waypoint_publisher.publish(waypoint)
         return response
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteSetVFForwardMagnitudeCommand(self, command: control_pb2.SetVFForwardMagnitudeCommand, context):
+        self.get_logger().info("Got VF forward magnitude command")
+
+        msg = Float64()
+        msg.data = command.magnitude
+        self.vf_forward_magnitude_publisher.publish(msg)
+
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
+        return response
+
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def GetMap(self, command: boat_state_pb2.MapRequest, context):
@@ -789,7 +805,6 @@ class NetworkComms(LifecycleNode):
         response.east = self.bbox['east']
         response.west = self.bbox['west']
         return response
-
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest, context):

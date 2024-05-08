@@ -118,6 +118,11 @@ class HeadingController(LifecycleNode):
             'true_wind_smoothed',
             self.true_wind_callback,
             10)
+        self.vf_forward_magnitude_subscription = self.create_subscription(
+            Float64,
+            'vf_forward_magnitude',
+            self.forward_magnitude_callback,
+            10)
         self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
         
@@ -248,6 +253,9 @@ class HeadingController(LifecycleNode):
 
     def true_wind_callback(self, msg: Wind) -> None:
         self.wind_direction_deg = msg.direction
+
+    def forward_magnitude_callback(self, msg: Float64) -> None:
+        self.lambda_base = msg.data
     
     def needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
         # Normalize angles
