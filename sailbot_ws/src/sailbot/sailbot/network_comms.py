@@ -416,7 +416,7 @@ class NetworkComms(LifecycleNode):
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
-        super().on_deactivate(state)
+        return super().on_deactivate(state)
 
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Cleaning up...")
@@ -838,19 +838,22 @@ class NetworkComms(LifecycleNode):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def RestartNode(self, command: node_restart_pb2.RestartNodeRequest, context):
         self.get_logger().info("Received restart command for: "+command.node_name)
-        # restart_node_request = RestartNode.Request()
-        # restart_node_request.node_name = command.node_name
-        # if(self.restart_node_client.wait_for_service(3) is False):
-        #     self.get_logger().error("Client service not available for state manager!")
-        #     response.success = False
-        #     return response
-        # future = self.restart_node_client.call_async(restart_node_request)
-        # self.get_logger().info("About to spin")
-        # rclpy.spin_until_future_complete(self, future)
-        # self.get_logger().info("completed command")
-        result = self.restart_lifecycle_node_by_name(command.node_name)
+        restart_node_request = RestartNode.Request()
+        restart_node_request.node_name = command.node_name
+
         response = node_restart_pb2.RestartNodeResponse()
-        response.success = result
+        if(self.restart_node_client.wait_for_service(3) is False):
+            self.get_logger().error("Client service not available for state manager!")
+            response.success = False
+            return response
+        
+        result = self.restart_node_client.call(restart_node_request)
+        #self.get_logger().info("About to spin")
+        #rclpy.spin_until_future_complete(self, future)
+        #self.get_logger().info("completed command")
+        
+        #result = self.restart_lifecycle_node_by_name(command.node_name)
+        response.success = result.success
         self.get_logger().info("Restart node: "+str(result))
         return response
     

@@ -119,7 +119,7 @@ class BallastControl(LifecycleNode):
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
-        super().on_deactivate(state)
+        return super().on_deactivate(state)
 
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Cleaning up...")

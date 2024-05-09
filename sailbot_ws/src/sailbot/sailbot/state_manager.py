@@ -73,7 +73,7 @@ class StateManager(Node):
     def restart_lifecycle_node_callback(self, request, response):
         node_name = request.node_name
         try:
-            #self.restart_node(node_name)
+            self.restart_node(node_name)
             response.success = True
             response.message = f"Node {node_name} restarted successfully."
         except Exception as e:
@@ -84,16 +84,18 @@ class StateManager(Node):
 
     # Incomplete- services calling services doesn't really work
     def restart_node(self, node_name):
+        self.get_logger().info("Getting node state")
         current_state = self.get_node_state(node_name)
-
+        self.get_logger().info(f"Current state: {current_state}")
+        self.get_logger().info("Setting node state")
         if current_state in ['unconfigured', 'inactive', 'active']:
-            self.change_node_state(node_name, Transition.TRANSITION_DEACTIVATE)
-            self.change_node_state(node_name, Transition.TRANSITION_CLEANUP)
-            self.change_node_state(node_name, Transition.TRANSITION_CONFIGURE)
-            self.change_node_state(node_name, Transition.TRANSITION_ACTIVATE)
+            self.change_node_state_sync(node_name, Transition.TRANSITION_DEACTIVATE)
+            self.change_node_state_sync(node_name, Transition.TRANSITION_CLEANUP)
+            self.change_node_state_sync(node_name, Transition.TRANSITION_CONFIGURE)
+            self.change_node_state_sync(node_name, Transition.TRANSITION_ACTIVATE)
         elif current_state == 'finalized' or current_state is None:
-            self.change_node_state(node_name, Transition.TRANSITION_CONFIGURE)
-            self.change_node_state(node_name, Transition.TRANSITION_ACTIVATE)
+            self.change_node_state_sync(node_name, Transition.TRANSITION_CONFIGURE)
+            self.change_node_state_sync(node_name, Transition.TRANSITION_ACTIVATE)
         else:
             self.get_logger().info(f'Node {node_name} is in an unknown state: {current_state}')
 
@@ -114,14 +116,14 @@ class StateManager(Node):
             self.get_logger().info(f'Waiting for {node_name} GetState service...')
         
         request = GetState.Request()
-        future = cli.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-
-        if future.result() is not None:
-            return future.result().current_state.label
-        else:
-            self.get_logger().error('Failed to call get_state service')
-            return None
+        result = cli.call(request)
+        #rclpy.spin_until_future_complete(self, future)
+        return result.current_state.label
+        # if future.result() is not None:
+        #     return future.result().current_state.label
+        # else:
+        #     self.get_logger().error('Failed to call get_state service')
+        #     return None
 
     def change_node_state(self, node_name, transition):
         # Create a service client for ChangeState
@@ -141,6 +143,24 @@ class StateManager(Node):
         else:
             self.get_logger().error('Failed to call change_state service')
             return False
+    
+    def change_node_state_sync(self, node_name, transition):
+        # Create a service client for ChangeState
+        cli = self.client_state_setters[node_name]#self.create_client(ChangeState, f'{node_name}/change_state')
+        while not cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(f'Waiting for {node_name} ChangeState service...')
+        
+        request = ChangeState.Request()
+        request.transition.id = transition
+        self.get_logger().info("Before call")
+        result = cli.call(request)
+
+        if result is not None:
+            self.get_logger().info(f'State changed successfully in {node_name}')
+            return True
+        else:
+            self.get_logger().error('Failed to call change_state service')
+            return False
             
 
 def main(args=None):
@@ -148,7 +168,7 @@ def main(args=None):
     state_manager = StateManager()
 
     # Use the SingleThreadedExecutor to spin the node.
-    executor = SingleThreadedExecutor()
+    executor = MultiThreadedExecutor()
     executor.add_node(state_manager)
 
     try:

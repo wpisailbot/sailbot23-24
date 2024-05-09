@@ -275,7 +275,7 @@ class PathFollower(LifecycleNode):
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Deactivating...")
-        super().on_deactivate(state)
+        return super().on_deactivate(state)
 
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Cleaning up...")
@@ -366,6 +366,27 @@ class PathFollower(LifecycleNode):
         return degrees(initial_bearing)
 
     def get_square_corners(self, A, B, side_length, direction) -> List[Tuple[float, float]]:
+        """
+        Calculates the corners of a square around point B, based on the direction from point A to B and a specified side length.
+        The square is oriented such that its sides are either perpendicular or parallel to the line from A to B depending on the direction.
+
+        :param A: A tuple (latitude, longitude) representing the starting point.
+        :param B: A tuple (latitude, longitude) representing the end point or the center of the square.
+        :param side_length: The side length of the square.
+        :param direction: A string indicating the direction to rotate the square ('right' or 'left') around point B.
+
+        :return: A list of tuples representing the geographic coordinates (latitude, longitude) of the square's corners.
+                The order of corners depends on the specified direction.
+
+        Function behavior includes:
+        - Calculating the diagonal distance of the square based on the side length.
+        - Determining the initial bearing from point A to point B.
+        - Calculating bearings for each corner of the square using the initial bearing and adding specific angles.
+        - Using the geodesic method to find the exact locations for each corner based on these bearings.
+        - Returning the corners in a specific order depending on whether the direction is 'right' or 'left'.
+
+        This function is used to calculate intermediate targets for buoy rounding maneuvers.
+        """
         # Convert side length to diagonal distance
         diagonal_distance = (side_length * sqrt(2)) / 2  # Half diagonal for geodesic distance
         
@@ -405,6 +426,24 @@ class PathFollower(LifecycleNode):
         return relevant
 
     def remove_last_points_if_necessary(self, next_point):
+        """
+        Removes points from the list of exact points and grid points if they are deemed unnecessary based on their distance
+        to a new point ('next_point'). This function is called when adding waypoints, and is intended to remove unwanted rounding 
+        segments generated around a previous rounding waypoint.
+
+        :param next_point: A tuple (latitude, longitude) representing the next point's geographic coordinates.
+
+        :return: None. Modifies the internal lists `exact_points` and `grid_points` by potentially removing points that
+                are no longer relevant after analyzing the new point's proximity to the previous points.
+
+        Function behavior includes:
+        - Checking if the last processed waypoint was a rounding type.
+        - Comparing distances between consecutive exact points and the next point.
+        - Removing points from both `exact_points` and `grid_points` if the conditions indicate that newer points
+        have looped back and are curther away than earlier points, requiring a path correction
+
+        This function is intended to ensure buoy rounding paths are sensible.
+        """
         # Remove points from last rounding waypoint if necessary
         if(self.last_waypoint_was_rounding_type):
             num_points = len(self.exact_points)
