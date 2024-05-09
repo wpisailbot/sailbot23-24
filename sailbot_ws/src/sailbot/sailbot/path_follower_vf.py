@@ -426,8 +426,27 @@ class PathFollower(LifecycleNode):
                         self.exact_points.pop()
                         self.grid_points.pop()
 
-    def calculate_exact_points_from_waypoint(self, waypoint_msg) -> None:
-        #self.waypoint_indices = []
+    def calculate_exact_points_from_waypoint(self, waypoint_msg: Waypoint) -> None:
+        """
+        Processes a waypoint message to calculate exact geographic points that the path follower node should navigate through.
+        Depending on the type of waypoint, this function either calculates corner points for rounding maneuvers (either to the right or left), 
+        snapping to the closest buoy if within a defined proximity, or directly uses the waypoint's location.
+
+        The function updates the current path with exact geographic points and grid coordinates on the current map.
+
+        :param waypoint_msg: A sailbot_msgs/Waypoint message object containing waypoint information such as the latitude, longitude, and type of the waypoint.
+
+        :return: None. The function updates the instance's `exact_points` and `grid_points` lists with the calculated points.
+
+        Function behavior includes:
+        - Checking each buoy position for proximity to the waypoint and snapping to the closest buoy if applicable.
+        - Handling different types of waypoints like intersection, circle right, and circle left by generating respective path adjustments.
+        - Logging various state changes and decisions for debugging and monitoring purposes.
+        - Maintaining and updating the internal node state based on the type of the last waypoint processed.
+
+        This function assumes that `latitude`, `longitude`, `bbox`,
+        `image_width`, and `image_height` are available within the class instance and are appropriately set before calling this function.
+        """
         
         self.grid_points = []
         self.exact_points = []
@@ -478,6 +497,27 @@ class PathFollower(LifecycleNode):
             self.last_waypoint_was_rounding_type = True
 
     def recalculate_path_from_exact_points(self) -> None:
+        """
+        Recalculates the current path based on exact geographic points and grid coordinates determined by previous processing.
+        This function constructs the path segment by segment, updating it with any changes in conditions or coordinates.
+
+        The function checks for wind conditions, recalculates path segments between exact points, and publishes the updated path.
+
+        :return: None. The function directly updates the `current_path` and `current_grid_path` attributes of the instance, 
+                and publishes the new path to a designated topic.
+
+        Function behavior includes:
+        - Verifying if wind conditions are reported; if not, the function logs a message and exits without updating the path.
+        - If there are no waypoints to process (i.e., if `grid_points` is empty), the function clears the current path and logs this event.
+        - Creating a new path by connecting all exact points through calculated segments, while taking into account wind angle.
+        - Dynamically inserting intermediate points into path segments to enhance navigation precision.
+        - Publishing the newly calculated path for use by the navigation system.
+        - Logging various state changes and decisions for debugging and monitoring purposes.
+
+        This function assumes that `current_grid_cell` and `grid_points` are available within the class instance 
+        and are appropriately set before calling this function.
+        """
+         
         if self.wind_angle_deg is None:
             self.get_logger().info("No wind reported yet, cannot path")
             return
@@ -562,7 +602,27 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("Threat removed")
 
 
-    def add_threat(self, waypoint, id=-1) -> None:
+    def add_threat(self, waypoint: Waypoint, id=-1) -> None:
+        """
+        Adds a threat to the system based on a waypoint's geographic location by converting it into a Gaussian threat model.
+        This function also performs a synchronous service call to register the threat in the system and optionally map the threat ID
+        back to the waypoint for subsequent adjustments.
+
+        :param waypoint: A `Waypoint` object that contains the latitude and longitude of the threat location.
+        :param id: An optional integer specifying the threat ID. If set to -1, a new threat ID is requested. Default is -1.
+
+        :return: None. The function updates the system with a new or adjusted threat model and logs the response.
+
+        Function behavior includes:
+        - Calculating grid coordinates from the waypoint's geographic coordinates.
+        - Configuring a GaussianThreat object with predefined size and intensity.
+        - Making a synchronous service call to set the threat in the pathfinding system.
+        - Logging the setting process and the response, including the assigned threat ID.
+        - Storing the assigned threat ID for position adjustment and reference.
+
+        This function assumes that `buoy_threat_size_map_units`, `buoy_threat_gaussian_intensity`,
+        `bbox`, `image_width`, `image_height`, and `set_threat_cli` (a ROS2 service client) are properly configured and available.
+        """
         threat = GaussianThreat()
         threat.size = self.buoy_threat_size_map_units
         threat.intensity = self.buoy_threat_guassian_intensity
@@ -583,6 +643,27 @@ class PathFollower(LifecycleNode):
         self.threat_ids.append(result.assigned_id)
 
     def single_waypoint_callback(self, msg: Waypoint) -> None:
+        """
+        Callback function that processes a single waypoint message. This function updates the waypoint list, calculates exact points, 
+        recalculates the path, and determines the look-ahead point based on the received waypoint message.
+
+        :param msg: A sailbot_msgs/Waypoint object that contains details such as the type of waypoint and its geographic coordinates.
+
+        :return: None. This function triggers a series of operations that update the internal state of the navigation system, 
+                including appending the waypoint to a list, potentially adding a threat to the map based on the waypoint type, 
+                recalculating the navigation path, and updating the look-ahead mechanism.
+
+        Function behavior includes:
+        - Logging receipt of a new waypoint.
+        - Appending the new waypoint to the `waypoints` list.
+        - Adding the waypoint as a threat if it is a rounding waypoint (either to the right or left).
+        - Calling the function to calculate exact points from the new waypoint.
+        - Recalculating the entire path based on updated waypoint data.
+        - Determining and updating the look-ahead point for navigation.
+        - Logging the completion of processing for the waypoint.
+
+        This function is intended to be used as a callback for a waypoint message subscriber in a ROS2 node environment.
+        """
         self.get_logger().info("Got single waypoint")
         self.waypoints.waypoints.append(msg)
         if msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT or msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
@@ -600,6 +681,25 @@ class PathFollower(LifecycleNode):
         self.current_buoy_positions[msg.id] = msg
     
     def find_look_ahead(self) -> None:
+        """
+        Determines and updates the vector field target segment based on the current navigation path. 
+        This function also handles publishing various navigation-related messages to update
+        the system's state and debug information.
+
+        :return: None. This function modifies the navigation state by publishing the current grid cell, target position, 
+                and path segments for display or further processing.
+
+        Function behavior includes:
+        - Publishing the current grid cell position.
+        - Early exit if the path has zero length.
+        - Iterating through path points to find the appropriate target path segment based on calculated distance.
+        - Conditionally publishing target positions and path segments for system updates and debugging.
+        - Checking if the next path point is closer than the current target to avoid backtracking.
+        - Managing and removing passed exact points to maintain an updated path.
+
+        This function assumes that instance attributes `latitude`, `longitude`, `current_path`, 
+        `current_grid_path`, and `exact_points` are properly initialized and available.
+        """
         grid_cell_msg = Point()
         grid_cell_msg.x = float(self.current_grid_cell[0])
         grid_cell_msg.y = float(self.current_grid_cell[1])
@@ -609,10 +709,6 @@ class PathFollower(LifecycleNode):
             #self.get_logger().info("No lookAhead point for zero-length path")
             return
         
-        base_distance = self.look_ahead_distance_meters  # Minimum look-ahead distance in meters
-        speed_factor = self.look_ahead_increase_per_knot   # How much the look-ahead distance increases per knot of speed
-        
-        look_ahead_distance = base_distance + speed_factor * self.speed_knots
         self.get_logger().info(f"Grid path length: {len(self.current_grid_path)}")
         num_points = len(self.current_path.points) 
         for i in range(self.previous_look_ahead_index, num_points-1):
@@ -657,19 +753,19 @@ class PathFollower(LifecycleNode):
         bearing = (90 - math.degrees(theta)) % 360
         return bearing
 
-    def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
+    def latlong_to_grid_proj(self, latitude: float, longitude: float, bbox: dict, image_width: int, image_height: int, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
         """
-        Convert lat/long coordinates to grid cell using pyproj for projection handling.
-        
-        Parameters:
-        - latitude, longitude: The lat/long coordinates to convert.
-        - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
-        - image_width, image_height: The dimensions of the image in pixels.
-        - src_proj: Source projection (latitude/longitude).
-        - dest_proj: Destination projection for the image.
+        Convert latitude and longitude coordinates to grid cell coordinates using pyproj for projection handling.
 
-        Returns:
-        - A tuple (x, y) representing the grid cell coordinates in the image.
+        :param latitude: The latitude coordinate to convert.
+        :param longitude: The longitude coordinate to convert.
+        :param bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
+        :param image_width: The width of the image in pixels.
+        :param image_height: The height of the image in pixels.
+        :param src_proj: Source projection (usually latitude/longitude).
+        :param dest_proj: Destination projection for converting geographic coordinates into grid coordinates.
+
+        :return: A tuple (x, y) representing the grid cell coordinates in the image.
         """
         transformer = Transformer.from_crs(src_proj, dest_proj, always_xy=True)
         north_east = transformer.transform(bbox['north'], bbox['east'])
@@ -688,19 +784,17 @@ class PathFollower(LifecycleNode):
         
         return x, y
 
-    def grid_to_latlong_proj(self, x, y, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[float, float]:
+    def grid_to_latlong_proj(self, x: int, y: int, bbox: dict, image_width, image_height) -> Tuple[float, float]:
         """
-        Convert grid cell coordinates in an image to latitude/longitude coordinates.
+        Convert grid cell coordinates in an image to latitude/longitude coordinates using specified projections.
 
-        Parameters:
-        - x, y: The pixel positions in the image.
-        - bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
-        - image_width, image_height: The dimensions of the image in pixels.
-        - src_proj: Source projection (latitude/longitude).
-        - dest_proj: Destination projection for the image.
+        :param x: The x-coordinate (pixel position) in the image.
+        :param y: The y-coordinate (pixel position) in the image.
+        :param bbox: A dictionary with keys 'north', 'south', 'east', 'west' representing the bounding box.
+        :param image_width: The width of the image in pixels.
+        :param image_height: The height of the image in pixels.
 
-        Returns:
-        - A tuple (latitude, longitude) representing the geographic coordinates.
+        :return: A tuple (latitude, longitude) representing the geographic coordinates.
         """
         
         # Transform the bounding box to the destination projection
@@ -723,6 +817,23 @@ class PathFollower(LifecycleNode):
         return latitude, longitude
     
     def insert_intermediate_points(self, path, num_per_unit_distance) -> List[PoseStamped]:
+        """
+        Inserts intermediate points into a given path segment to simplify more granular path following.
+        The number of points inserted between each pair of original points is determined by the distance between them
+        multiplied by a specified factor (`num_per_unit_distance`).
+
+        :param path: A list of `PoseStamped` objects representing the waypoints of a path segment.
+        :param num_per_unit_distance: A floating point number that determines how many points to insert per unit of distance
+                                    between each pair of consecutive waypoints in the path.
+
+        :return: A list of `PoseStamped` objects with the newly inserted intermediate points included.
+
+        Function behavior includes:
+        - Logging a warning and returning the original path if it has zero length.
+        - Dynamically calculating the number of intermediate points to insert based on the distance between consecutive waypoints.
+        - Using linear interpolation to determine the position of each intermediate point between each consecutive waypoint pair.
+        - Returning a new path list that includes both the original and the newly interpolated points.
+        """
         length = len(path)
         if(length  == 0):
             self.get_logger().warn("Called insert_intermediate_points on a zero length segment!")

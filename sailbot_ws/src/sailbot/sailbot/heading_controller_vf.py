@@ -123,6 +123,11 @@ class HeadingController(LifecycleNode):
             'vf_forward_magnitude',
             self.forward_magnitude_callback,
             10)
+        self.rudder_kp_subscription = self.create_subscription(
+            Float64,
+            'rudder_kp',
+            self.rudder_kp_callback,
+            10)
         self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
         
@@ -162,16 +167,16 @@ class HeadingController(LifecycleNode):
         rule4 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Small Positive'], rudder_adjustment['Small Negative'])
         rule5 = ctrl.Rule(heading_error['ZE'] & rate_of_change['Large Positive'], rudder_adjustment['Large Negative'])
 
-        rule6 = ctrl.Rule(heading_error['PM'] & rate_of_change['Large Negative'], rudder_adjustment['Small Negative'])
-        rule7 = ctrl.Rule(heading_error['PM'] & rate_of_change['Small Negative'], rudder_adjustment['Small Negative'])
+        rule6 = ctrl.Rule(heading_error['PM'] & rate_of_change['Large Negative'], rudder_adjustment['Small Positive'])
+        rule7 = ctrl.Rule(heading_error['PM'] & rate_of_change['Small Negative'], rudder_adjustment['Zero'])
         rule8 = ctrl.Rule(heading_error['PM'] & rate_of_change['Zero'], rudder_adjustment['Small Negative'])
         rule9 = ctrl.Rule(heading_error['PM'] & rate_of_change['Small Positive'], rudder_adjustment['Large Negative'])
         rule10 = ctrl.Rule(heading_error['PM'] & rate_of_change['Large Positive'], rudder_adjustment['Large Negative'])
 
         rule11 = ctrl.Rule(heading_error['PL'], rudder_adjustment['Large Negative'])
 
-        rule12 = ctrl.Rule(heading_error['NM'] & rate_of_change['Large Positive'], rudder_adjustment['Small Positive'])
-        rule13 = ctrl.Rule(heading_error['NM'] & rate_of_change['Small Positive'], rudder_adjustment['Small Positive'])
+        rule12 = ctrl.Rule(heading_error['NM'] & rate_of_change['Large Positive'], rudder_adjustment['Small Negative'])
+        rule13 = ctrl.Rule(heading_error['NM'] & rate_of_change['Small Positive'], rudder_adjustment['Zero'])
         rule14 = ctrl.Rule(heading_error['NM'] & rate_of_change['Zero'], rudder_adjustment['Small Positive'])
         rule15 = ctrl.Rule(heading_error['NM'] & rate_of_change['Small Negative'], rudder_adjustment['Large Positive'])
         rule16 = ctrl.Rule(heading_error['NM'] & rate_of_change['Large Negative'], rudder_adjustment['Large Positive'])
@@ -256,6 +261,9 @@ class HeadingController(LifecycleNode):
 
     def forward_magnitude_callback(self, msg: Float64) -> None:
         self.lambda_base = msg.data
+
+    def rudder_kp_callback(self, msg: Float64) -> None:
+        self.heading_kp = msg.data
     
     def needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
         # Normalize angles
@@ -344,7 +352,7 @@ class HeadingController(LifecycleNode):
         self.rudder_simulator.input['rate_of_change'] = delta_heading_error
         self.rudder_simulator.compute()
         rudder_value = self.rudder_simulator.output['rudder_adjustment']
-        self.rudder_angle += rudder_value#*self.heading_kp # Scale
+        self.rudder_angle += rudder_value*self.heading_kp # Scale
 
         if(self.rudder_angle>30):
             self.rudder_angle = 30

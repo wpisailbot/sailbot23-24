@@ -191,6 +191,7 @@ class NetworkComms(LifecycleNode):
         self.autonomous_mode_publisher = self.create_lifecycle_publisher(AutonomousMode, 'autonomous_mode', 10)
 
         self.vf_forward_magnitude_publisher = self.create_lifecycle_publisher(Float64, 'vf_forward_magnitude', 10)
+        self.rudder_kp_publisher = self.create_lifecycle_publisher(Float64, 'rudder_kp', 10)
 
         self.rot_subscription = self.create_subscription(
             Float64,
@@ -639,6 +640,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteAddWaypointCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetVFForwardMagnitudeCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteSetRudderKPCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_StreamBoatStateServiceServicer_to_server(self, self.grpc_server)
@@ -792,6 +794,17 @@ class NetworkComms(LifecycleNode):
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         return response
 
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteSetRudderKPCommand(self, command: control_pb2.SetRudderKPCommand, context):
+        self.get_logger().info("Got rudder kp command")
+
+        msg = Float64()
+        msg.data = command.kp
+        self.rudder_kp_publisher.publish(msg)
+
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
+        return response
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def GetMap(self, command: boat_state_pb2.MapRequest, context):
