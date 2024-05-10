@@ -389,17 +389,21 @@
 <span class="sd">        :param msg: A message containing the rudder angle as an integer.</span>
 
 <span class="sd">        **Process**:</span>
+
 <span class="sd">        - **Angle Limiting**: Checks if the received rudder angle exceeds preset limits (&#39;&#39;self.rudder_angle_limit_deg&#39;&#39;).</span>
 <span class="sd">        - **Tacking Detection**: Sets a flag (&#39;&#39;self.could_be_tacking&#39;&#39;) if the rudder angle is beyond its limit, which heading_controller will use to indicate tacking.</span>
 <span class="sd">        - **Serial Communication**: Sends the adjusted rudder angle to the ESP32 in a JSON formatted string over a serial connection.</span>
 
 <span class="sd">        **Example of Serial Message**:</span>
-<span class="sd">        - Sent: &#39;{&quot;rudder_angle&quot;: 20}\n&#39;</span>
+
+<span class="sd">        - Sent: &#39;{&quot;rudder_angle&quot;: 20}&#39;</span>
 
 <span class="sd">        **Usage**:</span>
+
 <span class="sd">        - The node must be managed by state_manager</span>
 
 <span class="sd">        **Note**:</span>
+<span class="sd">        </span>
 <span class="sd">        - The function modifies the state variable &#39;&#39;self.could_be_tacking&#39;&#39; based on the rudder angle&#39;s relation to its limits.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -448,18 +452,21 @@
 <span class="sd">        errors or JSON decoding errors and logs them accordingly.</span>
 <span class="sd">        </span>
 <span class="sd">        **Process**:</span>
+
 <span class="sd">        - **Request**: Sends a JSON message with a request for ballast position.</span>
 <span class="sd">        - **Response Handling**: Attempts to read and decode the response. If successful, publishes the ballast position.</span>
 <span class="sd">        - **Error Handling**: Captures and logs errors related to serial communication or JSON decoding.</span>
 <span class="sd">        - **Logging**: Logs messages indicating the status of data reception and errors.</span>
 <span class="sd">        </span>
 <span class="sd">        **Details**:</span>
+
 <span class="sd">        - The request is sent periodically, triggered by a ROS timer.</span>
 <span class="sd">        - If no data is received, or if there is an error in the data, logs this as an warning message.</span>
 <span class="sd">        - Even if the potentiometer is reading strangely (position is 0), the position is published to indicate that a response was received.</span>
 <span class="sd">        </span>
 <span class="sd">        **Example of Serial Message**:</span>
-<span class="sd">        - Sent: &#39;{&quot;get_ballast_pos&quot;: True}\n&#39;</span>
+
+<span class="sd">        - Sent: &#39;{&quot;get_ballast_pos&quot;: True}&#39;</span>
 <span class="sd">        - Received: &#39;{&quot;ballast_pos&quot;: 102}&#39;</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>

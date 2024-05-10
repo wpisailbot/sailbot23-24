@@ -58,9 +58,11 @@
 <span class="sd">    :ivar client_state_setters: Dictionary mapping node names to ROS2 clients for setting state.</span>
 
 <span class="sd">    **Service Servers**:</span>
+
 <span class="sd">    - &#39;restart_node_srv&#39;: A service that allows external requests to restart managed nodes.</span>
 
 <span class="sd">    **Methods**:</span>
+
 <span class="sd">    - &#39;configure_nodes&#39;: Configures a list of nodes using their transition services.</span>
 <span class="sd">    - &#39;activate_nodes&#39;: Activates a list of nodes, bringing them from the configured state to active.</span>
 <span class="sd">    - &#39;transitionNodes&#39;: Manages the state transitions for a list of nodes based on specified transition IDs.</span>
@@ -71,11 +73,13 @@
 <span class="sd">    - &#39;change_node_state_sync&#39;: Synchronously changes the state of a node, suitable for calling from other ROS2 callbacks.</span>
 
 <span class="sd">    **Usage**:</span>
-<span class="sd">    - This node is initialized and run using a ROS2 launch file and interacts with other nodes through service</span>
-<span class="sd">    calls to manage their states according to system requirements or external inputs.</span>
+
+<span class="sd">    - This node is initialized and run using a ROS2 launch file and interacts with other nodes through service calls to manage their states according to system requirements or external inputs.</span>
 
 <span class="sd">    **Notes**:</span>
+
 <span class="sd">    - The manager must be aware of all nodes it needs to manage, configured through the managed_nodes parameter.</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">early_node_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;network_comms&quot;</span><span class="p">]</span>
     <span class="n">node_names</span> <span class="o">=</span> <span class="p">[]</span>

@@ -130,22 +130,16 @@
 <span class="sd">    :ivar grid_points: The intermediate step between waypoints and the full grid path, passed to the pathfinder node.</span>
 <span class="sd">    :ivar exact_points: The intermediate step between waypoints and the full geographical path.</span>
 <span class="sd">    :ivar current_buoy_positions: Dictionary containing a mapping between buoy IDs and their current positions.</span>
-<span class="sd">    :ivar last_waypoint_was_rounding_type: Internal state to decide if the last few points might need to be trimmed,</span>
-<span class="sd">        as we don&#39;t always want to go fully around a buoy.</span>
-
-<span class="sd">    **Lifecycle Management**:</span>
-<span class="sd">    - **on_configure**: Configures publishers, subscribers, and service clients used for navigation.</span>
-<span class="sd">    - **on_activate**: Activates the node to start path management and threat detection.</span>
-<span class="sd">    - **on_deactivate**: Deactivates the node, stopping all navigation and path updates.</span>
-<span class="sd">    - **on_cleanup**: Cleans up resources, particularly the subscribers and publishers.</span>
-<span class="sd">    - **on_shutdown**: Handles tasks necessary for node shutdown.</span>
+<span class="sd">    :ivar last_waypoint_was_rounding_type: Internal state to decide if the last few points might need to be trimmed, as we don&#39;t always want to go fully around a buoy.</span>
 
 <span class="sd">    **Subscriptions**:</span>
+
 <span class="sd">    - &#39;airmar_heading_subscription&#39;: Subscribes to heading updates from the boat&#39;s sensors.</span>
 <span class="sd">    - &#39;airmar_position_subscription&#39;: Subscribes to position updates, updating boat&#39;s geographic location.</span>
 <span class="sd">    - &#39;airmar_speed_knots_subscription&#39;: Subscribes to speed updates in knots.</span>
 
 <span class="sd">    **Publishers**:</span>
+
 <span class="sd">    - &#39;current_grid_segment_publisher&#39;: Publishes the current segment of the navigation grid being followed.</span>
 <span class="sd">    - &#39;current_segment_debug_publisher&#39;: Publishes debug information about the current navigation segment.</span>
 <span class="sd">    - &#39;target_position_publisher&#39;: Publishes the target position the boat is navigating towards.</span>
@@ -153,9 +147,11 @@
 <span class="sd">    - &#39;current_grid_cell_publisher&#39;: Publishes the current grid cell location of the boat within the navigation map.</span>
 
 <span class="sd">    **Services**:</span>
+<span class="sd">    </span>
 <span class="sd">    - &#39;set_map_cli&#39;, &#39;get_path_cli&#39;, &#39;set_threat_cli&#39;: Service clients for setting the navigation map, retrieving paths, and managing navigation threats.</span>
 
 <span class="sd">    **Methods**:</span>
+
 <span class="sd">    - &#39;set_parameters&#39;, &#39;get_parameters&#39;: Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.</span>
 <span class="sd">    - &#39;calculate_exact_points_from_waypoint&#39;: Processes waypoints to calculate exact navigation points.</span>
 <span class="sd">    - &#39;recalculate_path_from_exact_points&#39;: Recalculates the navigation path based on new or updated exact navigation points.</span>
@@ -164,10 +160,13 @@
 <span class="sd">    - &#39;get_square_corners&#39;: Calculates and orders the four corners of a square about a target position, facing a starting position.</span>
 
 <span class="sd">    **Usage**:</span>
+
 <span class="sd">    - The node must be managed by state_manager</span>
 
 <span class="sd">    **Notes**:</span>
+
 <span class="sd">    - This is the vector-field variant of the boat&#39;s pathfinding. See path_follower.py for the look-ahead variant.</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">heading</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="c1"># latitude = 42.273822</span>

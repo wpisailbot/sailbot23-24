@@ -358,17 +358,21 @@ class ESPComms(LifecycleNode):
         :param msg: A message containing the rudder angle as an integer.
 
         **Process**:
+
         - **Angle Limiting**: Checks if the received rudder angle exceeds preset limits (''self.rudder_angle_limit_deg'').
         - **Tacking Detection**: Sets a flag (''self.could_be_tacking'') if the rudder angle is beyond its limit, which heading_controller will use to indicate tacking.
         - **Serial Communication**: Sends the adjusted rudder angle to the ESP32 in a JSON formatted string over a serial connection.
 
         **Example of Serial Message**:
-        - Sent: '{"rudder_angle": 20}\n'
+
+        - Sent: '{"rudder_angle": 20}'
 
         **Usage**:
+
         - The node must be managed by state_manager
 
         **Note**:
+        
         - The function modifies the state variable ''self.could_be_tacking'' based on the rudder angle's relation to its limits.
 
         """
@@ -417,18 +421,21 @@ class ESPComms(LifecycleNode):
         errors or JSON decoding errors and logs them accordingly.
         
         **Process**:
+
         - **Request**: Sends a JSON message with a request for ballast position.
         - **Response Handling**: Attempts to read and decode the response. If successful, publishes the ballast position.
         - **Error Handling**: Captures and logs errors related to serial communication or JSON decoding.
         - **Logging**: Logs messages indicating the status of data reception and errors.
         
         **Details**:
+
         - The request is sent periodically, triggered by a ROS timer.
         - If no data is received, or if there is an error in the data, logs this as an warning message.
         - Even if the potentiometer is reading strangely (position is 0), the position is published to indicate that a response was received.
         
         **Example of Serial Message**:
-        - Sent: '{"get_ballast_pos": True}\n'
+
+        - Sent: '{"get_ballast_pos": True}'
         - Received: '{"ballast_pos": 102}'
 
         """

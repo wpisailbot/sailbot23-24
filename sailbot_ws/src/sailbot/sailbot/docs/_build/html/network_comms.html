@@ -48,20 +48,32 @@ for the boat. It handles command executions and telemetry data streaming over gR
 </ul>
 </dd>
 </dl>
-<p><strong>Subscriptions</strong>:
-- Multiple subscriptions for telemetry data such as position, heading, wind conditions, and video streams.</p>
-<p><strong>Publishers</strong>:
-- Publishers for various control commands like rudder angle, ballast position, and trim tab angle.</p>
-<p><strong>Services</strong>:
-- Service clients and servers for managing commands related to boat state, video streaming, and node restarts.</p>
-<p><strong>Methods</strong>:
-- Various callback methods for handling telemetry data.
-- Methods for sending commands to control systems based on remote or autonomous inputs.</p>
-<p><strong>Usage</strong>:
-- The node must be managed by state_manager</p>
-<p><strong>Notes</strong>:
-- This node runs before all other lifecycle nodes, so that it can monitor their state transitions.
-- It utilizes gRPC for robust, efficient, and flexible network communication.</p>
+<p><strong>Subscriptions</strong>:</p>
+<ul class="simple">
+<li><p>Multiple subscriptions for telemetry data such as position, heading, wind conditions, and video streams.</p></li>
+</ul>
+<p><strong>Publishers</strong>:</p>
+<ul class="simple">
+<li><p>Publishers for various control commands like rudder angle, ballast position, and trim tab angle.</p></li>
+</ul>
+<p><strong>Services</strong>:</p>
+<ul class="simple">
+<li><p>Service clients and servers for managing commands related to boat state, video streaming, and node restarts.</p></li>
+</ul>
+<p><strong>Methods</strong>:</p>
+<ul class="simple">
+<li><p>Various callback methods for handling telemetry data.</p></li>
+<li><p>Methods for sending commands to control systems based on remote or autonomous inputs.</p></li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<ul class="simple">
+<li><p>The node must be managed by state_manager</p></li>
+</ul>
+<p><strong>Notes</strong>:</p>
+<ul class="simple">
+<li><p>This node runs before all other lifecycle nodes, so that it can monitor their state transitions.</p></li>
+<li><p>It utilizes gRPC for robust, efficient, and flexible network communication.</p></li>
+</ul>
 <dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteAddWaypointCommand">
 <span class="sig-name descname"><span class="pre">ExecuteAddWaypointCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">AddWaypointCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteAddWaypointCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteAddWaypointCommand" title="Permalink to this definition">¶</a></dt>
@@ -219,7 +231,7 @@ for the boat. It handles command executions and telemetry data streaming over gR
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.last_camera_frame_time">
-<span class="sig-name descname"><span class="pre">last_camera_frame_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715325784.3523874</span></em><a class="headerlink" href="#network_comms.NetworkComms.last_camera_frame_time" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">last_camera_frame_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715326550.6879745</span></em><a class="headerlink" href="#network_comms.NetworkComms.last_camera_frame_time" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">

@@ -27,9 +27,11 @@ class StateManager(Node):
     :ivar client_state_setters: Dictionary mapping node names to ROS2 clients for setting state.
 
     **Service Servers**:
+
     - 'restart_node_srv': A service that allows external requests to restart managed nodes.
 
     **Methods**:
+
     - 'configure_nodes': Configures a list of nodes using their transition services.
     - 'activate_nodes': Activates a list of nodes, bringing them from the configured state to active.
     - 'transitionNodes': Manages the state transitions for a list of nodes based on specified transition IDs.
@@ -40,11 +42,13 @@ class StateManager(Node):
     - 'change_node_state_sync': Synchronously changes the state of a node, suitable for calling from other ROS2 callbacks.
 
     **Usage**:
-    - This node is initialized and run using a ROS2 launch file and interacts with other nodes through service
-    calls to manage their states according to system requirements or external inputs.
+
+    - This node is initialized and run using a ROS2 launch file and interacts with other nodes through service calls to manage their states according to system requirements or external inputs.
 
     **Notes**:
+
     - The manager must be aware of all nodes it needs to manage, configured through the managed_nodes parameter.
+
     """
     early_node_names = ["network_comms"]
     node_names = []

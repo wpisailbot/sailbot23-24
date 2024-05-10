@@ -50,22 +50,29 @@ as managed and can ensure that they are initialized in the correct state during 
 </ul>
 </dd>
 </dl>
-<p><strong>Service Servers</strong>:
-- ‘restart_node_srv’: A service that allows external requests to restart managed nodes.</p>
-<p><strong>Methods</strong>:
-- ‘configure_nodes’: Configures a list of nodes using their transition services.
-- ‘activate_nodes’: Activates a list of nodes, bringing them from the configured state to active.
-- ‘transitionNodes’: Manages the state transitions for a list of nodes based on specified transition IDs.
-- ‘restart_lifecycle_node_callback’: Callback for the service that handles requests to restart nodes.
-- ‘restart_node’: Handles the actual restart of a node by managing its state transitions.
-- ‘get_node_state’: Retrieves the current state of a node.
-- ‘change_node_state’: Asynchronously changes the state of a node.
-- ‘change_node_state_sync’: Synchronously changes the state of a node, suitable for calling from other ROS2 callbacks.</p>
-<p><strong>Usage</strong>:
-- This node is initialized and run using a ROS2 launch file and interacts with other nodes through service
-calls to manage their states according to system requirements or external inputs.</p>
-<p><strong>Notes</strong>:
-- The manager must be aware of all nodes it needs to manage, configured through the managed_nodes parameter.</p>
+<p><strong>Service Servers</strong>:</p>
+<ul class="simple">
+<li><p>‘restart_node_srv’: A service that allows external requests to restart managed nodes.</p></li>
+</ul>
+<p><strong>Methods</strong>:</p>
+<ul class="simple">
+<li><p>‘configure_nodes’: Configures a list of nodes using their transition services.</p></li>
+<li><p>‘activate_nodes’: Activates a list of nodes, bringing them from the configured state to active.</p></li>
+<li><p>‘transitionNodes’: Manages the state transitions for a list of nodes based on specified transition IDs.</p></li>
+<li><p>‘restart_lifecycle_node_callback’: Callback for the service that handles requests to restart nodes.</p></li>
+<li><p>‘restart_node’: Handles the actual restart of a node by managing its state transitions.</p></li>
+<li><p>‘get_node_state’: Retrieves the current state of a node.</p></li>
+<li><p>‘change_node_state’: Asynchronously changes the state of a node.</p></li>
+<li><p>‘change_node_state_sync’: Synchronously changes the state of a node, suitable for calling from other ROS2 callbacks.</p></li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<ul class="simple">
+<li><p>This node is initialized and run using a ROS2 launch file and interacts with other nodes through service calls to manage their states according to system requirements or external inputs.</p></li>
+</ul>
+<p><strong>Notes</strong>:</p>
+<ul class="simple">
+<li><p>The manager must be aware of all nodes it needs to manage, configured through the managed_nodes parameter.</p></li>
+</ul>
 <dl class="py method">
 <dt class="sig sig-object py" id="state_manager.StateManager.activate_nodes">
 <span class="sig-name descname"><span class="pre">activate_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.activate_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.activate_nodes" title="Permalink to this definition">¶</a></dt>

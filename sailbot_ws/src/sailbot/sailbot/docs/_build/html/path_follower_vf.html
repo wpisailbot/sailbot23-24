@@ -58,40 +58,45 @@ manages threats, and integrates sensor data to navigate efficiently.</p>
 <li><p><strong>grid_points</strong> – The intermediate step between waypoints and the full grid path, passed to the pathfinder node.</p></li>
 <li><p><strong>exact_points</strong> – The intermediate step between waypoints and the full geographical path.</p></li>
 <li><p><strong>current_buoy_positions</strong> – Dictionary containing a mapping between buoy IDs and their current positions.</p></li>
-<li><p><strong>last_waypoint_was_rounding_type</strong> – Internal state to decide if the last few points might need to be trimmed,
-as we don’t always want to go fully around a buoy.</p></li>
+<li><p><strong>last_waypoint_was_rounding_type</strong> – Internal state to decide if the last few points might need to be trimmed, as we don’t always want to go fully around a buoy.</p></li>
 </ul>
 </dd>
 </dl>
-<p><strong>Lifecycle Management</strong>:
-- <strong>on_configure</strong>: Configures publishers, subscribers, and service clients used for navigation.
-- <strong>on_activate</strong>: Activates the node to start path management and threat detection.
-- <strong>on_deactivate</strong>: Deactivates the node, stopping all navigation and path updates.
-- <strong>on_cleanup</strong>: Cleans up resources, particularly the subscribers and publishers.
-- <strong>on_shutdown</strong>: Handles tasks necessary for node shutdown.</p>
-<p><strong>Subscriptions</strong>:
-- ‘airmar_heading_subscription’: Subscribes to heading updates from the boat’s sensors.
-- ‘airmar_position_subscription’: Subscribes to position updates, updating boat’s geographic location.
-- ‘airmar_speed_knots_subscription’: Subscribes to speed updates in knots.</p>
-<p><strong>Publishers</strong>:
-- ‘current_grid_segment_publisher’: Publishes the current segment of the navigation grid being followed.
-- ‘current_segment_debug_publisher’: Publishes debug information about the current navigation segment.
-- ‘target_position_publisher’: Publishes the target position the boat is navigating towards.
-- ‘current_path_publisher’: Publishes updates to the navigation path as it is recalculated.
-- ‘current_grid_cell_publisher’: Publishes the current grid cell location of the boat within the navigation map.</p>
-<p><strong>Services</strong>:
-- ‘set_map_cli’, ‘get_path_cli’, ‘set_threat_cli’: Service clients for setting the navigation map, retrieving paths, and managing navigation threats.</p>
-<p><strong>Methods</strong>:
-- ‘set_parameters’, ‘get_parameters’: Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.
-- ‘calculate_exact_points_from_waypoint’: Processes waypoints to calculate exact navigation points.
-- ‘recalculate_path_from_exact_points’: Recalculates the navigation path based on new or updated exact navigation points.
-- ‘find_look_ahead’: Determines the boat’s progress along the path.
-- ‘remove_last_points_if_necessary’: Trims unnecessary navigation points if the last waypoint was a rounding type.
-- ‘get_square_corners’: Calculates and orders the four corners of a square about a target position, facing a starting position.</p>
-<p><strong>Usage</strong>:
-- The node must be managed by state_manager</p>
-<p><strong>Notes</strong>:
-- This is the vector-field variant of the boat’s pathfinding. See path_follower.py for the look-ahead variant.</p>
+<p><strong>Subscriptions</strong>:</p>
+<ul class="simple">
+<li><p>‘airmar_heading_subscription’: Subscribes to heading updates from the boat’s sensors.</p></li>
+<li><p>‘airmar_position_subscription’: Subscribes to position updates, updating boat’s geographic location.</p></li>
+<li><p>‘airmar_speed_knots_subscription’: Subscribes to speed updates in knots.</p></li>
+</ul>
+<p><strong>Publishers</strong>:</p>
+<ul class="simple">
+<li><p>‘current_grid_segment_publisher’: Publishes the current segment of the navigation grid being followed.</p></li>
+<li><p>‘current_segment_debug_publisher’: Publishes debug information about the current navigation segment.</p></li>
+<li><p>‘target_position_publisher’: Publishes the target position the boat is navigating towards.</p></li>
+<li><p>‘current_path_publisher’: Publishes updates to the navigation path as it is recalculated.</p></li>
+<li><p>‘current_grid_cell_publisher’: Publishes the current grid cell location of the boat within the navigation map.</p></li>
+</ul>
+<p><strong>Services</strong>:</p>
+<ul class="simple">
+<li><p>‘set_map_cli’, ‘get_path_cli’, ‘set_threat_cli’: Service clients for setting the navigation map, retrieving paths, and managing navigation threats.</p></li>
+</ul>
+<p><strong>Methods</strong>:</p>
+<ul class="simple">
+<li><p>‘set_parameters’, ‘get_parameters’: Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.</p></li>
+<li><p>‘calculate_exact_points_from_waypoint’: Processes waypoints to calculate exact navigation points.</p></li>
+<li><p>‘recalculate_path_from_exact_points’: Recalculates the navigation path based on new or updated exact navigation points.</p></li>
+<li><p>‘find_look_ahead’: Determines the boat’s progress along the path.</p></li>
+<li><p>‘remove_last_points_if_necessary’: Trims unnecessary navigation points if the last waypoint was a rounding type.</p></li>
+<li><p>‘get_square_corners’: Calculates and orders the four corners of a square about a target position, facing a starting position.</p></li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<ul class="simple">
+<li><p>The node must be managed by state_manager</p></li>
+</ul>
+<p><strong>Notes</strong>:</p>
+<ul class="simple">
+<li><p>This is the vector-field variant of the boat’s pathfinding. See path_follower.py for the look-ahead variant.</p></li>
+</ul>
 <dl class="py method">
 <dt class="sig sig-object py" id="path_follower_vf.PathFollower.add_threat">
 <span class="sig-name descname"><span class="pre">add_threat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waypoint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Waypoint</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.add_threat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.add_threat" title="Permalink to this definition">¶</a></dt>
@@ -345,7 +350,7 @@ between each pair of consecutive waypoints in the path.</p></li>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="path_follower_vf.PathFollower.last_recalculation_time">
-<span class="sig-name descname"><span class="pre">last_recalculation_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715325785.0107558</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.last_recalculation_time" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">last_recalculation_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715326551.3428483</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.last_recalculation_time" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">

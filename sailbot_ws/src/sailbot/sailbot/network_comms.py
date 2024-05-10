@@ -134,22 +134,28 @@ class NetworkComms(LifecycleNode):
     :ivar current_video_source: An integer representing the current requested video source
 
     **Subscriptions**:
+
     - Multiple subscriptions for telemetry data such as position, heading, wind conditions, and video streams.
 
     **Publishers**:
+
     - Publishers for various control commands like rudder angle, ballast position, and trim tab angle.
 
     **Services**:
+
     - Service clients and servers for managing commands related to boat state, video streaming, and node restarts.
 
     **Methods**:
+
     - Various callback methods for handling telemetry data.
     - Methods for sending commands to control systems based on remote or autonomous inputs.
 
     **Usage**:
+
     - The node must be managed by state_manager
 
     **Notes**:
+    
     - This node runs before all other lifecycle nodes, so that it can monitor their state transitions.
     - It utilizes gRPC for robust, efficient, and flexible network communication.
 

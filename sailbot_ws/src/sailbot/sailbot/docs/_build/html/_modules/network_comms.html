@@ -165,22 +165,28 @@
 <span class="sd">    :ivar current_video_source: An integer representing the current requested video source</span>
 
 <span class="sd">    **Subscriptions**:</span>
+
 <span class="sd">    - Multiple subscriptions for telemetry data such as position, heading, wind conditions, and video streams.</span>
 
 <span class="sd">    **Publishers**:</span>
+
 <span class="sd">    - Publishers for various control commands like rudder angle, ballast position, and trim tab angle.</span>
 
 <span class="sd">    **Services**:</span>
+
 <span class="sd">    - Service clients and servers for managing commands related to boat state, video streaming, and node restarts.</span>
 
 <span class="sd">    **Methods**:</span>
+
 <span class="sd">    - Various callback methods for handling telemetry data.</span>
 <span class="sd">    - Methods for sending commands to control systems based on remote or autonomous inputs.</span>
 
 <span class="sd">    **Usage**:</span>
+
 <span class="sd">    - The node must be managed by state_manager</span>
 
 <span class="sd">    **Notes**:</span>
+<span class="sd">    </span>
 <span class="sd">    - This node runs before all other lifecycle nodes, so that it can monitor their state transitions.</span>
 <span class="sd">    - It utilizes gRPC for robust, efficient, and flexible network communication.</span>
 

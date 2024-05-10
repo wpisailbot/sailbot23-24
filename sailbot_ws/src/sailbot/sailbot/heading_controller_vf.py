@@ -58,45 +58,24 @@ class HeadingController(LifecycleNode):
     :ivar rudder_angle: (float) Current angle of the rudder.
 
 
-    Functions:
-        on_configure(self, state: State) -> TransitionCallbackReturn:
-            Configures the node, setting up publishers and subscribers. Initializes the fuzzy control system for rudder angle determination based on heading error and rate of change.
+    **Functions**:
 
-        on_activate(self, state: State) -> TransitionCallbackReturn:
-            Activates the node to start responding to incoming data and controlling the rudder.
+    - compute_rudder_angle(self): Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.
+    - needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool: Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat's heading, target heading, and wind direction.
+    - adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -> np.ndarray: Calculates a navigation vector based on the boat's current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.
+    - vector_to_heading(self, dx, dy) -> float: Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.
+    - getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -> float: Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.
 
-        on_deactivate(self, state: State) -> TransitionCallbackReturn:
-            Deactivates the node, stopping its control activities.
+    **Subscriptions**:
 
-        on_cleanup(self, state: State) -> TransitionCallbackReturn:
-            Cleans up by destroying timers, subscribers, and publishers.
+    - Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat's rudder for optimal heading control.
 
-        on_shutdown(self, state: State) -> TransitionCallbackReturn:
-            Performs shutdown procedures, ensuring all resources are cleanly released.
+    **Publishers**:
 
-        compute_rudder_angle(self):
-            Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and 
-            possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.
-
-        needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
-            Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat's heading, target heading, and wind direction.
-
-        adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -> np.ndarray:
-            Calculates a navigation vector based on the boat's current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.
-
-        vector_to_heading(self, dx, dy) -> float:
-            Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.
-
-        getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -> float:
-            Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.
-
-    Subscriptions:
-        Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat's rudder for optimal heading control.
-
-    Publishers:
-        Publishes the computed rudder angle to a designated topic for execution by the boat's steering mechanism.
+    - Publishes the computed rudder angle to a designated topic for execution by the boat's steering mechanism.
 
     **Usage**:
+
     - The node must be managed by state_manager
 
     """

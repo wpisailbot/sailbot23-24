@@ -55,38 +55,26 @@ commands for rudder angle adjustments. It is capable of handling different auton
 </ul>
 </dd>
 </dl>
-<dl class="simple">
-<dt>Functions:</dt><dd><dl class="simple">
-<dt>on_configure(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Configures the node, setting up publishers and subscribers. Initializes the fuzzy control system for rudder angle determination based on heading error and rate of change.</p>
-</dd>
-<dt>on_activate(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Activates the node to start responding to incoming data and controlling the rudder.</p>
-</dd>
-<dt>on_deactivate(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Deactivates the node, stopping its control activities.</p>
-</dd>
-<dt>on_cleanup(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Cleans up by destroying timers, subscribers, and publishers.</p>
-</dd>
-<dt>on_shutdown(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Performs shutdown procedures, ensuring all resources are cleanly released.</p>
-</dd>
-<dt>compute_rudder_angle(self):</dt><dd><p>Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and
-possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.</p>
-</dd>
-<dt>needs_to_tack(self, boat_heading, target_heading, wind_direction) -&gt; bool:</dt><dd><p>Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat’s heading, target heading, and wind direction.</p>
-</dd>
-<dt>adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -&gt; np.ndarray:</dt><dd><p>Calculates a navigation vector based on the boat’s current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.</p>
-</dd>
-<dt>vector_to_heading(self, dx, dy) -&gt; float:</dt><dd><p>Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.</p>
-</dd>
-<dt>getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -&gt; float:</dt><dd><p>Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.</p>
-</dd>
-</dl>
-</dd>
-<dt>Subscriptions:</dt><dd><p>Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat’s rudder for optimal heading control.</p>
-</dd>
-<dt>Publishers:</dt><dd><p>Publishes the computed rudder angle to a designated topic for execution by the boat’s steering mechanism.</p>
-</dd>
-</dl>
-<p><strong>Usage</strong>:
-- The node must be managed by state_manager</p>
+<p><strong>Functions</strong>:</p>
+<ul class="simple">
+<li><p>compute_rudder_angle(self): Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.</p></li>
+<li><p>needs_to_tack(self, boat_heading, target_heading, wind_direction) -&gt; bool: Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat’s heading, target heading, and wind direction.</p></li>
+<li><p>adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -&gt; np.ndarray: Calculates a navigation vector based on the boat’s current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.</p></li>
+<li><p>vector_to_heading(self, dx, dy) -&gt; float: Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.</p></li>
+<li><p>getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -&gt; float: Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.</p></li>
+</ul>
+<p><strong>Subscriptions</strong>:</p>
+<ul class="simple">
+<li><p>Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat’s rudder for optimal heading control.</p></li>
+</ul>
+<p><strong>Publishers</strong>:</p>
+<ul class="simple">
+<li><p>Publishes the computed rudder angle to a designated topic for execution by the boat’s steering mechanism.</p></li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<ul class="simple">
+<li><p>The node must be managed by state_manager</p></li>
+</ul>
 <dl class="py method">
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.adaptive_vector_field">
 <span class="sig-name descname"><span class="pre">adaptive_vector_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">P1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lambda_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.adaptive_vector_field"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.adaptive_vector_field" title="Permalink to this definition">¶</a></dt>

@@ -73,29 +73,28 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="esp32_comms.ESPComms.ballast_timer_callback">
 <span class="sig-name descname"><span class="pre">ballast_timer_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/esp32_comms.html#ESPComms.ballast_timer_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#esp32_comms.ESPComms.ballast_timer_callback" title="Permalink to this definition">¶</a></dt>
-<dd><blockquote>
-<div><p>Timer callback function that sends a request to the ESP32 for the current position of the ballast and handles the response.</p>
+<dd><p>Timer callback function that sends a request to the ESP32 for the current position of the ballast and handles the response.</p>
 <p>This function formats a JSON message to request the ballast position, sends it via serial communication, reads the response,
 decodes the JSON data received, and publishes the ballast position. It handles possible exceptions like serial communication
 errors or JSON decoding errors and logs them accordingly.</p>
-<p><strong>Process</strong>:
-- <strong>Request</strong>: Sends a JSON message with a request for ballast position.
-- <strong>Response Handling</strong>: Attempts to read and decode the response. If successful, publishes the ballast position.
-- <strong>Error Handling</strong>: Captures and logs errors related to serial communication or JSON decoding.
-- <strong>Logging</strong>: Logs messages indicating the status of data reception and errors.</p>
-<p><strong>Details</strong>:
-- The request is sent periodically, triggered by a ROS timer.
-- If no data is received, or if there is an error in the data, logs this as an warning message.
-- Even if the potentiometer is reading strangely (position is 0), the position is published to indicate that a response was received.</p>
-<p><strong>Example of Serial Message</strong>:
-- Sent: ‘{“get_ballast_pos”: True}</p>
-</div></blockquote>
-<dl class="simple">
-<dt>‘</dt><dd><ul class="simple">
+<p><strong>Process</strong>:</p>
+<ul class="simple">
+<li><p><strong>Request</strong>: Sends a JSON message with a request for ballast position.</p></li>
+<li><p><strong>Response Handling</strong>: Attempts to read and decode the response. If successful, publishes the ballast position.</p></li>
+<li><p><strong>Error Handling</strong>: Captures and logs errors related to serial communication or JSON decoding.</p></li>
+<li><p><strong>Logging</strong>: Logs messages indicating the status of data reception and errors.</p></li>
+</ul>
+<p><strong>Details</strong>:</p>
+<ul class="simple">
+<li><p>The request is sent periodically, triggered by a ROS timer.</p></li>
+<li><p>If no data is received, or if there is an error in the data, logs this as an warning message.</p></li>
+<li><p>Even if the potentiometer is reading strangely (position is 0), the position is published to indicate that a response was received.</p></li>
+</ul>
+<p><strong>Example of Serial Message</strong>:</p>
+<ul class="simple">
+<li><p>Sent: ‘{“get_ballast_pos”: True}’</p></li>
 <li><p>Received: ‘{“ballast_pos”: 102}’</p></li>
 </ul>
-</dd>
-</dl>
 </dd></dl>
 
 <dl class="py attribute">
@@ -256,30 +255,33 @@ super().on_shutdown() in derived classes.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="esp32_comms.ESPComms.rudder_angle_callback">
 <span class="sig-name descname"><span class="pre">rudder_angle_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Int16</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/esp32_comms.html#ESPComms.rudder_angle_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#esp32_comms.ESPComms.rudder_angle_callback" title="Permalink to this definition">¶</a></dt>
-<dd><blockquote>
-<div><p>Callback function that processes received rudder angle data, applies constraints, and sends a corrected value to the ESP32.</p>
+<dd><p>Callback function that processes received rudder angle data, applies constraints, and sends a corrected value to the ESP32.</p>
 <p>This function is triggered by a ROS subscription whenever a new rudder angle message is published. It checks the received
 angle against preset limits, adjusts the angle if necessary to prevent extreme positions, and then sends the corrected
 rudder angle to the ESP32 via serial communication.</p>
 <dl class="field-list simple">
-<dt class="field-odd">param msg<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A message containing the rudder angle as an integer.</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg</strong> – A message containing the rudder angle as an integer.</p>
 </dd>
 </dl>
-<p><strong>Process</strong>:
-- <strong>Angle Limiting</strong>: Checks if the received rudder angle exceeds preset limits (‘’self.rudder_angle_limit_deg’’).
-- <strong>Tacking Detection</strong>: Sets a flag (‘’self.could_be_tacking’’) if the rudder angle is beyond its limit, which heading_controller will use to indicate tacking.
-- <strong>Serial Communication</strong>: Sends the adjusted rudder angle to the ESP32 in a JSON formatted string over a serial connection.</p>
-<p><strong>Example of Serial Message</strong>:
-- Sent: ‘{“rudder_angle”: 20}</p>
-</div></blockquote>
-<p>‘</p>
-<blockquote>
-<div><p><strong>Usage</strong>:
-- The node must be managed by state_manager</p>
-<p><strong>Note</strong>:
-- The function modifies the state variable ‘’self.could_be_tacking’’ based on the rudder angle’s relation to its limits.</p>
-</div></blockquote>
+<p><strong>Process</strong>:</p>
+<ul class="simple">
+<li><p><strong>Angle Limiting</strong>: Checks if the received rudder angle exceeds preset limits (‘’self.rudder_angle_limit_deg’’).</p></li>
+<li><p><strong>Tacking Detection</strong>: Sets a flag (‘’self.could_be_tacking’’) if the rudder angle is beyond its limit, which heading_controller will use to indicate tacking.</p></li>
+<li><p><strong>Serial Communication</strong>: Sends the adjusted rudder angle to the ESP32 in a JSON formatted string over a serial connection.</p></li>
+</ul>
+<p><strong>Example of Serial Message</strong>:</p>
+<ul class="simple">
+<li><p>Sent: ‘{“rudder_angle”: 20}’</p></li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<ul class="simple">
+<li><p>The node must be managed by state_manager</p></li>
+</ul>
+<p><strong>Note</strong>:</p>
+<ul class="simple">
+<li><p>The function modifies the state variable ‘’self.could_be_tacking’’ based on the rudder angle’s relation to its limits.</p></li>
+</ul>
 </dd></dl>
 
 <dl class="py attribute">

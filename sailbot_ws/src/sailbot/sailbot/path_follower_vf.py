@@ -99,22 +99,16 @@ class PathFollower(LifecycleNode):
     :ivar grid_points: The intermediate step between waypoints and the full grid path, passed to the pathfinder node.
     :ivar exact_points: The intermediate step between waypoints and the full geographical path.
     :ivar current_buoy_positions: Dictionary containing a mapping between buoy IDs and their current positions.
-    :ivar last_waypoint_was_rounding_type: Internal state to decide if the last few points might need to be trimmed,
-        as we don't always want to go fully around a buoy.
-
-    **Lifecycle Management**:
-    - **on_configure**: Configures publishers, subscribers, and service clients used for navigation.
-    - **on_activate**: Activates the node to start path management and threat detection.
-    - **on_deactivate**: Deactivates the node, stopping all navigation and path updates.
-    - **on_cleanup**: Cleans up resources, particularly the subscribers and publishers.
-    - **on_shutdown**: Handles tasks necessary for node shutdown.
+    :ivar last_waypoint_was_rounding_type: Internal state to decide if the last few points might need to be trimmed, as we don't always want to go fully around a buoy.
 
     **Subscriptions**:
+
     - 'airmar_heading_subscription': Subscribes to heading updates from the boat's sensors.
     - 'airmar_position_subscription': Subscribes to position updates, updating boat's geographic location.
     - 'airmar_speed_knots_subscription': Subscribes to speed updates in knots.
 
     **Publishers**:
+
     - 'current_grid_segment_publisher': Publishes the current segment of the navigation grid being followed.
     - 'current_segment_debug_publisher': Publishes debug information about the current navigation segment.
     - 'target_position_publisher': Publishes the target position the boat is navigating towards.
@@ -122,9 +116,11 @@ class PathFollower(LifecycleNode):
     - 'current_grid_cell_publisher': Publishes the current grid cell location of the boat within the navigation map.
 
     **Services**:
+    
     - 'set_map_cli', 'get_path_cli', 'set_threat_cli': Service clients for setting the navigation map, retrieving paths, and managing navigation threats.
 
     **Methods**:
+
     - 'set_parameters', 'get_parameters': Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.
     - 'calculate_exact_points_from_waypoint': Processes waypoints to calculate exact navigation points.
     - 'recalculate_path_from_exact_points': Recalculates the navigation path based on new or updated exact navigation points.
@@ -133,10 +129,13 @@ class PathFollower(LifecycleNode):
     - 'get_square_corners': Calculates and orders the four corners of a square about a target position, facing a starting position.
 
     **Usage**:
+
     - The node must be managed by state_manager
 
     **Notes**:
+
     - This is the vector-field variant of the boat's pathfinding. See path_follower.py for the look-ahead variant.
+
     """
     heading = 0
     # latitude = 42.273822

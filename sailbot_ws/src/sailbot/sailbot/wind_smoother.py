@@ -27,14 +27,17 @@ class WindSmoother(LifecycleNode):
     :ivar num_apparent_wind_readings: The number of apparent wind readings to store for smoothing.
 
     **Subscriptions**:
+
     - 'apparent_wind_subscriber': Subscribes to apparent wind data.
     - 'true_wind_subscriber': Subscribes to true wind data.
 
     **Publishers**:
+
     - 'smooth_apparent_wind_publisher': Publishes smoothed apparent wind data.
     - 'smooth_true_wind_publisher': Publishes smoothed true wind data.
 
     **Methods**:
+
     - 'median': Computes the median of a list.
     - 'update_apparent_winds': Updates the list of recent apparent wind directions.
     - 'update_true_winds': Updates the list of recent true wind directions.
@@ -42,6 +45,7 @@ class WindSmoother(LifecycleNode):
     - 'true_wind_callback': Callback for true wind data, smooths and publishes data.
 
     **Usage**:
+    
     - The node must be managed by state_manager
 
     """

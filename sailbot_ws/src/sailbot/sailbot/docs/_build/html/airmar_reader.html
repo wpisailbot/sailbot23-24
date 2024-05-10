@@ -166,13 +166,15 @@ that are deemed unnecessary or redundant.</p>
 into more structured data forms. It handles a variety of NMEA sentence types including GPS position data (‘GLL’),
 rate of turn (‘ROT’), speed and heading information (‘VTG’), environmental data like temperature and atmospheric pressure (‘XDR’),
 and wind data (‘MWV’, ‘MWD’). It also includes error handling to manage exceptions during the read and parse operations.</p>
-<p>Function behavior includes:
-- Reading and decoding a line from the serial port.
-- Splitting the line based on commas to differentiate data fields and removing any checksums.
-- Identifying the sentence type through a code in the tag and processing accordingly.
-- Publishing valid data to appropriate ROS topics using helper functions.
-- Logging significant actions and data points for debugging purposes.
-- Returning structured data as a dictionary where applicable, or an empty dictionary for unsupported or unnecessary data types.</p>
+<p>Function behavior includes:</p>
+<ul class="simple">
+<li><p>Reading and decoding a line from the serial port.</p></li>
+<li><p>Splitting the line based on commas to differentiate data fields and removing any checksums.</p></li>
+<li><p>Identifying the sentence type through a code in the tag and processing accordingly.</p></li>
+<li><p>Publishing valid data to appropriate ROS topics using helper functions.</p></li>
+<li><p>Logging significant actions and data points for debugging purposes.</p></li>
+<li><p>Returning structured data as a dictionary where applicable, or an empty dictionary for unsupported or unnecessary data types.</p></li>
+</ul>
 <p>This function assumes the availability of a serial port connection, currently to a Maretron USB100.</p>
 </dd></dl>
 

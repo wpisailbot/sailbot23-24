@@ -217,6 +217,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         and wind data ('MWV', 'MWD'). It also includes error handling to manage exceptions during the read and parse operations.
 
         Function behavior includes:
+        
         - Reading and decoding a line from the serial port.
         - Splitting the line based on commas to differentiate data fields and removing any checksums.
         - Identifying the sentence type through a code in the tag and processing accordingly.

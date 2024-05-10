@@ -58,14 +58,17 @@
 <span class="sd">    :ivar num_apparent_wind_readings: The number of apparent wind readings to store for smoothing.</span>
 
 <span class="sd">    **Subscriptions**:</span>
+
 <span class="sd">    - &#39;apparent_wind_subscriber&#39;: Subscribes to apparent wind data.</span>
 <span class="sd">    - &#39;true_wind_subscriber&#39;: Subscribes to true wind data.</span>
 
 <span class="sd">    **Publishers**:</span>
+
 <span class="sd">    - &#39;smooth_apparent_wind_publisher&#39;: Publishes smoothed apparent wind data.</span>
 <span class="sd">    - &#39;smooth_true_wind_publisher&#39;: Publishes smoothed true wind data.</span>
 
 <span class="sd">    **Methods**:</span>
+
 <span class="sd">    - &#39;median&#39;: Computes the median of a list.</span>
 <span class="sd">    - &#39;update_apparent_winds&#39;: Updates the list of recent apparent wind directions.</span>
 <span class="sd">    - &#39;update_true_winds&#39;: Updates the list of recent true wind directions.</span>
@@ -73,6 +76,7 @@
 <span class="sd">    - &#39;true_wind_callback&#39;: Callback for true wind data, smooths and publishes data.</span>
 
 <span class="sd">    **Usage**:</span>
+<span class="sd">    </span>
 <span class="sd">    - The node must be managed by state_manager</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>

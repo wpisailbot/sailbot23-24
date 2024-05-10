@@ -89,45 +89,24 @@
 <span class="sd">    :ivar rudder_angle: (float) Current angle of the rudder.</span>
 
 
-<span class="sd">    Functions:</span>
-<span class="sd">        on_configure(self, state: State) -&gt; TransitionCallbackReturn:</span>
-<span class="sd">            Configures the node, setting up publishers and subscribers. Initializes the fuzzy control system for rudder angle determination based on heading error and rate of change.</span>
+<span class="sd">    **Functions**:</span>
 
-<span class="sd">        on_activate(self, state: State) -&gt; TransitionCallbackReturn:</span>
-<span class="sd">            Activates the node to start responding to incoming data and controlling the rudder.</span>
+<span class="sd">    - compute_rudder_angle(self): Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.</span>
+<span class="sd">    - needs_to_tack(self, boat_heading, target_heading, wind_direction) -&gt; bool: Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat&#39;s heading, target heading, and wind direction.</span>
+<span class="sd">    - adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -&gt; np.ndarray: Calculates a navigation vector based on the boat&#39;s current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.</span>
+<span class="sd">    - vector_to_heading(self, dx, dy) -&gt; float: Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.</span>
+<span class="sd">    - getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -&gt; float: Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.</span>
 
-<span class="sd">        on_deactivate(self, state: State) -&gt; TransitionCallbackReturn:</span>
-<span class="sd">            Deactivates the node, stopping its control activities.</span>
+<span class="sd">    **Subscriptions**:</span>
 
-<span class="sd">        on_cleanup(self, state: State) -&gt; TransitionCallbackReturn:</span>
-<span class="sd">            Cleans up by destroying timers, subscribers, and publishers.</span>
+<span class="sd">    - Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat&#39;s rudder for optimal heading control.</span>
 
-<span class="sd">        on_shutdown(self, state: State) -&gt; TransitionCallbackReturn:</span>
-<span class="sd">            Performs shutdown procedures, ensuring all resources are cleanly released.</span>
+<span class="sd">    **Publishers**:</span>
 
-<span class="sd">        compute_rudder_angle(self):</span>
-<span class="sd">            Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and </span>
-<span class="sd">            possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.</span>
-
-<span class="sd">        needs_to_tack(self, boat_heading, target_heading, wind_direction) -&gt; bool:</span>
-<span class="sd">            Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat&#39;s heading, target heading, and wind direction.</span>
-
-<span class="sd">        adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -&gt; np.ndarray:</span>
-<span class="sd">            Calculates a navigation vector based on the boat&#39;s current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.</span>
-
-<span class="sd">        vector_to_heading(self, dx, dy) -&gt; float:</span>
-<span class="sd">            Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.</span>
-
-<span class="sd">        getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -&gt; float:</span>
-<span class="sd">            Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.</span>
-
-<span class="sd">    Subscriptions:</span>
-<span class="sd">        Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat&#39;s rudder for optimal heading control.</span>
-
-<span class="sd">    Publishers:</span>
-<span class="sd">        Publishes the computed rudder angle to a designated topic for execution by the boat&#39;s steering mechanism.</span>
+<span class="sd">    - Publishes the computed rudder angle to a designated topic for execution by the boat&#39;s steering mechanism.</span>
 
 <span class="sd">    **Usage**:</span>
+
 <span class="sd">    - The node must be managed by state_manager</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
