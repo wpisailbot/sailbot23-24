@@ -110,15 +110,15 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
 
         :param value: The value to be published. Depending on the type, this can be a single value or a tuple of values.
         :param publisher: The ROS publisher object used to publish the data.
-        :param type: The data type class which defines how to interpret `value`. This can be one of several expected ROS message types
-                    such as `Float64`, `Wind`, or `NavSatFix`.
+        :param type: The data type class which defines how to interpret 'value'. This can be one of several expected ROS message types
+                    such as 'Float64', 'Wind', or 'NavSatFix'.
 
         :return: None. This function does not return a value but instead publishes data to a ROS topic if the data is valid.
 
         Function behavior includes:
-        - Checking the specified `type` and constructing a corresponding ROS message object.
-        - Attempting to cast `value` to the appropriate type(s) required by the ROS message.
-        - If casting is successful and the value is valid, the data is published using the provided `publisher`.
+        - Checking the specified 'type' and constructing a corresponding ROS message object.
+        - Attempting to cast 'value' to the appropriate type(s) required by the ROS message.
+        - If casting is successful and the value is valid, the data is published using the provided 'publisher'.
         - If an error occurs during casting or validation, the function catches the exception and refrains from publishing,
         optionally logging the error or ignoring invalid data.
 
@@ -171,9 +171,9 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
                 that are deemed unnecessary or redundant.
 
         This function primarily processes data for navigation and environmental monitoring, converting raw NMEA sentence inputs
-        into more structured data forms. It handles a variety of NMEA sentence types including GPS position data (`GLL`),
-        rate of turn (`ROT`), speed and heading information (`VTG`), environmental data like temperature and atmospheric pressure (`XDR`),
-        and wind data (`MWV`, `MWD`). It also includes error handling to manage exceptions during the read and parse operations.
+        into more structured data forms. It handles a variety of NMEA sentence types including GPS position data ('GLL'),
+        rate of turn ('ROT'), speed and heading information ('VTG'), environmental data like temperature and atmospheric pressure ('XDR'),
+        and wind data ('MWV', 'MWD'). It also includes error handling to manage exceptions during the read and parse operations.
 
         Function behavior includes:
         - Reading and decoding a line from the serial port.

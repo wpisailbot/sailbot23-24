@@ -433,13 +433,13 @@ class PathFollower(LifecycleNode):
 
         :param next_point: A tuple (latitude, longitude) representing the next point's geographic coordinates.
 
-        :return: None. Modifies the internal lists `exact_points` and `grid_points` by potentially removing points that
+        :return: None. Modifies the internal lists 'exact_points' and 'grid_points' by potentially removing points that
                 are no longer relevant after analyzing the new point's proximity to the previous points.
 
         Function behavior includes:
         - Checking if the last processed waypoint was a rounding type.
         - Comparing distances between consecutive exact points and the next point.
-        - Removing points from both `exact_points` and `grid_points` if the conditions indicate that newer points
+        - Removing points from both 'exact_points' and 'grid_points' if the conditions indicate that newer points
         have looped back and are curther away than earlier points, requiring a path correction
 
         This function is intended to ensure buoy rounding paths are sensible.
@@ -475,7 +475,7 @@ class PathFollower(LifecycleNode):
 
         :param waypoint_msg: A sailbot_msgs/Waypoint message object containing waypoint information such as the latitude, longitude, and type of the waypoint.
 
-        :return: None. The function updates the instance's `exact_points` and `grid_points` lists with the calculated points.
+        :return: None. The function updates the instance's 'exact_points' and 'grid_points' lists with the calculated points.
 
         Function behavior includes:
         - Checking each buoy position for proximity to the waypoint and snapping to the closest buoy if applicable.
@@ -483,8 +483,8 @@ class PathFollower(LifecycleNode):
         - Logging various state changes and decisions for debugging and monitoring purposes.
         - Maintaining and updating the internal node state based on the type of the last waypoint processed.
 
-        This function assumes that `latitude`, `longitude`, `bbox`,
-        `image_width`, and `image_height` are available within the class instance and are appropriately set before calling this function.
+        This function assumes that 'latitude', 'longitude', 'bbox',
+        'image_width', and 'image_height' are available within the class instance and are appropriately set before calling this function.
         """
         
         self.grid_points = []
@@ -542,18 +542,18 @@ class PathFollower(LifecycleNode):
 
         The function checks for wind conditions, recalculates path segments between exact points, and publishes the updated path.
 
-        :return: None. The function directly updates the `current_path` and `current_grid_path` attributes of the instance, 
+        :return: None. The function directly updates the 'current_path' and 'current_grid_path' attributes of the instance, 
                 and publishes the new path to a designated topic.
 
         Function behavior includes:
         - Verifying if wind conditions are reported; if not, the function logs a message and exits without updating the path.
-        - If there are no waypoints to process (i.e., if `grid_points` is empty), the function clears the current path and logs this event.
+        - If there are no waypoints to process (i.e., if 'grid_points' is empty), the function clears the current path and logs this event.
         - Creating a new path by connecting all exact points through calculated segments, while taking into account wind angle.
         - Dynamically inserting intermediate points into path segments to enhance navigation precision.
         - Publishing the newly calculated path for use by the navigation system.
         - Logging various state changes and decisions for debugging and monitoring purposes.
 
-        This function assumes that `current_grid_cell` and `grid_points` are available within the class instance 
+        This function assumes that 'current_grid_cell' and 'grid_points' are available within the class instance 
         and are appropriately set before calling this function.
         """
          
@@ -647,7 +647,7 @@ class PathFollower(LifecycleNode):
         This function also performs a synchronous service call to register the threat in the system and optionally map the threat ID
         back to the waypoint for subsequent adjustments.
 
-        :param waypoint: A `Waypoint` object that contains the latitude and longitude of the threat location.
+        :param waypoint: A 'Waypoint' object that contains the latitude and longitude of the threat location.
         :param id: An optional integer specifying the threat ID. If set to -1, a new threat ID is requested. Default is -1.
 
         :return: None. The function updates the system with a new or adjusted threat model and logs the response.
@@ -659,8 +659,8 @@ class PathFollower(LifecycleNode):
         - Logging the setting process and the response, including the assigned threat ID.
         - Storing the assigned threat ID for position adjustment and reference.
 
-        This function assumes that `buoy_threat_size_map_units`, `buoy_threat_gaussian_intensity`,
-        `bbox`, `image_width`, `image_height`, and `set_threat_cli` (a ROS2 service client) are properly configured and available.
+        This function assumes that 'buoy_threat_size_map_units', 'buoy_threat_gaussian_intensity',
+        'bbox', 'image_width', 'image_height', and 'set_threat_cli' (a ROS2 service client) are properly configured and available.
         """
         threat = GaussianThreat()
         threat.size = self.buoy_threat_size_map_units
@@ -694,7 +694,7 @@ class PathFollower(LifecycleNode):
 
         Function behavior includes:
         - Logging receipt of a new waypoint.
-        - Appending the new waypoint to the `waypoints` list.
+        - Appending the new waypoint to the 'waypoints' list.
         - Adding the waypoint as a threat if it is a rounding waypoint (either to the right or left).
         - Calling the function to calculate exact points from the new waypoint.
         - Recalculating the entire path based on updated waypoint data.
@@ -736,8 +736,8 @@ class PathFollower(LifecycleNode):
         - Checking if the next path point is closer than the current target to avoid backtracking.
         - Managing and removing passed exact points to maintain an updated path.
 
-        This function assumes that instance attributes `latitude`, `longitude`, `current_path`, 
-        `current_grid_path`, and `exact_points` are properly initialized and available.
+        This function assumes that instance attributes 'latitude', 'longitude', 'current_path', 
+        'current_grid_path', and 'exact_points' are properly initialized and available.
         """
         grid_cell_msg = Point()
         grid_cell_msg.x = float(self.current_grid_cell[0])
@@ -859,13 +859,13 @@ class PathFollower(LifecycleNode):
         """
         Inserts intermediate points into a given path segment to simplify more granular path following.
         The number of points inserted between each pair of original points is determined by the distance between them
-        multiplied by a specified factor (`num_per_unit_distance`).
+        multiplied by a specified factor ('num_per_unit_distance').
 
-        :param path: A list of `PoseStamped` objects representing the waypoints of a path segment.
+        :param path: A list of 'PoseStamped' objects representing the waypoints of a path segment.
         :param num_per_unit_distance: A floating point number that determines how many points to insert per unit of distance
                                     between each pair of consecutive waypoints in the path.
 
-        :return: A list of `PoseStamped` objects with the newly inserted intermediate points included.
+        :return: A list of 'PoseStamped' objects with the newly inserted intermediate points included.
 
         Function behavior includes:
         - Logging a warning and returning the original path if it has zero length.

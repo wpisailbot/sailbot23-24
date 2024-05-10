@@ -111,6 +111,29 @@ class Track:
         return (self.kf.x[0], self.kf.x[2])
 
 def calculate_offset_position(lat, lon, heading, z_distance, x_distance):
+    """
+    Calculates a new geographic position offset by specified distances in the forward (z-axis) and rightward (x-axis) directions
+    relative to a given heading from an initial latitude and longitude.
+
+    :param lat: The latitude of the starting point in decimal degrees.
+    :param lon: The longitude of the starting point in decimal degrees.
+    :param heading: The current heading in degrees from the North, measured clockwise.
+    :param z_distance: The distance to move forward from the starting point, in meters.
+    :param x_distance: The distance to move rightward from the starting point, in meters.
+
+    :return: A 'GeoPoint' object representing the new geographic position in decimal degrees of latitude and longitude.
+
+    Function behavior includes:
+    - Converting the heading from degrees to radians for trigonometric calculations.
+    - Calculating the angle from the original heading to the resultant vector created by the specified distances.
+    - Determining the total angle by combining the heading with this new angle.
+    - Computing the resultant distance using the Pythagorean theorem.
+    - Using the 'geodesic' method from the 'geopy' library to calculate the new position based on this resultant distance and angle.
+
+    This function assumes that the 'geodesic' method is capable of calculating a destination point given a starting point,
+    a distance, and a bearing. The 'GeoPoint' structure returned should be compatible with the needs of geographic
+    information systems or other location-based services.
+    """
     heading_rad = math.radians(heading)
 
     # Calculate the effective heading by considering the forward (Z) and rightward (X) distances
@@ -216,6 +239,25 @@ class BuoyDetection(Node):
                 self.buoy_position_publisher.publish(detection)
 
     def associate_detections_to_tracks(self, tracks, detections_enu, max_distance=3):
+        """
+        Associates detections to existing tracks using a cost matrix based on the Euclidean distance between predicted track
+        positions (from a Kalman filter, but we don't have velocity detection, so it's useless for now) and new detections. 
+        The function handles cases where there are no tracks or detections and returns matches and unmatched detections for further processing.
+
+        :param tracks: A list of track objects which maintain state and prediction methods.
+        :param detections_enu: A list of detections in East-North-Up (ENU) coordinates.
+        :param max_distance: The maximum allowable distance for a detection to be considered a match with a track. Default is 3 meters.
+
+        :return: A tuple containing two elements:
+                - matches: A list of tuples (track_index, detection_index) where each tuple represents a confirmed match.
+                - unmatched_detections: A list of indices from 'detections_enu' that did not match with any existing track.
+
+        Function behavior includes:
+        - Building a cost matrix where each element represents the distance between a track's predicted position and a detection's position.
+        - Using the Hungarian algorithm (linear sum assignment) to find the optimal matching of tracks to detections based on the cost matrix.
+        - Filtering these matches based on the 'max_distance' threshold to ensure only reasonable matches are kept.
+        - Determining which detections and tracks remain unmatched after the matching process.
+        """
         if len(tracks) == 0:
             return [], set(range(len(detections_enu)))
         
@@ -246,6 +288,30 @@ class BuoyDetection(Node):
         return matches, list(unmatched_detections)#, list(unmatched_tracks)
 
     def listener_callback(self, data) -> None:
+        """
+        Callback function for handling image data received from a ROS subscriber. This function processes each image frame to detect,
+        identify, and track orange objects, likely buoys, based on their color and shape. It converts ROS image messages to OpenCV
+        format, undistorts the image using camera intrinsics, and utilizes various helper functions to compute the objects' 
+        geographical and relative positions.
+
+        :param data: A ROS Image message that contains the image data captured by a camera.
+
+        :return: None. This function directly updates the system's state by modifying the tracking information and publishing the results.
+
+        Function behavior includes:
+        - Converting the ROS image message to an OpenCV image format.
+        - Calculating scaling factors based on the camera's resolution.
+        - Undistorting the image using pre-defined camera matrix and distortion coefficients.
+        - Detecting orange objects in the image by analyzing their contours.
+        - Calculating the center of each detected object.
+        - Converting the pixel coordinates of these centers to world coordinates, then to latitude and longitude.
+        - Transforming geodetic coordinates to East-North-Up (ENU) coordinates.
+        - Associating detected objects with existing tracks or creating new tracks for unmatched detections.
+        - Updating the track information and publishing the updated tracks for further processing or visualization.
+
+        This function relies on a set of predefined variables and configurations such as camera calibration parameters ('camera_matrix',
+        'distortion_coefficients'), and scaling factors ('FX', 'FY', 'CX', 'CY').
+        """
         # Convert ROS Image message to OpenCV image
         current_frame = self.bridge.imgmsg_to_cv2(data, 'bgr8')
         #self.get_logger().info("frame width: "+str(current_frame.shape))
@@ -283,6 +349,24 @@ class BuoyDetection(Node):
 
 
     def fill_holes(self, image):
+        """
+        Fills holes within binary images to create solid objects, which improves the reliability of subsequent image processing operations.
+        This function identifies contours within the image that represent both external boundaries and internal holes, filling
+        the latter to solidify the objects.
+
+        :param image: A binary image (numpy array) where objects are typically represented by white on a black background.
+
+        :return: A binary image (numpy array) where internal holes within objects have been filled.
+
+        Function behavior includes:
+        - Finding contours in the image using OpenCV's findContours method, configured to retrieve both external and internal contours.
+        - Creating a new all-white image of the same size as the input to serve as the base for drawing filled contours.
+        - Iterating through each contour and its corresponding hierarchy level to determine if it is an internal contour (a hole).
+        - Filling holes by drawing the internal contours as solid shapes on the new image.
+        - Returning the complement of the filled image, effectively reversing the colors to match the input format (objects are white).
+
+        This method is used in preparation for detection of orange circles.
+        """
         # Find contours
         contours, hierarchy = cv2.findContours(image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -302,6 +386,27 @@ class BuoyDetection(Node):
         return 255-filled_image
 
     def detect_orange_objects(self, image):
+        """
+        Detects orange objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,
+        converts it to HSV color space, applies a color mask to isolate orange regions, and identifies contours that meet
+        specific area and circularity criteria.
+
+        :param image: An image array in BGR format, typically received from an image capturing device or simulation environment.
+
+        :return: A list of contours that represent detected orange objects which meet the area and circularity thresholds.
+                These objects are presumed to be circular in shape, fitting the typical characteristics of buoys.
+
+        Function behavior includes:
+        - Converting the image to HSV color space for better color segmentation.
+        - Applying a mask to filter out colors that are not within a specified orange range.
+        - Refining the mask using morphological operations to reduce noise and improve object isolation.
+        - Detecting contours in the masked image and filtering these based on their area to remove too small or large objects.
+        - Further analyzing the filtered contours for circularity to confirm if they match the expected shape of buoys.
+        - Drawing detected objects on the mask image for visual verification.
+        - Publishing the result image with detected objects highlighted to a ROS topic for further use or debugging.
+        - Optionally saving the processed image to disk for analysis (commented out).
+
+        """
         # Convert to HSV color space
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 

@@ -247,7 +247,7 @@ class BallastControl(LifecycleNode):
             else:
                 ramp_factor = elapsed_time / self.RAMP_UP_TIME
 
-        error_derivative = (current_error - self.previous_error) / delta_time
+        #error_derivative = (current_error - self.previous_error) / delta_time
         motor_value = self.control_to_motor_value(self.constrain_control(self.Kp*current_error*ramp_factor))
         #self.get_logger().info("Current target: "+str(self.current_target) + " Current position: "+str(self.current_ballast_position)+" Current motor value: "+str(motor_value))
         
