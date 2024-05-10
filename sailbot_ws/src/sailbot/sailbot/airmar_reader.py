@@ -104,6 +104,26 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         #self.get_logger().info('Publishing: "%s"' % msg.data)
 
     def publishIfValid(self, value, publisher, type: type):
+        """
+        Validates and publishes the given value using the specified publisher based on the data type. This function is designed
+        to ensure that only valid data is published to ROS topics.
+
+        :param value: The value to be published. Depending on the type, this can be a single value or a tuple of values.
+        :param publisher: The ROS publisher object used to publish the data.
+        :param type: The data type class which defines how to interpret `value`. This can be one of several expected ROS message types
+                    such as `Float64`, `Wind`, or `NavSatFix`.
+
+        :return: None. This function does not return a value but instead publishes data to a ROS topic if the data is valid.
+
+        Function behavior includes:
+        - Checking the specified `type` and constructing a corresponding ROS message object.
+        - Attempting to cast `value` to the appropriate type(s) required by the ROS message.
+        - If casting is successful and the value is valid, the data is published using the provided `publisher`.
+        - If an error occurs during casting or validation, the function catches the exception and refrains from publishing,
+        optionally logging the error or ignoring invalid data.
+
+        This function supports multiple ROS data types and can be extended to include more types as needed.
+        """
         #self.get_logger().info("Checking validity: ")
         #self.get_logger().info(str(type))
         #self.get_logger().info(str(value))
@@ -141,7 +161,30 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         
 
     def readLineToJson(self):
+        """
+        Reads a line from a serial input, decodes it, and interprets various NMEA sentences into structured JSON-like dictionaries
+        based on the sentence type. The function handles various NMEA sentence codes by parsing and publishing appropriate data
+        while logging relevant information.
 
+        :return: A dictionary representing the parsed data from the NMEA sentence. This dictionary's structure varies depending
+                on the type of NMEA sentence processed. The function returns an empty dictionary for certain NMEA sentence types
+                that are deemed unnecessary or redundant.
+
+        This function primarily processes data for navigation and environmental monitoring, converting raw NMEA sentence inputs
+        into more structured data forms. It handles a variety of NMEA sentence types including GPS position data (`GLL`),
+        rate of turn (`ROT`), speed and heading information (`VTG`), environmental data like temperature and atmospheric pressure (`XDR`),
+        and wind data (`MWV`, `MWD`). It also includes error handling to manage exceptions during the read and parse operations.
+
+        Function behavior includes:
+        - Reading and decoding a line from the serial port.
+        - Splitting the line based on commas to differentiate data fields and removing any checksums.
+        - Identifying the sentence type through a code in the tag and processing accordingly.
+        - Publishing valid data to appropriate ROS topics using helper functions.
+        - Logging significant actions and data points for debugging purposes.
+        - Returning structured data as a dictionary where applicable, or an empty dictionary for unsupported or unnecessary data types.
+
+        This function assumes the availability of a serial port connection, currently to a Maretron USB100.
+        """
         try:
             line = self.ser.readline().decode()
             #self.get_logger().info(line)

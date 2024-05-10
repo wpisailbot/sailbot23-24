@@ -486,31 +486,6 @@ class NetworkComms(LifecycleNode):
 
         #self.get_logger().info(f"length of boatState path is: {len(self.current_boat_state.current_path.points)}")
 
-    def restart_lifecycle_node_by_name(self, node_name: str) -> bool:
-        # Create a service client to send lifecycle state change requests
-        client = self.create_client(ChangeState, f'{node_name}/change_state')
-
-        # Wait for the service to be available
-        i=0
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f'Waiting for {node_name} lifecycle service...')
-            i+=1
-            if i > 5:
-                return False
-
-        # Deactivate the node
-        deactivate_request = ChangeState.Request()
-        deactivate_request.transition.id = Transition.TRANSITION_DEACTIVATE
-        client.call_async(deactivate_request)
-        self.get_logger().info(f'Sent deactivate request to {node_name}')
-
-        # Reactivate the node
-        activate_request = ChangeState.Request()
-        activate_request.transition.id = Transition.TRANSITION_ACTIVATE
-        client.call_async(activate_request)
-        self.get_logger().info(f'Sent activate request to {node_name}')
-        return True
-    
     def create_lifecycle_callback(self, node_name: str) -> Callable[[Any, TransitionEvent], None]:
         def lifecycle_callback(self, msg):
             msg_details = f"Received {node_name} update! State is: {msg.goal_state.id}"
@@ -848,11 +823,6 @@ class NetworkComms(LifecycleNode):
             return response
         
         result = self.restart_node_client.call(restart_node_request)
-        #self.get_logger().info("About to spin")
-        #rclpy.spin_until_future_complete(self, future)
-        #self.get_logger().info("completed command")
-        
-        #result = self.restart_lifecycle_node_by_name(command.node_name)
         response.success = result.success
         self.get_logger().info("Restart node: "+str(result))
         return response
