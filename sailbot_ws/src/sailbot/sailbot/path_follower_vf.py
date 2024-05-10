@@ -79,6 +79,65 @@ def find_and_load_image(directory, location):
 
 
 class PathFollower(LifecycleNode):
+    """
+    A ROS2 lifecycle node that manages pathfinding and navigation for the boat. It processes waypoints, handles dynamic path updates,
+    manages threats, and integrates sensor data to navigate efficiently.
+
+    :ivar latitude: Current latitude of the boat.
+    :ivar longitude: Current longitude of the boat.
+    :ivar heading: Current boat heading in degrees.
+    :ivar speed_knots: Current speed of the boat in knots.
+    :ivar wind_angle_deg: Current wind direction in degrees relative to the boat.
+    :ivar waypoints: A 'WaypointPath' object containing the waypoints the boat must follow.
+    :ivar current_path: A 'GeoPath' object representing the currently planned path.
+    :ivar current_grid_path: List of grid coordinates corresponding to the 'current_path'.
+    :ivar segment_endpoint_indices: Indices in the 'current_path' where path segments end.
+    :ivar buoy_rounding_distance_meters: Distance for rounding buoys during navigation.
+    :ivar min_path_recalculation_interval_seconds: Minimum interval between path recalculations to avoid excessive updates.
+    :ivar threat_ids: List of internal IDs returned from pathfinder node for identified buoy threats.
+    :ivar previous_look_ahead_index: Last path point the boat was at, tracked to avoid issues with self-intersecting paths.
+    :ivar grid_points: The intermediate step between waypoints and the full grid path, passed to the pathfinder node.
+    :ivar exact_points: The intermediate step between waypoints and the full geographical path.
+    :ivar current_buoy_positions: Dictionary containing a mapping between buoy IDs and their current positions.
+    :ivar last_waypoint_was_rounding_type: Internal state to decide if the last few points might need to be trimmed,
+        as we don't always want to go fully around a buoy.
+
+    **Lifecycle Management**:
+    - **on_configure**: Configures publishers, subscribers, and service clients used for navigation.
+    - **on_activate**: Activates the node to start path management and threat detection.
+    - **on_deactivate**: Deactivates the node, stopping all navigation and path updates.
+    - **on_cleanup**: Cleans up resources, particularly the subscribers and publishers.
+    - **on_shutdown**: Handles tasks necessary for node shutdown.
+
+    **Subscriptions**:
+    - 'airmar_heading_subscription': Subscribes to heading updates from the boat's sensors.
+    - 'airmar_position_subscription': Subscribes to position updates, updating boat's geographic location.
+    - 'airmar_speed_knots_subscription': Subscribes to speed updates in knots.
+
+    **Publishers**:
+    - 'current_grid_segment_publisher': Publishes the current segment of the navigation grid being followed.
+    - 'current_segment_debug_publisher': Publishes debug information about the current navigation segment.
+    - 'target_position_publisher': Publishes the target position the boat is navigating towards.
+    - 'current_path_publisher': Publishes updates to the navigation path as it is recalculated.
+    - 'current_grid_cell_publisher': Publishes the current grid cell location of the boat within the navigation map.
+
+    **Services**:
+    - 'set_map_cli', 'get_path_cli', 'set_threat_cli': Service clients for setting the navigation map, retrieving paths, and managing navigation threats.
+
+    **Methods**:
+    - 'set_parameters', 'get_parameters': Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.
+    - 'calculate_exact_points_from_waypoint': Processes waypoints to calculate exact navigation points.
+    - 'recalculate_path_from_exact_points': Recalculates the navigation path based on new or updated exact navigation points.
+    - 'find_look_ahead': Determines the boat's progress along the path.
+    - 'remove_last_points_if_necessary': Trims unnecessary navigation points if the last waypoint was a rounding type.
+    - 'get_square_corners': Calculates and orders the four corners of a square about a target position, facing a starting position.
+
+    **Usage**:
+    - The node must be managed by state_manager
+
+    **Notes**:
+    - This is the vector-field variant of the boat's pathfinding. See path_follower.py for the look-ahead variant.
+    """
     heading = 0
     # latitude = 42.273822
     # longitude = -71.805967
@@ -100,15 +159,12 @@ class PathFollower(LifecycleNode):
 
     previous_look_ahead_index = 0
 
-    #waypoint_indices = []
-    waypoint_segment_last_coords = [] 
     grid_points = []
     exact_points = []
 
     last_recalculation_time = time.time()
 
     current_buoy_positions = {}
-    buoy_snap_latlongs = {}
     last_waypoint_was_rounding_type = False
 
     waypoint_threat_id_map = {}

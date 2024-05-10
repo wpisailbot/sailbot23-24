@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ballast_control &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=af2ce170"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for ballast_control</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="kn">import</span> <span class="nn">rclpy</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">String</span><span class="p">,</span> <span class="n">Float64</span><span class="p">,</span> <span class="n">Int16</span>
+<span class="kn">from</span> <span class="nn">sailbot_msgs.msg</span> <span class="kn">import</span> <span class="n">Wind</span><span class="p">,</span> <span class="n">AutonomousMode</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">board</span>
+<span class="kn">import</span> <span class="nn">busio</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">time</span> <span class="k">as</span> <span class="n">get_time</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">LifecycleNode</span><span class="p">,</span> <span class="n">LifecycleState</span><span class="p">,</span> <span class="n">TransitionCallbackReturn</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">Publisher</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">State</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">TransitionCallbackReturn</span>
+<span class="kn">from</span> <span class="nn">rclpy.timer</span> <span class="kn">import</span> <span class="n">Timer</span>
+<span class="kn">from</span> <span class="nn">rclpy.subscription</span> <span class="kn">import</span> <span class="n">Subscription</span>
+
+<div class="viewcode-block" id="make_json_string"><a class="viewcode-back" href="../ballast_control.html#ballast_control.make_json_string">[docs]</a><span class="k">def</span> <span class="nf">make_json_string</span><span class="p">(</span><span class="n">json_msg</span><span class="p">):</span>
+    <span class="n">json_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">json_msg</span><span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="n">String</span><span class="p">()</span>
+    <span class="n">message</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">json_str</span>
+    <span class="k">return</span> <span class="n">message</span></div>
+
+<div class="viewcode-block" id="bound"><a class="viewcode-back" href="../ballast_control.html#ballast_control.bound">[docs]</a><span class="k">def</span> <span class="nf">bound</span><span class="p">(</span><span class="n">low</span><span class="p">,</span> <span class="n">high</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">low</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">high</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="BallastControl"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl">[docs]</a><span class="k">class</span> <span class="nc">BallastControl</span><span class="p">(</span><span class="n">LifecycleNode</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A ROS 2 lifecycle node for controlling the ballast system of a sailboat, handling dynamic positioning based on sensor inputs</span>
+<span class="sd">    to maintain boat stability and optimal sailing conditions.</span>
+
+<span class="sd">    This node interfaces with hardware through PWM signals to control the ballast motor based on roll data from an Airmar sensor,</span>
+<span class="sd">    adjusting the ballast&#39;s position to counteract roll induced by wind or other environmental factors.</span>
+
+<span class="sd">    :ivar ballast_pwm_publisher: Publisher for ballast motor PWM values.</span>
+<span class="sd">    :ivar roll_errors: (list) Stores recent roll error measurements to compute the average roll error.</span>
+<span class="sd">    :ivar num_error_readings: (int) Number of roll readings to keep for averaging.</span>
+<span class="sd">    :ivar ADC_FULL_STARBOARD: (int) ADC value corresponding to the full starboard position of the ballast.</span>
+<span class="sd">    :ivar ADC_FULL_PORT: (int) ADC value corresponding to the full port position of the ballast.</span>
+<span class="sd">    :ivar ADC_MAX: (int) Maximum ADC value for the ballast position.</span>
+<span class="sd">    :ivar ADC_MIN: (int) Minimum ADC value for the ballast position.</span>
+<span class="sd">    :ivar MOTOR_FAST_STARBOARD: (int) PWM value to move the ballast fast towards starboard.</span>
+<span class="sd">    :ivar MOTOR_FAST_PORT: (int) PWM value to move the ballast fast towards port.</span>
+<span class="sd">    :ivar MOTOR_STOP: (int) PWM value to stop the ballast motor.</span>
+<span class="sd">    :ivar CONTROL_FAST_PORT: (float) Control signal for fast movement towards port.</span>
+<span class="sd">    :ivar CONTROL_FAST_STARBOARD: (float) Control signal for fast movement towards starboard.</span>
+<span class="sd">    :ivar ERROR_MIN_MAGNITUDE: (int) Minimum magnitude of error necessary to actuate the ballast.</span>
+<span class="sd">    :ivar RAMP_UP_TIME: (float) Time period to ramp up the motor to full speed.</span>
+<span class="sd">    :ivar Kp: (float) Proportional gain for the PID controller.</span>
+<span class="sd">    :ivar Kd: (float) Derivative gain for the PID controller (currently not in use).</span>
+<span class="sd">    :ivar roll_kp: (int) Proportional gain for roll correction.</span>
+<span class="sd">    :ivar current_target: (int) Current target ADC value for the ballast position.</span>
+<span class="sd">    :ivar current_ballast_position: (int) Last known ADC value of the ballast position.</span>
+<span class="sd">    :ivar move: (bool) Flag to determine if the ballast needs to be moved.</span>
+<span class="sd">    :ivar current_wind_dir: (float) Current wind direction in degrees.</span>
+<span class="sd">    :ivar autonomous_mode: (int) Current autonomous mode of the vessel.</span>
+
+<span class="sd">    **Lifecycle States**:</span>
+<span class="sd">    - **Configuring**: Sets up subscriptions and publishers.</span>
+<span class="sd">    - **Activating**: Starts the control loop timer.</span>
+<span class="sd">    - **Deactivating**: Stops the control loop timer.</span>
+<span class="sd">    - **Cleaning up**: Shuts down publishers and subscriptions.</span>
+<span class="sd">    - **Shutting down**: Performs additional cleanup as required.</span>
+
+<span class="sd">    The control strategy involves responding to roll data and desired position changes, using a P controller to compute</span>
+<span class="sd">    the necessary adjustments to the ballast position. The node uses a ramp-up mechanism to smooth out the control signals,</span>
+<span class="sd">    preventing sudden movements that could destabilize the boat.</span>
+
+<span class="sd">    **Callback Functions**:</span>
+<span class="sd">    - **ballast_position_callback**: Handles updates to the desired ballast position.</span>
+<span class="sd">    - **current_ballast_position_callback**: Updates the internal state with the current ballast position.</span>
+<span class="sd">    - **airmar_roll_callback**: Responds to new roll data by adjusting the ballast position to counteract the roll.</span>
+<span class="sd">    - **apparent_wind_callback**: Optional handling of wind data for more sophisticated control strategies.</span>
+<span class="sd">    - **airmar_heading_callback**: Tracks the boat&#39;s heading to adjust control strategies based on directional changes.</span>
+<span class="sd">    - **control_loop_callback**: The main control loop that calculates and sends PWM values to the ballast motor based on the PID control strategy.</span>
+<span class="sd">    - **roll_correction_callback**: Periodically adjusts the target position based on accumulated roll errors to maintain stability.</span>
+
+<span class="sd">    **Usage**:</span>
+<span class="sd">    - The node must be managed by state_manager</span>
+
+<span class="sd">    **Notes**:</span>
+<span class="sd">    - Currently, moves the ballast every 10 seconds. A shorter period will improve response, but ballast movement is extremely expensive in terms of battery use.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">roll_errors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">num_error_readings</span> <span class="o">=</span> <span class="mi">20</span>
+
+    <span class="n">ADC_FULL_STARBOARD</span> <span class="o">=</span> <span class="mi">700</span>
+    <span class="n">ADC_FULL_PORT</span> <span class="o">=</span> <span class="mi">2300</span>
+    <span class="n">ADC_MAX</span> <span class="o">=</span> <span class="n">ADC_FULL_PORT</span>
+    <span class="n">ADC_MIN</span> <span class="o">=</span> <span class="n">ADC_FULL_STARBOARD</span>
+    
+    <span class="n">MOTOR_FAST_STARBOARD</span> <span class="o">=</span> <span class="mi">130</span>
+    <span class="n">MOTOR_FAST_PORT</span> <span class="o">=</span> <span class="mi">60</span>
+    <span class="n">MOTOR_STOP</span> <span class="o">=</span> <span class="mi">95</span>
+
+    <span class="n">CONTROL_FAST_PORT</span><span class="o">=-</span><span class="mf">1.0</span>
+    <span class="n">CONTROL_FAST_STARBOARD</span><span class="o">=</span><span class="mf">1.0</span>
+
+    <span class="n">ERROR_MIN_MAGNITUDE</span> <span class="o">=</span> <span class="mi">20</span>
+
+    <span class="n">RAMP_UP_TIME</span> <span class="o">=</span> <span class="mf">2.0</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">in_ramp_up</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">Kp</span> <span class="o">=</span> <span class="mf">0.005</span>
+    <span class="n">Kd</span> <span class="o">=</span> <span class="mf">0.1</span>
+
+    <span class="n">roll_kp</span> <span class="o">=</span> <span class="mi">20</span>
+    <span class="n">previous_error</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">previous_time</span> <span class="o">=</span> <span class="n">get_time</span><span class="p">()</span>
+
+    <span class="n">current_target</span> <span class="o">=</span> <span class="p">(</span><span class="n">ADC_FULL_PORT</span><span class="o">-</span><span class="n">ADC_FULL_STARBOARD</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="o">+</span><span class="n">ADC_FULL_STARBOARD</span>
+    <span class="n">current_ballast_position</span> <span class="o">=</span> <span class="n">current_target</span>
+
+    <span class="n">move</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">current_wind_dir</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">autonomous_mode</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;ballast_control&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ballast_pwm_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">position_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_ballast_position_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_roll_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">timer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Timer</span><span class="p">]</span>
+
+    <span class="c1">#lifecycle node callbacks</span>
+<div class="viewcode-block" id="BallastControl.on_configure"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.on_configure">[docs]</a>    <span class="k">def</span> <span class="nf">on_configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;In configure&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ballast_pwm_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Int16</span><span class="p">,</span> <span class="s1">&#39;ballast_pwm&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">position_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;ballast_position&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_ballast_position_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Int16</span><span class="p">,</span>
+            <span class="s1">&#39;current_ballast_position&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_ballast_position_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_roll_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;/airmar_data/roll&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">airmar_roll_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">apparent_wind_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Wind</span><span class="p">,</span>
+            <span class="s2">&quot;apparent_wind_smoothed&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">apparent_wind_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s2">&quot;/airmar_data/heading&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_callback</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span><span class="n">AutonomousMode</span><span class="p">,</span> <span class="s1">&#39;autonomous_mode&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_callback</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">timer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_timer</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">control_loop_callback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">roll_correction_timer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_timer</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">roll_correction_callback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Ballast node configured&quot;</span><span class="p">)</span>
+        <span class="c1">#super().on_configure(state)</span>
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+
+<div class="viewcode-block" id="BallastControl.on_activate"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.on_activate">[docs]</a>    <span class="k">def</span> <span class="nf">on_activate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Activating...&quot;</span><span class="p">)</span>
+        <span class="c1"># Start publishers or timers</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_activate</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BallastControl.on_deactivate"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.on_deactivate">[docs]</a>    <span class="k">def</span> <span class="nf">on_deactivate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Deactivating...&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_deactivate</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="BallastControl.on_cleanup"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.on_cleanup">[docs]</a>    <span class="k">def</span> <span class="nf">on_cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Cleaning up...&quot;</span><span class="p">)</span>
+        <span class="c1"># Destroy subscribers, publishers, and timers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_timer</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">timer</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_lifecycle_publisher</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pwm_control_publisher</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_subscription</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+
+<div class="viewcode-block" id="BallastControl.on_shutdown"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.on_shutdown">[docs]</a>    <span class="k">def</span> <span class="nf">on_shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Shutting down...&quot;</span><span class="p">)</span>
+        <span class="c1"># Perform final cleanup if necessary</span>
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+    
+<div class="viewcode-block" id="BallastControl.on_error"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.on_error">[docs]</a>    <span class="k">def</span> <span class="nf">on_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">LifecycleState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Error caught!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_error</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+    
+    <span class="c1">#end callbacks</span>
+    
+<div class="viewcode-block" id="BallastControl.autonomous_mode_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.autonomous_mode_callback">[docs]</a>    <span class="k">def</span> <span class="nf">autonomous_mode_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">AutonomousMode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Got autonomous mode: </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">mode</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">mode</span></div>
+
+<div class="viewcode-block" id="BallastControl.median"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.median">[docs]</a>    <span class="k">def</span> <span class="nf">median</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lst</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lst</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">lst</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span><span class="n">n</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">s</span><span class="p">[</span><span class="n">n</span> <span class="o">//</span> <span class="mi">2</span><span class="p">])[</span><span class="n">n</span> <span class="o">%</span> <span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="n">n</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="BallastControl.constrain_control"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.constrain_control">[docs]</a>    <span class="k">def</span> <span class="nf">constrain_control</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">control</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">bound</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">CONTROL_FAST_PORT</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">CONTROL_FAST_STARBOARD</span><span class="p">,</span> <span class="n">control</span><span class="p">)</span></div>
+    
+<div class="viewcode-block" id="BallastControl.control_to_motor_value"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.control_to_motor_value">[docs]</a>    <span class="k">def</span> <span class="nf">control_to_motor_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">control</span><span class="p">):</span>
+        <span class="k">return</span>  <span class="bp">self</span><span class="o">.</span><span class="n">MOTOR_FAST_PORT</span> <span class="o">+</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">MOTOR_FAST_STARBOARD</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">MOTOR_FAST_PORT</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">CONTROL_FAST_STARBOARD</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">CONTROL_FAST_PORT</span><span class="p">))</span> <span class="o">*</span> <span class="p">(</span><span class="n">control</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">CONTROL_FAST_PORT</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="BallastControl.ballast_position_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.ballast_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">ballast_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Received ballast setpoint: &quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">data</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ADC_FULL_PORT</span> <span class="o">+</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">ADC_FULL_STARBOARD</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">ADC_FULL_PORT</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">))</span> <span class="o">*</span> <span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">-</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">move</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_ramp_up</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span> <span class="o">=</span> <span class="n">get_time</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="BallastControl.current_ballast_position_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.current_ballast_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">current_ballast_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Int16</span><span class="p">):</span>
+        <span class="c1">#self.get_logger().info(&quot;Got current ballast position&quot;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_ballast_position</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="BallastControl.airmar_roll_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.airmar_roll_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_roll_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Callback function that processes roll data received from the Airmar sensor, adjusts the target roll based on wind direction,</span>
+<span class="sd">        and stores the roll error for future analysis.</span>
+
+<span class="sd">        This method is called automatically whenever a new roll data message is received. It calculates the desired roll target</span>
+<span class="sd">        based on the relative wind angle, computes the error between the actual and target roll, and logs this error for control purposes.</span>
+
+<span class="sd">        :param msg: The roll data message containing the current roll angle of the boat.</span>
+<span class="sd">        :type msg: Float64</span>
+
+<span class="sd">        **Key Operations:**</span>
+
+<span class="sd">        - **Wind Direction Check**: Determines if the wind direction is known; if not, logs a message and exits.</span>
+<span class="sd">        - **Relative Wind Calculation**: Computes the angle of the wind relative to the boat&#39;s current heading.</span>
+<span class="sd">        - **Target Roll Setting**: Sets the roll target based on the relative wind angle:</span>
+<span class="sd">            - 20 degrees if wind is from the starboard side.</span>
+<span class="sd">            - -20 degrees if wind is from the port side.</span>
+<span class="sd">        - **Error Buffer Management**: Ensures that only the most recent &#39;self.num_error_readings&#39; errors are kept.</span>
+
+<span class="sd">        **Notes:**</span>
+<span class="sd">        - The function handles cases where the wind is directly behind or ahead by not changing the current roll target.</span>
+<span class="sd">        </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">roll_target</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_wind_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No apparent wind yet.&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">relative_wind_angle</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_wind_dir</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_heading</span> <span class="o">+</span> <span class="mi">360</span><span class="p">)</span> <span class="o">%</span> <span class="mi">360</span>
+        <span class="k">if</span> <span class="n">relative_wind_angle</span> <span class="o">==</span> <span class="mi">180</span><span class="p">:</span>
+            <span class="k">pass</span> <span class="c1"># Directly from behind</span>
+        <span class="k">elif</span> <span class="n">relative_wind_angle</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">pass</span> <span class="c1"># Directly ahead</span>
+        <span class="k">elif</span> <span class="n">relative_wind_angle</span> <span class="o">&lt;</span> <span class="mi">180</span><span class="p">:</span>
+            <span class="n">roll_target</span> <span class="o">=</span> <span class="mi">20</span> <span class="c1"># Starboard</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">roll_target</span> <span class="o">=</span> <span class="o">-</span><span class="mi">20</span> <span class="c1"># Port</span>
+        
+        <span class="n">roll_error</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span><span class="o">-</span><span class="n">roll_target</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">roll_errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">roll_error</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">roll_errors</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_error_readings</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">roll_errors</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span></div>
+
+        <span class="c1">#self.get_logger().info(&quot;Got roll data!&quot;)</span>
+
+<div class="viewcode-block" id="BallastControl.airmar_heading_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.airmar_heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="BallastControl.apparent_wind_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.apparent_wind_callback">[docs]</a>    <span class="k">def</span> <span class="nf">apparent_wind_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Wind</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_wind_dir</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">direction</span></div>
+
+<div class="viewcode-block" id="BallastControl.roll_correction_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.roll_correction_callback">[docs]</a>    <span class="k">def</span> <span class="nf">roll_correction_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">!=</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_FULL</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">!=</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_BALLAST</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">!=</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_TRIMTAB</span><span class="p">):</span>
+            <span class="k">return</span>
+        
+        <span class="k">if</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">roll_errors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No roll errors yet&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">avg_roll_err</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">roll_errors</span><span class="p">)</span>
+
+        <span class="n">move</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">roll_kp</span><span class="o">*</span><span class="n">avg_roll_err</span>
+        <span class="n">new_target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_target</span><span class="o">+</span><span class="n">move</span>
+
+        <span class="k">if</span><span class="p">(</span><span class="n">new_target</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">ADC_MIN</span><span class="p">):</span>
+            <span class="n">new_target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ADC_MIN</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">new_target</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">ADC_MAX</span><span class="p">):</span>
+            <span class="n">new_target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ADC_MAX</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_target</span> <span class="o">=</span> <span class="n">new_target</span>
+        <span class="c1">#self.get_logger().info(f&quot;Set target from roll: {self.current_target}&quot;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">move</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">in_ramp_up</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span> <span class="o">=</span> <span class="n">get_time</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BallastControl.control_loop_callback"><a class="viewcode-back" href="../ballast_control.html#ballast_control.BallastControl.control_loop_callback">[docs]</a>    <span class="k">def</span> <span class="nf">control_loop_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Periodically adjusts the ballast position based on the target setpoint, handling the motor control based on the error magnitude</span>
+<span class="sd">        and applying a ramp-up strategy for smoother operation.</span>
+
+<span class="sd">        This function forms the control loop for ballast position adjustment. It calculates the error between the current and target</span>
+<span class="sd">        positions, decides on the motor PWM value based using a proportional controller, and sends the command to the esp comms node. </span>
+<span class="sd">        The loop also incorporates a ramp-up mechanism to smoothly reach the desired position over a specified time.</span>
+
+<span class="sd">        **Conditions and Steps**:</span>
+
+<span class="sd">        - **No Movement**: If the system is not in a &#39;move&#39; state, the function returns immediately.</span>
+<span class="sd">        - **Small Error Handling**: Stops the motor if the current error is below a minimal threshold (&#39;ERROR_MIN_MAGNITUDE&#39;).</span>
+<span class="sd">        - **Ramp-Up Calculation**: If in ramp-up phase, scales the control effort based on the elapsed time from the start of the movement.</span>
+<span class="sd">        - **Control Computation**: Calculates the motor control signal using proportional control (Kp), scaled by the ramp-up factor.</span>
+<span class="sd">        - **Command Publishing**: Sends the computed PWM value to the motor via a ROS publisher.</span>
+
+<span class="sd">        **Motor Control Strategy**:</span>
+
+<span class="sd">        - The motor command is derived from a simple proportional control law adjusted by a ramp-up factor that ensures smooth transitions when starting movements, to avoid straining the timing belt, which has torn without this system.</span>
+<span class="sd">        - The actual motor value is constrained within operational PWM bounds.</span>
+
+<span class="sd">        **Note**:</span>
+
+<span class="sd">        - This callback is scheduled to run at regular intervals by a ROS timer, ensuring periodic updates to the ballast position.</span>
+<span class="sd">        - Stops the motor and resets the movement flag when the target is achieved within a small error margin, preventing oscillation around the target.</span>
+<span class="sd">        - Currently, &quot;ramp-down&quot; is provided by the proportional controller. A more robust system would decide if ramp-up or ramp-down was needed based on the target position and current movement direction/velocity, but since this runs only every 10 seconds, it&#39;s not necessary right now.</span>
+<span class="sd">        </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">move</span> <span class="o">==</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="c1"># if(self.current_ballast_position &lt; 500 or self.current_ballast_position &gt; 3000):</span>
+        <span class="c1">#     #self.get_logger().info(&quot;Ballast position is 0, assuming it&#39;s broken&quot;)</span>
+        <span class="c1">#     self.get_logger().info(&quot;Ballast out of range!&quot;)</span>
+        <span class="c1">#     return</span>
+        <span class="n">current_error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_ballast_position</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_target</span>
+        <span class="c1">#self.get_logger().info(f&quot;Current target: {self.current_target}, current position: {self.current_ballast_position}&quot;)</span>
+        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">current_error</span><span class="p">)</span><span class="o">&lt;</span><span class="bp">self</span><span class="o">.</span><span class="n">ERROR_MIN_MAGNITUDE</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Error is small, stopping&quot;</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">Int16</span><span class="p">()</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">95</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ballast_pwm_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">move</span><span class="o">=</span><span class="kc">False</span>
+            <span class="k">return</span>
+        
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">get_time</span><span class="p">()</span>
+        <span class="n">delta_time</span> <span class="o">=</span> <span class="n">current_time</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">previous_time</span>
+        <span class="n">ramp_factor</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_ramp_up</span><span class="p">:</span>
+            <span class="n">elapsed_time</span> <span class="o">=</span> <span class="n">current_time</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_time</span>
+            <span class="k">if</span> <span class="n">elapsed_time</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">RAMP_UP_TIME</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">in_ramp_up</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ramp_factor</span> <span class="o">=</span> <span class="n">elapsed_time</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">RAMP_UP_TIME</span>
+
+        <span class="c1">#error_derivative = (current_error - self.previous_error) / delta_time</span>
+        <span class="n">motor_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">control_to_motor_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">constrain_control</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Kp</span><span class="o">*</span><span class="n">current_error</span><span class="o">*</span><span class="n">ramp_factor</span><span class="p">))</span>
+        <span class="c1">#self.get_logger().info(&quot;Current target: &quot;+str(self.current_target) + &quot; Current position: &quot;+str(self.current_ballast_position)+&quot; Current motor value: &quot;+str(motor_value))</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">previous_error</span> <span class="o">=</span> <span class="n">current_error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">previous_time</span> <span class="o">=</span> <span class="n">current_time</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">Int16</span><span class="p">()</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">motor_value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ballast_pwm_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../ballast_control.html#ballast_control.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">ballast_control</span> <span class="o">=</span> <span class="n">BallastControl</span><span class="p">()</span>
+
+    <span class="c1"># Use the SingleThreadedExecutor to spin the node.</span>
+    <span class="n">executor</span> <span class="o">=</span> <span class="n">rclpy</span><span class="o">.</span><span class="n">executors</span><span class="o">.</span><span class="n">SingleThreadedExecutor</span><span class="p">()</span>
+    <span class="n">executor</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">ballast_control</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Spin the node to execute callbacks</span>
+        <span class="n">executor</span><span class="o">.</span><span class="n">spin</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">trace</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
+        <span class="n">ballast_control</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Shutdown and cleanup the node</span>
+        <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+        <span class="n">ballast_control</span><span class="o">.</span><span class="n">destroy_node</span><span class="p">()</span>
+        <span class="n">rclpy</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span></div>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

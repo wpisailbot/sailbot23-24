@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>State Manager Node &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=af2ce170"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Heading Controller Node" href="wind_smoother.html" />
+    <link rel="prev" title="Path Follower Node" href="path_follower_vf.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-state_manager">
+<span id="state-manager-node"></span><h1>State Manager Node<a class="headerlink" href="#module-state_manager" title="Permalink to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="state_manager.StateManager">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">state_manager.</span></span><span class="sig-name descname"><span class="pre">StateManager</span></span><a class="reference internal" href="_modules/state_manager.html#StateManager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Node</span></code></p>
+<p>A ROS2 node that manages the lifecycle states of other nodes within the system. It provides services for restarting
+nodes and functions to transition nodes between different lifecycle states. This manager supports nodes defined
+as managed and can ensure that they are initialized in the correct state during system startup.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>early_node_names</strong> – A list of node names that should be managed before others upon system start.</p></li>
+<li><p><strong>node_names</strong> – A list of all other node names to be managed.</p></li>
+<li><p><strong>client_state_getters</strong> – Dictionary mapping node names to ROS2 clients for getting current state.</p></li>
+<li><p><strong>client_state_setters</strong> – Dictionary mapping node names to ROS2 clients for setting state.</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Service Servers</strong>:
+- ‘restart_node_srv’: A service that allows external requests to restart managed nodes.</p>
+<p><strong>Methods</strong>:
+- ‘configure_nodes’: Configures a list of nodes using their transition services.
+- ‘activate_nodes’: Activates a list of nodes, bringing them from the configured state to active.
+- ‘transitionNodes’: Manages the state transitions for a list of nodes based on specified transition IDs.
+- ‘restart_lifecycle_node_callback’: Callback for the service that handles requests to restart nodes.
+- ‘restart_node’: Handles the actual restart of a node by managing its state transitions.
+- ‘get_node_state’: Retrieves the current state of a node.
+- ‘change_node_state’: Asynchronously changes the state of a node.
+- ‘change_node_state_sync’: Synchronously changes the state of a node, suitable for calling from other ROS2 callbacks.</p>
+<p><strong>Usage</strong>:
+- This node is initialized and run using a ROS2 launch file and interacts with other nodes through service
+calls to manage their states according to system requirements or external inputs.</p>
+<p><strong>Notes</strong>:
+- The manager must be aware of all nodes it needs to manage, configured through the managed_nodes parameter.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.activate_nodes">
+<span class="sig-name descname"><span class="pre">activate_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.activate_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.activate_nodes" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.change_node_state">
+<span class="sig-name descname"><span class="pre">change_node_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transition</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.change_node_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.change_node_state" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends a request to change the state of a specified node via a ROS2 service call. This function manages node transitions
+using the ROS2 lifecycle protocol by interacting with a service dedicated to changing node states.
+This function should NOT be used from ROS2 callbacks- timers, subscriptions, service callbacks, etc, as the async spin
+WILL deadlock this node. This is used at startup to launch many nodes simultaneously. Callbacks should instead use change_node_state_sync.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node_name</strong> – The name of the node whose state is to be changed.</p></li>
+<li><p><strong>transition</strong> – The transition ID that needs to be applied to the node. This ID should correspond to one of the
+predefined transition states in the ROS2 lifecycle.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A boolean value indicating the success or failure of the state change. Returns True if the state transition was
+successful, False otherwise.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Checking for the availability of the service that allows state changes for the specified node. If the service is not
+available immediately, it waits up to one second for it to become available.
+- Creating and sending a request to change the state of the node based on the specified transition.
+- Using asynchronous service calls to request the transition and waiting for the call to complete.
+- Logging the process and outcome of the service call, including waiting for the service, the attempt to change state,
+and the result of the call.</p>
+<p>This function assumes that a client for the node-specific ‘ChangeState’ service has already been set up in ‘client_state_setters’.
+It handles possible delays in service availability and logs significant actions and outcomes to aid in debugging and monitoring.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.change_node_state_sync">
+<span class="sig-name descname"><span class="pre">change_node_state_sync</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transition</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.change_node_state_sync"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.change_node_state_sync" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends a request to change the state of a specified node via a ROS2 service call. This function manages node transitions
+using the ROS2 lifecycle protocol by interacting with a service dedicated to changing node states.
+This function is intended for use in callbacks, and will not deadlock this node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node_name</strong> – The name of the node whose state is to be changed.</p></li>
+<li><p><strong>transition</strong> – The transition ID that needs to be applied to the node. This ID should correspond to one of the
+predefined transition states in the ROS2 lifecycle.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A boolean value indicating the success or failure of the state change. Returns True if the state transition was
+successful, False otherwise.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Checking for the availability of the service that allows state changes for the specified node. If the service is not
+available immediately, it waits up to one second for it to become available.
+- Creating and sending a request to change the state of the node based on the specified transition.
+- Using synchronous service calls to request the transition.
+- Logging the process and outcome of the service call, including waiting for the service, the attempt to change state,
+and the result of the call.</p>
+<p>This function assumes that a client for the node-specific ‘ChangeState’ service has already been set up in ‘client_state_setters’.
+It handles possible delays in service availability and logs significant actions and outcomes to aid in debugging and monitoring.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="state_manager.StateManager.client_state_getters">
+<span class="sig-name descname"><span class="pre">client_state_getters</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Client</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#state_manager.StateManager.client_state_getters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="state_manager.StateManager.client_state_setters">
+<span class="sig-name descname"><span class="pre">client_state_setters</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Client</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#state_manager.StateManager.client_state_setters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.configure_nodes">
+<span class="sig-name descname"><span class="pre">configure_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.configure_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.configure_nodes" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="state_manager.StateManager.early_node_names">
+<span class="sig-name descname"><span class="pre">early_node_names</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['network_comms']</span></em><a class="headerlink" href="#state_manager.StateManager.early_node_names" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.get_node_state">
+<span class="sig-name descname"><span class="pre">get_node_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.get_node_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.get_node_state" title="Permalink to this definition">¶</a></dt>
+<dd><p>Retrieves the current state of a specified node using a ROS2 service call. If the service is not available within three seconds,
+returns ‘unknown’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node_name</strong> – The name of the node whose state is to be retrieved.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The label of the current state of the node as a string, or ‘unknown’ if the service is not available within the timeout.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Checking the availability of the ‘GetState’ service for the specified node up to three times, with one second wait each.
+- If the service becomes available, sending a request to obtain the current state of the node.
+- If the service is not available within three attempts, returning ‘unknown’.
+- Logging each attempt to connect to the service and the outcome.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="state_manager.StateManager.node_names">
+<span class="sig-name descname"><span class="pre">node_names</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#state_manager.StateManager.node_names" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.restart_lifecycle_node_callback">
+<span class="sig-name descname"><span class="pre">restart_lifecycle_node_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">response</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.restart_lifecycle_node_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.restart_lifecycle_node_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.restart_node">
+<span class="sig-name descname"><span class="pre">restart_node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.restart_node"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.restart_node" title="Permalink to this definition">¶</a></dt>
+<dd><p>Manages the state transitions of a specified lifecycle node to effectively restart it. This function checks the
+current state of the node and applies the necessary transitions to bring it to an active state from any other state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>node_name</strong> – The name of the node whose state needs to be managed.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None. This function directly affects the state of the node by sending transition commands based on its current state.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Retrieving the current state of the node.
+- Logging the current state for monitoring and debugging purposes.
+- Applying a series of state transitions to restart the node:
+- If the node is ‘active’, it will be deactivated, cleaned up, configured, and reactivated.
+- If the node is ‘inactive’, it will be cleaned up, configured, and activated.
+- If the node is in ‘finalized’ or ‘unconfigured’ state, it will be configured and activated.
+- If the node is in an unknown state, a log message will be generated indicating this.
+- These transitions are designed to ensure that the node can recover from any stable state to active status.</p>
+<p>The function relies on the ‘change_node_state_sync’ method to perform the state transitions, which sends requests to
+the node to change its state according to the ROS2 lifecycle state machine. Each transition is logged to provide a clear
+trace of the actions taken.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="state_manager.StateManager.transitionNodes">
+<span class="sig-name descname"><span class="pre">transitionNodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transition_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#StateManager.transitionNodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.StateManager.transitionNodes" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="state_manager.main">
+<span class="sig-prename descclassname"><span class="pre">state_manager.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/state_manager.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#state_manager.main" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">State Manager Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#state_manager.StateManager"><code class="docutils literal notranslate"><span class="pre">StateManager</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#state_manager.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="path_follower_vf.html" title="previous chapter">Path Follower Node</a></li>
+      <li>Next: <a href="wind_smoother.html" title="next chapter">Heading Controller Node</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/state_manager.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

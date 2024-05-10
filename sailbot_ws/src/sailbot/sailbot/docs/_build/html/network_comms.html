@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Network Comms Node &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=af2ce170"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Path Follower Node" href="path_follower_vf.html" />
+    <link rel="prev" title="Heading Controller Node" href="heading_controller_vf.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-network_comms">
+<span id="network-comms-node"></span><h1>Network Comms Node<a class="headerlink" href="#module-network_comms" title="Permalink to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="network_comms.NetworkComms">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">network_comms.</span></span><span class="sig-name descname"><span class="pre">NetworkComms</span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">LifecycleNode</span></code></p>
+<p>A ROS2 lifecycle node that handles network communications for various telemetry and control tasks
+for the boat. It handles command executions and telemetry data streaming over gRPC.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>current_map</strong> – An ‘OccupancyGrid’ object representing the current map used for navigation.</p></li>
+<li><p><strong>current_boat_state</strong> – A protobuf message holding the current state of the boat.</p></li>
+<li><p><strong>current_video_source</strong> – An integer representing the current requested video source</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Subscriptions</strong>:
+- Multiple subscriptions for telemetry data such as position, heading, wind conditions, and video streams.</p>
+<p><strong>Publishers</strong>:
+- Publishers for various control commands like rudder angle, ballast position, and trim tab angle.</p>
+<p><strong>Services</strong>:
+- Service clients and servers for managing commands related to boat state, video streaming, and node restarts.</p>
+<p><strong>Methods</strong>:
+- Various callback methods for handling telemetry data.
+- Methods for sending commands to control systems based on remote or autonomous inputs.</p>
+<p><strong>Usage</strong>:
+- The node must be managed by state_manager</p>
+<p><strong>Notes</strong>:
+- This node runs before all other lifecycle nodes, so that it can monitor their state transitions.
+- It utilizes gRPC for robust, efficient, and flexible network communication.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteAddWaypointCommand">
+<span class="sig-name descname"><span class="pre">ExecuteAddWaypointCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">AddWaypointCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteAddWaypointCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteAddWaypointCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteAutonomousModeCommand">
+<span class="sig-name descname"><span class="pre">ExecuteAutonomousModeCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">AutonomousModeCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteAutonomousModeCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteAutonomousModeCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteBallastCommand">
+<span class="sig-name descname"><span class="pre">ExecuteBallastCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BallastCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteBallastCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteBallastCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteMarkBuoyCommand">
+<span class="sig-name descname"><span class="pre">ExecuteMarkBuoyCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">MarkBuoyCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteMarkBuoyCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteMarkBuoyCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteRudderCommand">
+<span class="sig-name descname"><span class="pre">ExecuteRudderCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">RudderCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteRudderCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteRudderCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteSetRudderKPCommand">
+<span class="sig-name descname"><span class="pre">ExecuteSetRudderKPCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SetRudderKPCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteSetRudderKPCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteSetRudderKPCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteSetVFForwardMagnitudeCommand">
+<span class="sig-name descname"><span class="pre">ExecuteSetVFForwardMagnitudeCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SetVFForwardMagnitudeCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteSetVFForwardMagnitudeCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteSetVFForwardMagnitudeCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteSetWaypointsCommand">
+<span class="sig-name descname"><span class="pre">ExecuteSetWaypointsCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SetWaypointsCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteSetWaypointsCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteSetWaypointsCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteTrimTabCommand">
+<span class="sig-name descname"><span class="pre">ExecuteTrimTabCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TrimTabCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteTrimTabCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteTrimTabCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.GetMap">
+<span class="sig-name descname"><span class="pre">GetMap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">MapRequest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.GetMap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.GetMap" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.RestartNode">
+<span class="sig-name descname"><span class="pre">RestartNode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">RestartNodeRequest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.RestartNode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.RestartNode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.SendBoatState">
+<span class="sig-name descname"><span class="pre">SendBoatState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BoatStateRequest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.SendBoatState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.SendBoatState" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.StreamBoatState">
+<span class="sig-name descname"><span class="pre">StreamBoatState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BoatStateRequest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.StreamBoatState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.StreamBoatState" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.StreamVideo">
+<span class="sig-name descname"><span class="pre">StreamVideo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">VideoRequest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.StreamVideo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.StreamVideo" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.apparent_wind_callback">
+<span class="sig-name descname"><span class="pre">apparent_wind_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Wind</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.apparent_wind_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.apparent_wind_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.buoy_position_callback">
+<span class="sig-name descname"><span class="pre">buoy_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BuoyDetectionStamped</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.buoy_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.buoy_position_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.camera_color_image_callback">
+<span class="sig-name descname"><span class="pre">camera_color_image_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.camera_color_image_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.camera_color_image_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.camera_depth_image_callback">
+<span class="sig-name descname"><span class="pre">camera_depth_image_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.camera_depth_image_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.camera_depth_image_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.camera_mask_image_callback">
+<span class="sig-name descname"><span class="pre">camera_mask_image_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.camera_mask_image_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.camera_mask_image_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.control_system_heartbeat">
+<span class="sig-name descname"><span class="pre">control_system_heartbeat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.control_system_heartbeat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.control_system_heartbeat" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.create_grpc_server">
+<span class="sig-name descname"><span class="pre">create_grpc_server</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.create_grpc_server"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.create_grpc_server" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.create_lifecycle_callback">
+<span class="sig-name descname"><span class="pre">create_lifecycle_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">TransitionEvent</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.create_lifecycle_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.create_lifecycle_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.current_boat_state">
+<span class="sig-name descname"><span class="pre">current_boat_state</span></span><a class="headerlink" href="#network_comms.NetworkComms.current_boat_state" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.current_buoy_positions">
+<span class="sig-name descname"><span class="pre">current_buoy_positions</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#network_comms.NetworkComms.current_buoy_positions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.current_map">
+<span class="sig-name descname"><span class="pre">current_map</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">OccupancyGrid</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#network_comms.NetworkComms.current_map" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.current_path_callback">
+<span class="sig-name descname"><span class="pre">current_path_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GeoPath</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.current_path_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.current_path_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.current_video_source">
+<span class="sig-name descname"><span class="pre">current_video_source</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#network_comms.NetworkComms.current_video_source" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.do_video_encode">
+<span class="sig-name descname"><span class="pre">do_video_encode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#network_comms.NetworkComms.do_video_encode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.heading_callback">
+<span class="sig-name descname"><span class="pre">heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.heading_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.last_camera_frame">
+<span class="sig-name descname"><span class="pre">last_camera_frame</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#network_comms.NetworkComms.last_camera_frame" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.last_camera_frame_shape">
+<span class="sig-name descname"><span class="pre">last_camera_frame_shape</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#network_comms.NetworkComms.last_camera_frame_shape" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.last_camera_frame_time">
+<span class="sig-name descname"><span class="pre">last_camera_frame_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715325784.3523874</span></em><a class="headerlink" href="#network_comms.NetworkComms.last_camera_frame_time" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.lat_long_callback">
+<span class="sig-name descname"><span class="pre">lat_long_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">NavSatFix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.lat_long_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.lat_long_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.on_activate">
+<span class="sig-name descname"><span class="pre">on_activate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.on_activate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.on_activate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle an activating transition.</p>
+<p>This is the default on_activate() callback.
+It will call all on_activate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_activate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.on_cleanup">
+<span class="sig-name descname"><span class="pre">on_cleanup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.on_cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.on_cleanup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a cleaning up transition.</p>
+<p>This is the default on_cleanup() callback.
+It will call all on_cleanup() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_cleanup() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.on_configure">
+<span class="sig-name descname"><span class="pre">on_configure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.on_configure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.on_configure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a configuring transition.</p>
+<p>This is the default on_configure() callback.
+It will call all on_configure() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_configure() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.on_deactivate">
+<span class="sig-name descname"><span class="pre">on_deactivate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.on_deactivate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.on_deactivate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a deactivating transition.</p>
+<p>This is the default on_deactivate() callback.
+It will call all on_deactivate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_deactivate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.on_error">
+<span class="sig-name descname"><span class="pre">on_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.on_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.on_error" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a transition error.</p>
+<p>This is the default on_error() callback.
+It will call all on_error() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_error() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.on_shutdown">
+<span class="sig-name descname"><span class="pre">on_shutdown</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.on_shutdown"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.on_shutdown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a shutting down transition.</p>
+<p>This is the default on_shutdown() callback.
+It will call all on_shutdown() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_shutdown() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.path_segment_debug_callback">
+<span class="sig-name descname"><span class="pre">path_segment_debug_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GeoPathSegment</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.path_segment_debug_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.path_segment_debug_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.pitch_callback">
+<span class="sig-name descname"><span class="pre">pitch_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.pitch_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.pitch_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.pwm_controller_heartbeat">
+<span class="sig-name descname"><span class="pre">pwm_controller_heartbeat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.pwm_controller_heartbeat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.pwm_controller_heartbeat" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.rate_of_turn_callback">
+<span class="sig-name descname"><span class="pre">rate_of_turn_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.rate_of_turn_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.rate_of_turn_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.roll_callback">
+<span class="sig-name descname"><span class="pre">roll_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.roll_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.roll_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.rudder_angle_callback">
+<span class="sig-name descname"><span class="pre">rudder_angle_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Int16</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.rudder_angle_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.rudder_angle_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.set_current_image">
+<span class="sig-name descname"><span class="pre">set_current_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.set_current_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.set_current_image" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.setup_node_subscription">
+<span class="sig-name descname"><span class="pre">setup_node_subscription</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.setup_node_subscription"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.setup_node_subscription" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.speed_kmh_callback">
+<span class="sig-name descname"><span class="pre">speed_kmh_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.speed_kmh_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.speed_kmh_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.speed_knots_callback">
+<span class="sig-name descname"><span class="pre">speed_knots_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.speed_knots_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.speed_knots_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.target_heading_debug_callback">
+<span class="sig-name descname"><span class="pre">target_heading_debug_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.target_heading_debug_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.target_heading_debug_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.target_position_callback">
+<span class="sig-name descname"><span class="pre">target_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GeoPoint</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.target_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.target_position_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.track_degrees_magnetic_callback">
+<span class="sig-name descname"><span class="pre">track_degrees_magnetic_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.track_degrees_magnetic_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.track_degrees_magnetic_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.track_degrees_true_callback">
+<span class="sig-name descname"><span class="pre">track_degrees_true_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.track_degrees_true_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.track_degrees_true_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.trim_state_callback">
+<span class="sig-name descname"><span class="pre">trim_state_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TrimState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.trim_state_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.trim_state_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.trim_tab_comms_heartbeat">
+<span class="sig-name descname"><span class="pre">trim_tab_comms_heartbeat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.trim_tab_comms_heartbeat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.trim_tab_comms_heartbeat" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.true_wind_callback">
+<span class="sig-name descname"><span class="pre">true_wind_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Wind</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.true_wind_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.true_wind_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.update_node_status_timer_callback">
+<span class="sig-name descname"><span class="pre">update_node_status_timer_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.update_node_status_timer_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.update_node_status_timer_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="network_comms.encode_frame">
+<span class="sig-prename descclassname"><span class="pre">network_comms.</span></span><span class="sig-name descname"><span class="pre">encode_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#encode_frame"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.encode_frame" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="network_comms.find_and_load_image">
+<span class="sig-prename descclassname"><span class="pre">network_comms.</span></span><span class="sig-name descname"><span class="pre">find_and_load_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">directory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">location</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#find_and_load_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.find_and_load_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find an image by location and load it along with its bounding box coordinates.</p>
+<p>Parameters:
+- directory: The directory to search in.
+- location: The location to match.</p>
+<p>Returns:
+- A tuple containing the loaded image and a dictionary with the bounding box coordinates.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="network_comms.get_resource_dir">
+<span class="sig-prename descclassname"><span class="pre">network_comms.</span></span><span class="sig-name descname"><span class="pre">get_resource_dir</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#get_resource_dir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.get_resource_dir" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="network_comms.get_state">
+<span class="sig-prename descclassname"><span class="pre">network_comms.</span></span><span class="sig-name descname"><span class="pre">get_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#get_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.get_state" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="network_comms.main">
+<span class="sig-prename descclassname"><span class="pre">network_comms.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.main" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="network_comms.make_json_string">
+<span class="sig-prename descclassname"><span class="pre">network_comms.</span></span><span class="sig-name descname"><span class="pre">make_json_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_msg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#make_json_string"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.make_json_string" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Network Comms Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#network_comms.NetworkComms"><code class="docutils literal notranslate"><span class="pre">NetworkComms</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#network_comms.encode_frame"><code class="docutils literal notranslate"><span class="pre">encode_frame()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#network_comms.find_and_load_image"><code class="docutils literal notranslate"><span class="pre">find_and_load_image()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#network_comms.get_resource_dir"><code class="docutils literal notranslate"><span class="pre">get_resource_dir()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#network_comms.get_state"><code class="docutils literal notranslate"><span class="pre">get_state()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#network_comms.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#network_comms.make_json_string"><code class="docutils literal notranslate"><span class="pre">make_json_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="heading_controller_vf.html" title="previous chapter">Heading Controller Node</a></li>
+      <li>Next: <a href="path_follower_vf.html" title="next chapter">Path Follower Node</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/network_comms.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

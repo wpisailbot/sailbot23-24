@@ -41,6 +41,66 @@ def normalRelativeAngle(angle):
 
 class HeadingController(LifecycleNode):
 
+    """
+    A ROS2 Lifecycle node for controlling the heading of a robotic sailboat based on navigational data and environmental conditions. 
+    This node integrates fuzzy logic for rudder angle control and uses an adaptive vector field for path following, 
+    dynamically adjusting the rudder based on computed heading errors and external factors like wind direction.
+
+    The node subscribes to various topics to receive updates on the boat's heading, wind conditions, and navigation path, and publishes 
+    commands for rudder angle adjustments. It is capable of handling different autonomous modes, specifically focusing on full autonomous navigation.
+
+    :ivar heading: (float) Current heading of the boat.
+    :ivar current_grid_cell: (Optional[Point]) Current grid cell position of the boat.
+    :ivar path_segment: (Optional[PathSegment]) Current path segment for navigation.
+    :ivar wind_direction_deg: (Optional[float]) Current wind direction in degrees.
+    :ivar autonomous_mode: (int) Current autonomous mode of operation.
+    :ivar heading_kp: (float) Proportional gain for heading control.
+    :ivar rudder_angle: (float) Current angle of the rudder.
+
+
+    Functions:
+        on_configure(self, state: State) -> TransitionCallbackReturn:
+            Configures the node, setting up publishers and subscribers. Initializes the fuzzy control system for rudder angle determination based on heading error and rate of change.
+
+        on_activate(self, state: State) -> TransitionCallbackReturn:
+            Activates the node to start responding to incoming data and controlling the rudder.
+
+        on_deactivate(self, state: State) -> TransitionCallbackReturn:
+            Deactivates the node, stopping its control activities.
+
+        on_cleanup(self, state: State) -> TransitionCallbackReturn:
+            Cleans up by destroying timers, subscribers, and publishers.
+
+        on_shutdown(self, state: State) -> TransitionCallbackReturn:
+            Performs shutdown procedures, ensuring all resources are cleanly released.
+
+        compute_rudder_angle(self):
+            Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and 
+            possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.
+
+        needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
+            Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat's heading, target heading, and wind direction.
+
+        adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -> np.ndarray:
+            Calculates a navigation vector based on the boat's current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.
+
+        vector_to_heading(self, dx, dy) -> float:
+            Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.
+
+        getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -> float:
+            Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.
+
+    Subscriptions:
+        Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat's rudder for optimal heading control.
+
+    Publishers:
+        Publishes the computed rudder angle to a designated topic for execution by the boat's steering mechanism.
+
+    **Usage**:
+    - The node must be managed by state_manager
+
+    """
+
     heading = 0
     #latitude = 42.273822
     #longitude = -71.805967
@@ -266,6 +326,27 @@ class HeadingController(LifecycleNode):
         self.heading_kp = msg.data
     
     def needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
+        """
+        Determines whether a tacking maneuver is required based on the current boat heading, target heading, and the direction
+        of the wind. Tacking is necessary when the desired heading would cause the boat to turn through the wind vector. 
+        This is only relevant for the sail controller, which will direct the sail to switch sides as the boat turns.
+
+        :param boat_heading: The current heading of the boat in degrees.
+        :param target_heading: The desired heading of the boat in degrees.
+        :param wind_direction: The current wind direction in degrees.
+
+        :return: A boolean value. Returns True if tacking is necessary to reach the target heading; otherwise, False.
+
+        Function behavior includes:
+        - Normalizing all heading and direction values to ensure they fall within a 0-360 degree range.
+        - Calculating whether the shortest path from the current to the target heading is clockwise or counterclockwise.
+        - Checking if the wind direction lies within the arc between the current and target headings in the chosen direction.
+        - Publishing a position adjustment to the ballast to aid in tacking, if necessary.
+        - Returning True if a tacking maneuver is needed based on the relative positions of the boat heading, target heading, and wind.
+
+        This function also manages the ballast position by publishing to 'ballast_position_publisher' to optimize the boat's
+        balance and performance during potential tacking maneuvers.
+        """
         # Normalize angles
         boat_heading %= 360
         target_heading %= 360
@@ -290,7 +371,33 @@ class HeadingController(LifecycleNode):
         
         return False
     
-    def adaptive_vector_field(self, P1, P2, x, y, k_base=1, lambda_base=0.1):
+    def adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0):
+        """
+        Computes an adaptive vector field between two points, providing a navigation vector that changes dynamically based on
+        the current position relative to a line segment defined by two points (P1 and P2). This method is used for
+        path following, where the vector field helps steer the boat towards and along the path.
+
+        :param P1: Tuple (x1, y1) representing the start point of the line segment.
+        :param P2: Tuple (x2, y2) representing the end point of the line segment.
+        :param x: Current x-coordinate of the boat.
+        :param y: Current y-coordinate of the boat.
+        :param k_base: Base proportional gain for the vector field calculation. Default is 1.0.
+        :param lambda_base: Base rate for the attraction to the path's direction. Default is 1.0.
+
+        :return: A numpy array representing the vector (V) in the 2D plane, pointing in the direction of movement required
+                to reduce the error relative to the path and maintain alignment with the path direction.
+
+        Function behavior includes:
+        - Calculating the directional vector (d) from P1 to P2.
+        - Projecting the current point (x, y) onto the line defined by P1 and P2 to find the closest point on the line.
+        - Calculating the error vector (e) from the current point to this projection.
+        - Determining the distance from the current point to the projected point on the line to dynamically adjust the gains.
+        - Computing the navigation vector (V) which combines a component to reduce the perpendicular distance to the line
+        (corrective force) and a component to move along the line (propulsive force).
+
+        The adaptive nature of the gains k and lambda ensures that the corrective force diminishes as the point approaches
+        the line, and the propulsive force increases, aiding in smoother convergence and travel along the path.
+        """
         x1, y1 = P1
         x2, y2 = P2
         d = np.array([x2 - x1, y2 - y1])
@@ -307,17 +414,43 @@ class HeadingController(LifecycleNode):
         """
         Convert vector components (dx, dy) at a grid position to a navigation heading.
 
-        Parameters:
-        - dx, dy: Changes in x and y grid coordinates.
+        :param dx: Change in x grid coordinate.
+        :param dy: Change in y grid coordinate.
 
-        Returns:
-        - Navigation bearing in degrees from north.
+        :return: Navigation bearing in degrees from north.
         """
         theta = math.atan2(dy, dx)  # Angle in radians
         bearing = (90 - math.degrees(theta)) % 360
         return bearing
 
     def compute_rudder_angle(self) -> None:
+        """
+        Computes and publishes the rudder angle based on the current heading, target segment, and other navigational parameters.
+        The function adjusts the rudder angle to align the vessel's heading with the target heading derived from the current path segment.
+        The rudder adjustment also considers the rate of change in heading error and conditions such as the need to tack against the wind.
+
+        This function performs several checks and computations:
+        - Ensures that the vessel is in full autonomous mode before making any adjustments.
+        - Publishes a zero rudder angle if there is no target path segment.
+        - Logs and exits if the current grid cell is not available.
+        - Computes a target heading from the current path segment using a vector field.
+        - Calculates heading error and its rate of change.
+        - Uses a fuzzy logic controller to compute the required rudder adjustment.
+        - Caps the rudder angle within specified limits and adjusts for tacking if necessary based on wind direction.
+        - Publishes the computed rudder angle.
+
+        :return: None. This function directly affects the vessel's steering by publishing rudder angle adjustments to a designated ROS topic.
+
+        The function relies on the following attributes:
+        - 'autonomous_mode': The current mode of operation, checked against predefined autonomous modes.
+        - 'path_segment': The current navigation path segment from which the target heading is derived.
+        - 'current_grid_cell': The vessel's current position in grid coordinates, necessary for vector field calculations.
+        - 'rudder_simulator': A fuzzy logic controller for computing the rudder angle based on heading error and rate of change.
+        - 'heading_kp': A proportional gain used to scale the rudder adjustment.
+        - 'wind_direction_deg': The current wind direction, used to determine if tacking maneuvers are necessary.
+
+        This method logs significant states and decisions to assist with debugging and operational monitoring.
+        """
         autonomous_modes = AutonomousMode()
         if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL):
             #self.get_logger().info("Not in auto")

@@ -21,7 +21,48 @@ import traceback
 
 
 class AirmarReader(LifecycleNode): #translates airmar data into json and publishes on 'airmar_data' ROS2 topic
+    """
+    A ROS 2 lifecycle node that handles reading and interpreting NMEA data from an Airmar sensor, publishing the data as
+    structured JSON on various ROS topics.
 
+    This node is responsible for establishing a serial connection to an Airmar sensor, parsing the incoming NMEA sentences,
+    and distributing the processed data through a set of ROS publishers for various types of data including navigation,
+    environmental conditions, and vessel dynamics.
+
+    :ivar publisher_: General publisher for raw JSON formatted data.
+    :ivar rot_publisher: Publisher for vessel's rate of turn.
+    :ivar navsat_publisher: Publisher for latitude and longitude data.
+    :ivar track_degrees_true_publisher: Publisher for true heading.
+    :ivar track_degrees_magnetic_publisher: Publisher for magnetic heading.
+    :ivar speed_knots_publisher: Publisher for speed in knots.
+    :ivar speed_kmh_publisher: Publisher for speed in kilometers per hour.
+    :ivar heading_publisher: Publisher for compass heading.
+    :ivar true_wind_publisher: Publisher for true wind data.
+    :ivar apparent_wind_publisher: Publisher for apparent wind data.
+    :ivar roll_publisher: Publisher for vessel roll data.
+    :ivar pitch_publisher: Publisher for vessel pitch data.
+
+    **Lifecycle States**:
+    - **Configuring**: Establishes the serial connection and sets up the publishers.
+    - **Activating**: Starts the timers and publishers.
+    - **Deactivating**: Stops the timers and publishers.
+    - **Cleaning up**: Destroys the timers and publishers.
+    - **Shutting down**: Closes the serial port and performs any final cleanup.
+
+    The node subscribes to no topics directly but instead pulls data continuously from the serial port connected to the Airmar sensor.
+    It publishes the processed data to various topics depending on the type of data (e.g., navigational, environmental).
+
+    **Timer Callbacks**:
+    - **timer_callback**: Regularly called to read from the serial port, parse the received data, and publish the results.
+
+    
+    **Usage**:
+    - The node must be managed by state_manager
+
+    **Notes**:
+    - Usage of this node requires a serial port connection to an Airmar weatherstation, currently provided by a Maretron USB100.
+
+    """
     def __init__(self):
         super().__init__('airmar_reader')
         self.publisher_: Optional[Publisher]

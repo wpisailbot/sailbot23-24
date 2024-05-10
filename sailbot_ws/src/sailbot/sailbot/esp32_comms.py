@@ -52,8 +52,18 @@ def find_esp32_serial_ports() -> list:
     return esp32_ports
 
 
-class TrimTabComms(LifecycleNode):
-    last_websocket = None
+class ESPComms(LifecycleNode):
+    """
+    A ROS2 Lifecycle Node for handling communications with the onboard ESP32 for rudder, trim tab, and ballast control.
+
+    :ivar last_winds: Stores recent wind measurements for processing.
+    :ivar autonomous_mode: Current mode of operation, based on 'AutonomousMode' message.
+    :ivar force_neutral_position: Flag to keep the trim tab in a neutral position, regardless of wind conditions.
+    :ivar could_be_tacking: Indicates if the boat is be performing a tacking maneuver.
+    :ivar last_lift_state: Last state of the trim tab concerning lift, stored as a 'TrimState'.
+    :ivar rudder_angle_limit_deg: Configurable limit for rudder angle to avoid extreme positions and stalls.
+    """
+
     last_winds = []
     autonomous_mode = 0
     force_neutral_position = True
@@ -62,7 +72,7 @@ class TrimTabComms(LifecycleNode):
     rudder_angle_limit_deg = None
 
     def __init__(self):
-        super(TrimTabComms, self).__init__('esp32_comms')
+        super(ESPComms, self).__init__('esp32_comms')
 
         self.set_parameters()
         self.get_parameters()
@@ -204,6 +214,34 @@ class TrimTabComms(LifecycleNode):
         self.find_trim_tab_state(msg.direction)
 
     def find_trim_tab_state(self, relative_wind) -> None:  # five states of trim
+        """
+        Determines the trim tab state based on the relative wind angle and current autonomous mode.
+        
+        This function sets the trim tab state to optimize the sail's position by adjusting the trim tab
+        to either maximize lift or drag on the port or starboard side, or to minimize lift when "in irons" (directly into the wind).
+        The function also handles state changes during tacking by detecting tacking signals from the rudder controller.
+
+        :param relative_wind: The angle of the wind relative to the boat, in degrees.
+
+        **Key Steps**:
+        - **Mode Check**: Exits if the system is not in full autonomous or trim tab autonomous mode.
+        - **State Determination**: Sets the trim tab state based on the relative wind angle.
+        - **Tacking Adjustment**: Adjusts trim tab states during tacking maneuvers.
+        - **Serial Communication**: Sends the determined state to the ESP32 for execution.
+
+        **Trim Tab States**:
+        - **Max Lift Port**: Applied when the relative wind is between 25 and 100 degrees.
+        - **Max Drag Port**: Applied when the relative wind is between 100 and 180 degrees.
+        - **Max Drag Starboard**: Applied when the relative wind is between 180 and 260 degrees.
+        - **Max Lift Starboard**: Applied when the relative wind is between 260 and 335 degrees.
+        - **Min Lift**: Default state, used when the wind angle does not match any other conditions or when in irons.
+
+        **Behavior**:
+        - Updates the trim tab state based on wind angle, adjusting for tacking if necessary.
+        - Publishes the new state to a ROS topic for other components to utilize.
+        - Handles exceptional cases where the boat might be in an unexpected state due to sudden wind changes.
+
+        """
         #self.get_logger().info(f"apparent wind: {relative_wind}")
         
         # Check autonomous mode TODO: This is a coupling that shouldn't be necessary. 
@@ -227,7 +265,7 @@ class TrimTabComms(LifecycleNode):
         elif 100 <= relative_wind < 180:
             # Max drag port
             msg = {
-                "state": "max_drag_starboard" # switched for testing
+                "state": "max_drag_starboard" # switched for testing, need to swap in trim_tab_client
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_PORT
             #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_PORT
@@ -253,7 +291,7 @@ class TrimTabComms(LifecycleNode):
             self.get_logger().info("In Min lift")
             # In irons
             
-            #adjust behavior to not stop during a tack
+            # Adjust behavior to not stop during a tack
             if(self.could_be_tacking):
                 self.get_logger().info("Tacking detected!")
                 if(self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
@@ -271,7 +309,7 @@ class TrimTabComms(LifecycleNode):
                         "state": "max_lift_starboard"
                     }
                 else:
-                    #how did we get here?
+                    # How did we get here?
                     self.get_logger().warn("Went into min lift in tack mode, but previous state was not max lift. Did the wind change suddenly?")
                     msg = {
                         "clear_winds": True,
@@ -310,6 +348,31 @@ class TrimTabComms(LifecycleNode):
         self.ser.write(message_string.encode())
 
     def rudder_angle_callback(self, msg: Int16) -> None:
+        """
+        Callback function that processes received rudder angle data, applies constraints, and sends a corrected value to the ESP32.
+
+        This function is triggered by a ROS subscription whenever a new rudder angle message is published. It checks the received
+        angle against preset limits, adjusts the angle if necessary to prevent extreme positions, and then sends the corrected
+        rudder angle to the ESP32 via serial communication.
+
+        :param msg: A message containing the rudder angle as an integer.
+
+        **Process**:
+        - **Angle Limiting**: Checks if the received rudder angle exceeds preset limits (''self.rudder_angle_limit_deg'').
+        - **Tacking Detection**: Sets a flag (''self.could_be_tacking'') if the rudder angle is beyond its limit, which heading_controller will use to indicate tacking.
+        - **Serial Communication**: Sends the adjusted rudder angle to the ESP32 in a JSON formatted string over a serial connection.
+
+        **Example of Serial Message**:
+        - Sent: '{"rudder_angle": 20}\n'
+
+        **Usage**:
+        - The node must be managed by state_manager
+
+        **Note**:
+        - The function modifies the state variable ''self.could_be_tacking'' based on the rudder angle's relation to its limits.
+
+        """
+
         #self.get_logger().info(f"Got rudder position: {msg.data}")
         degrees = msg.data
         # If rudder angles are high, limit them, and note that we could be tacking
@@ -346,6 +409,30 @@ class TrimTabComms(LifecycleNode):
         self.ser.write(message_string.encode())
 
     def ballast_timer_callback(self) -> None:
+        """
+        Timer callback function that sends a request to the ESP32 for the current position of the ballast and handles the response.
+        
+        This function formats a JSON message to request the ballast position, sends it via serial communication, reads the response,
+        decodes the JSON data received, and publishes the ballast position. It handles possible exceptions like serial communication
+        errors or JSON decoding errors and logs them accordingly.
+        
+        **Process**:
+        - **Request**: Sends a JSON message with a request for ballast position.
+        - **Response Handling**: Attempts to read and decode the response. If successful, publishes the ballast position.
+        - **Error Handling**: Captures and logs errors related to serial communication or JSON decoding.
+        - **Logging**: Logs messages indicating the status of data reception and errors.
+        
+        **Details**:
+        - The request is sent periodically, triggered by a ROS timer.
+        - If no data is received, or if there is an error in the data, logs this as an warning message.
+        - Even if the potentiometer is reading strangely (position is 0), the position is published to indicate that a response was received.
+        
+        **Example of Serial Message**:
+        - Sent: '{"get_ballast_pos": True}\n'
+        - Received: '{"ballast_pos": 102}'
+
+        """
+
         message = {
             "get_ballast_pos": True
         }
@@ -374,27 +461,27 @@ class TrimTabComms(LifecycleNode):
                 #publish even if it's broken, ballast_control will detect it
                 self.ballast_pos_publisher.publish(pos)
             except json.JSONDecodeError:
-                self.get_logger().info("Error decoding JSON")
+                self.get_logger().warn("Error decoding JSON")
         else:
-            self.get_logger().info("No data received within the timeout period.")
+            self.get_logger().warn("No data received within the timeout period.")
 
 def main(args=None):
     rclpy.init(args=args)
 
-    tt_comms = TrimTabComms()
+    esp_comms = ESPComms()
 
     try:
         ser = serial.Serial(serial_port, baud_rate, timeout=1)
         ser.close()
     except Exception as e:
         trace = traceback.format_exc()
-        tt_comms.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        esp_comms.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()
-    executor.add_node(tt_comms)
+    executor.add_node(esp_comms)
 
     executor.spin()
-    tt_comms.destroy_node()
+    esp_comms.destroy_node()
     executor.shutdown()
     rclpy.shutdown()
 

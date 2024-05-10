@@ -148,6 +148,39 @@ def calculate_offset_position(lat, lon, heading, z_distance, x_distance):
     return GeoPoint(latitude=new_location.latitude, longitude=new_location.longitude)
 
 class BuoyDetection(Node):
+    """
+    A ROS2 node responsible for detecting buoys using image data from a camera. This node subscribes to image streams,
+    processes the images to detect objects based on color and shape criteria, and publishes the locations of detected buoys.
+
+    :ivar current_x_scaling_factor: Scaling factor to adjust the pixel coordinates based on the image width.
+    :ivar current_y_scaling_factor: Scaling factor to adjust the pixel coordinates based on the image height.
+    :ivar latitude: Current latitude of the node.
+    :ivar longitude: Current longitude of the node.
+    :ivar heading: Current heading of the vehicle in degrees.
+    :ivar tracks: List of current tracking objects representing detected buoys.
+
+    **Methods**:
+    - **publish_tracks**: Publishes the current tracked positions of detected buoys.
+    - **associate_detections_to_tracks**: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.
+    - **listener_callback**: Processes each incoming image, detects buoys, and manages tracks.
+    - **fill_holes**: Fills holes within binary images to create solid objects, improving reliability of object detection.
+    - **detect_orange_objects**: Detects orange objects in the image by applying a color threshold and shape analysis.
+    - **calculate_depth**: Estimates the depth of detected objects based on their size in the image.
+    - **calculate_object_center**: Calculates the center of detected objects in pixel coordinates.
+    - **pixel_to_world**: Converts pixel coordinates to world coordinates using intrinsic camera parameters.
+
+    **Node Lifecycle**:
+    - **on_configure**: Configures the node's publishers, subscribers, and initializes parameters.
+    - **on_activate**: Activates the node, enabling the publishing of detection data.
+    - **on_deactivate**: Deactivates the node, stopping the publishing of detection data.
+    - **on_cleanup**: Cleans up resources, shutting down publishers and subscribers.
+
+    **Usage**:
+    - The node must be managed by state_manager
+
+    **Notes**:
+    - The ZED2 ros node must be running in order for this node to receive frames.
+    """
     current_x_scaling_factor = 1.0
     current_y_scaling_factor = 1.0
     latitude, longitude = 42.0396766107111, -71.84585650616927
@@ -476,16 +509,21 @@ class BuoyDetection(Node):
 
     def pixel_to_world(self, x_pixel, y_pixel, depth, f_x, f_y, c_x, c_y):
         """
-        Convert pixel coordinates to world coordinates.
+        Converts pixel coordinates to world coordinates based on the intrinsic camera parameters and the depth information.
 
-        Parameters:
-        x_pixel, y_pixel (float): Pixel coordinates of the sphere's center.
-        depth (float): Depth of the sphere from the camera.
-        f_x, f_y (float): Focal length of the camera (in pixels).
-        c_x, c_y (float): Optical center of the camera (in pixels).
+        :param x_pixel: Pixel x-coordinate of the sphere's center.
+        :param y_pixel: Pixel y-coordinate of the sphere's center.
+        :param depth: Depth of the sphere from the camera, in the same units used for world coordinates.
+        :param f_x: Focal length of the camera along the x-axis, in pixels.
+        :param f_y: Focal length of the camera along the y-axis, in pixels.
+        :param c_x: x-coordinate of the optical center of the camera, in pixels.
+        :param c_y: y-coordinate of the optical center of the camera, in pixels.
 
-        Returns:
-        tuple: Real-world coordinates (x, y, z) of the sphere.
+        :return: A tuple (x, y, z) representing the real-world coordinates of the sphere, where 'z' is the depth,
+                and 'x' and 'y' are the corresponding world coordinates derived from the pixel coordinates.
+
+        This function uses the pinhole camera model to translate pixel coordinates (x_pixel, y_pixel) and a depth measurement
+        into a 3D point in space relative to the camera. The conversion accounts for camera focal lengths and optical center offsets.
         """
         # Convert to normalized camera coordinates
         x_norm = (x_pixel - c_x) / f_x

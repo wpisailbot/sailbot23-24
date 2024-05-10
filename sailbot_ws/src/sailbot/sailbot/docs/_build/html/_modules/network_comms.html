@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>network_comms &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=af2ce170"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for network_comms</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">rclpy</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">rclpy.callback_groups</span> <span class="kn">import</span> <span class="n">MutuallyExclusiveCallbackGroup</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">LifecycleNode</span><span class="p">,</span> <span class="n">LifecycleState</span><span class="p">,</span> <span class="n">TransitionCallbackReturn</span>
+<span class="kn">from</span> <span class="nn">lifecycle_msgs.srv</span> <span class="kn">import</span> <span class="n">ChangeState</span>
+<span class="kn">from</span> <span class="nn">lifecycle_msgs.msg</span> <span class="kn">import</span> <span class="n">Transition</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">Publisher</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">State</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">TransitionCallbackReturn</span>
+<span class="kn">from</span> <span class="nn">rclpy.timer</span> <span class="kn">import</span> <span class="n">Timer</span>
+<span class="kn">from</span> <span class="nn">rclpy.subscription</span> <span class="kn">import</span> <span class="n">Subscription</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">String</span><span class="p">,</span>  <span class="n">Int8</span><span class="p">,</span> <span class="n">Int16</span><span class="p">,</span> <span class="n">Empty</span><span class="p">,</span> <span class="n">Float64</span>
+<span class="kn">from</span> <span class="nn">lifecycle_msgs.msg</span> <span class="kn">import</span> <span class="n">TransitionEvent</span>
+<span class="kn">from</span> <span class="nn">lifecycle_msgs.msg</span> <span class="kn">import</span> <span class="n">State</span> <span class="k">as</span> <span class="n">StateMsg</span>
+<span class="kn">from</span> <span class="nn">sensor_msgs.msg</span> <span class="kn">import</span> <span class="n">NavSatFix</span><span class="p">,</span> <span class="n">Image</span>
+<span class="kn">from</span> <span class="nn">geographic_msgs.msg</span> <span class="kn">import</span> <span class="n">GeoPoint</span>
+<span class="kn">from</span> <span class="nn">nav_msgs.msg</span> <span class="kn">import</span> <span class="n">OccupancyGrid</span>
+<span class="kn">from</span> <span class="nn">ament_index_python.packages</span> <span class="kn">import</span> <span class="n">get_package_share_directory</span>
+<span class="kn">from</span> <span class="nn">sailbot_msgs.msg</span> <span class="kn">import</span> <span class="n">Wind</span><span class="p">,</span> <span class="n">GeoPath</span><span class="p">,</span> <span class="n">AutonomousMode</span><span class="p">,</span> <span class="n">TrimState</span><span class="p">,</span> <span class="n">Waypoint</span><span class="p">,</span> <span class="n">WaypointPath</span><span class="p">,</span> <span class="n">GeoPathSegment</span><span class="p">,</span> <span class="n">BuoyDetectionStamped</span>
+<span class="kn">import</span> <span class="nn">grpc</span>
+<span class="kn">from</span> <span class="nn">concurrent</span> <span class="kn">import</span> <span class="n">futures</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">cv2</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">import</span> <span class="nn">types</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">from</span> <span class="nn">sailbot_msgs.srv</span> <span class="kn">import</span> <span class="n">RestartNode</span>
+
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.boat_state_pb2</span> <span class="k">as</span> <span class="nn">boat_state_pb2</span>
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.boat_state_pb2_grpc</span> <span class="k">as</span> <span class="nn">boat_state_pb2_rpc</span>
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.control_pb2</span> <span class="k">as</span> <span class="nn">control_pb2</span>
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.control_pb2_grpc</span> <span class="k">as</span> <span class="nn">control_pb2_grpc</span>
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.node_restart_pb2</span> <span class="k">as</span> <span class="nn">node_restart_pb2</span>
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.node_restart_pb2_grpc</span> <span class="k">as</span> <span class="nn">node_restart_pb2_grpc</span>
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.video_pb2</span> <span class="k">as</span> <span class="nn">video_pb2</span>
+<span class="kn">import</span> <span class="nn">telemetry_messages.python.video_pb2_grpc</span> <span class="k">as</span> <span class="nn">video_pb2_grpc</span>
+
+<div class="viewcode-block" id="find_and_load_image"><a class="viewcode-back" href="../network_comms.html#network_comms.find_and_load_image">[docs]</a><span class="k">def</span> <span class="nf">find_and_load_image</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">location</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Find an image by location and load it along with its bounding box coordinates.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - directory: The directory to search in.</span>
+<span class="sd">    - location: The location to match.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - A tuple containing the loaded image and a dictionary with the bounding box coordinates.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Regular expression to match the filename format and capture coordinates</span>
+    <span class="n">pattern</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">rf</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">location</span><span class="si">}</span><span class="s2">:(-?\d+\.?\d*):(-?\d+\.?\d*):(-?\d+\.?\d*):(-?\d+\.?\d*)\.png&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+        <span class="n">match</span> <span class="o">=</span> <span class="n">pattern</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+            <span class="c1"># Extract the bounding box coordinates</span>
+            <span class="n">south</span><span class="p">,</span> <span class="n">west</span><span class="p">,</span> <span class="n">north</span><span class="p">,</span> <span class="n">east</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">match</span><span class="o">.</span><span class="n">groups</span><span class="p">())</span>
+
+            <span class="c1"># Load the image</span>
+            <span class="n">image_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="mi">255</span><span class="o">-</span><span class="n">cv2</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">image_path</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">IMREAD_GRAYSCALE</span><span class="p">)</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">flip</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">img_rgba</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_GRAY2BGRA</span><span class="p">)</span>
+            <span class="n">alpha_channel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span> <span class="o">*</span> <span class="mi">127</span>
+            <span class="n">alpha_channel</span><span class="p">[</span><span class="n">image</span> <span class="o">==</span> <span class="mi">255</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span> 
+            <span class="n">img_rgba</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">alpha_channel</span>
+            <span class="k">if</span> <span class="n">image</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unable to load image at </span><span class="si">{</span><span class="n">image_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">img_rgba</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;south&quot;</span><span class="p">:</span> <span class="n">south</span><span class="p">,</span> <span class="s2">&quot;west&quot;</span><span class="p">:</span> <span class="n">west</span><span class="p">,</span> <span class="s2">&quot;north&quot;</span><span class="p">:</span> <span class="n">north</span><span class="p">,</span> <span class="s2">&quot;east&quot;</span><span class="p">:</span> <span class="n">east</span><span class="p">}</span>
+
+    <span class="c1"># Return None if no matching file is found</span>
+    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="get_resource_dir"><a class="viewcode-back" href="../network_comms.html#network_comms.get_resource_dir">[docs]</a><span class="k">def</span> <span class="nf">get_resource_dir</span><span class="p">():</span>
+    <span class="n">package_path</span> <span class="o">=</span> <span class="n">get_package_share_directory</span><span class="p">(</span><span class="s1">&#39;sailbot&#39;</span><span class="p">)</span>
+    <span class="n">resource_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">package_path</span><span class="p">,</span> <span class="s1">&#39;maps&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">resource_path</span></div>
+
+<div class="viewcode-block" id="encode_frame"><a class="viewcode-back" href="../network_comms.html#network_comms.encode_frame">[docs]</a><span class="k">def</span> <span class="nf">encode_frame</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+    <span class="c1"># Convert the frame to JPEG</span>
+    <span class="n">result</span><span class="p">,</span> <span class="n">encoded_image</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imencode</span><span class="p">(</span><span class="s1">&#39;.jpg&#39;</span><span class="p">,</span> <span class="n">frame</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">encoded_image</span><span class="o">.</span><span class="n">tobytes</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="make_json_string"><a class="viewcode-back" href="../network_comms.html#network_comms.make_json_string">[docs]</a><span class="k">def</span> <span class="nf">make_json_string</span><span class="p">(</span><span class="n">json_msg</span><span class="p">):</span>
+    <span class="n">json_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">json_msg</span><span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="n">String</span><span class="p">()</span>
+    <span class="n">message</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">json_str</span>
+    <span class="k">return</span> <span class="n">message</span></div>
+
+<div class="viewcode-block" id="get_state"><a class="viewcode-back" href="../network_comms.html#network_comms.get_state">[docs]</a><span class="k">def</span> <span class="nf">get_state</span><span class="p">(</span><span class="n">state_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">PRIMARY_STATE_ACTIVE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_ACTIVE</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">PRIMARY_STATE_INACTIVE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_INACTIVE</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">PRIMARY_STATE_FINALIZED</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_FINALIZED</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">PRIMARY_STATE_UNCONFIGURED</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_UNCONFIGURED</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">PRIMARY_STATE_UNKNOWN</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_UNKNOWN</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">TRANSITION_STATE_ACTIVATING</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_ACTIVATING</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">TRANSITION_STATE_CLEANINGUP</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_CLEANING_UP</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">TRANSITION_STATE_CONFIGURING</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_CONFIGURING</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">TRANSITION_STATE_DEACTIVATING</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_DEACTIVATING</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">TRANSITION_STATE_ERRORPROCESSING</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_ERROR_PROCESSING</span>
+    <span class="k">if</span> <span class="n">state_id</span> <span class="o">==</span> <span class="n">StateMsg</span><span class="o">.</span><span class="n">TRANSITION_STATE_SHUTTINGDOWN</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_SHUTTINGDOWN</span>
+    <span class="k">return</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeLifecycleState</span><span class="o">.</span><span class="n">NODE_LIFECYCLE_STATE_UNKNOWN</span></div>
+
+<div class="viewcode-block" id="NetworkComms"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms">[docs]</a><span class="k">class</span> <span class="nc">NetworkComms</span><span class="p">(</span><span class="n">LifecycleNode</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A ROS2 lifecycle node that handles network communications for various telemetry and control tasks</span>
+<span class="sd">    for the boat. It handles command executions and telemetry data streaming over gRPC.</span>
+
+<span class="sd">    :ivar current_map: An &#39;OccupancyGrid&#39; object representing the current map used for navigation.</span>
+<span class="sd">    :ivar current_boat_state: A protobuf message holding the current state of the boat.</span>
+<span class="sd">    :ivar current_video_source: An integer representing the current requested video source</span>
+
+<span class="sd">    **Subscriptions**:</span>
+<span class="sd">    - Multiple subscriptions for telemetry data such as position, heading, wind conditions, and video streams.</span>
+
+<span class="sd">    **Publishers**:</span>
+<span class="sd">    - Publishers for various control commands like rudder angle, ballast position, and trim tab angle.</span>
+
+<span class="sd">    **Services**:</span>
+<span class="sd">    - Service clients and servers for managing commands related to boat state, video streaming, and node restarts.</span>
+
+<span class="sd">    **Methods**:</span>
+<span class="sd">    - Various callback methods for handling telemetry data.</span>
+<span class="sd">    - Methods for sending commands to control systems based on remote or autonomous inputs.</span>
+
+<span class="sd">    **Usage**:</span>
+<span class="sd">    - The node must be managed by state_manager</span>
+
+<span class="sd">    **Notes**:</span>
+<span class="sd">    - This node runs before all other lifecycle nodes, so that it can monitor their state transitions.</span>
+<span class="sd">    - It utilizes gRPC for robust, efficient, and flexible network communication.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">current_map</span><span class="p">:</span> <span class="n">OccupancyGrid</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">current_boat_state</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">BoatState</span><span class="p">()</span>
+    <span class="n">last_camera_frame</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">last_camera_frame_shape</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">last_camera_frame_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">do_video_encode</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">current_video_source</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">current_buoy_positions</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;network_comms&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_control_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_control_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_angle_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">waypoints_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">single_waypoint_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rot_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">navsat_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_true_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_magnetic_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">speed_knots_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">speed_kmh_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">heading_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">apparent_wind_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">roll_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pitch_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pwm_heartbeat_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">control_system_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_path_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_position_subscriber</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_state_subscriber</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera_image_subscriber</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+
+        <span class="c1">#receives state updates from other nodes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_reader_lifecycle_state_subscriber</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">callback_group_state</span> <span class="o">=</span> <span class="n">MutuallyExclusiveCallbackGroup</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;map_name&#39;</span><span class="p">,</span> <span class="s1">&#39;quinsigamond&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">map_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;map_name&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">string_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Map name: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">map_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Getting map image&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">map_image</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox</span> <span class="o">=</span> <span class="n">find_and_load_image</span><span class="p">(</span><span class="n">get_resource_dir</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_name</span><span class="p">)</span>
+        
+    <span class="c1">#lifecycle node callbacks</span>
+<div class="viewcode-block" id="NetworkComms.on_configure"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.on_configure">[docs]</a>    <span class="k">def</span> <span class="nf">on_configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;In configure&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pwm_control_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">String</span><span class="p">,</span> <span class="s1">&#39;pwm_control&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_control_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Int16</span><span class="p">,</span> <span class="s1">&#39;rudder_angle&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Float64</span><span class="p">,</span> <span class="s1">&#39;ballast_position&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_control_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Int8</span><span class="p">,</span> <span class="s1">&#39;tt_control&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_angle_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Int16</span><span class="p">,</span> <span class="s1">&#39;tt_angle&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">waypoints_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">WaypointPath</span><span class="p">,</span> <span class="s1">&#39;waypoints&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">single_waypoint_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Waypoint</span><span class="p">,</span> <span class="s1">&#39;single_waypoint&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">AutonomousMode</span><span class="p">,</span> <span class="s1">&#39;autonomous_mode&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf_forward_magnitude_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Float64</span><span class="p">,</span> <span class="s1">&#39;vf_forward_magnitude&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_kp_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Float64</span><span class="p">,</span> <span class="s1">&#39;rudder_kp&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rot_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/rate_of_turn&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rate_of_turn_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">navsat_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">NavSatFix</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/lat_long&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lat_long_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_true_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/track_degrees_true&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_true_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_magnetic_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/track_degrees_magnetic&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_magnetic_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">speed_knots_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/speed_knots&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">speed_knots_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">speed_kmh_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/speed_kmh&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">speed_kmh_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">heading_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/heading&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">heading_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Wind</span><span class="p">,</span>
+            <span class="s1">&#39;true_wind_smoothed&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">apparent_wind_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Wind</span><span class="p">,</span>
+            <span class="s1">&#39;apparent_wind_smoothed&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">apparent_wind_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">roll_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/roll&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">roll_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">pitch_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;airmar_data/pitch&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pitch_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_path_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">GeoPath</span><span class="p">,</span>
+            <span class="s1">&#39;current_path&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_path_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_position_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">GeoPoint</span><span class="p">,</span>
+            <span class="s1">&#39;target_position&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_position_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_state_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">TrimState</span><span class="p">,</span>
+            <span class="s1">&#39;trim_state&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">trim_state_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera_color_image_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Image</span><span class="p">,</span>
+            <span class="s1">&#39;/zed/zed_node/rgb/image_rect_color&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">camera_color_image_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera_depth_image_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Image</span><span class="p">,</span>
+            <span class="s1">&#39;/zed/zed_node/depth/depth_registered&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">camera_depth_image_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera_mask_image_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Image</span><span class="p">,</span>
+            <span class="s1">&#39;cv_mask&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">camera_mask_image_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_position_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">BuoyDetectionStamped</span><span class="p">,</span>
+            <span class="s1">&#39;buoy_position&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">buoy_position_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Int16</span><span class="p">,</span>
+            <span class="s1">&#39;rudder_angle&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_callback</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">path_segment_debug_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">GeoPathSegment</span><span class="p">,</span>
+            <span class="s1">&#39;current_segment_debug&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">path_segment_debug_callback</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_heading_debug_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;target_heading&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_heading_debug_callback</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">restart_node_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_client</span><span class="p">(</span><span class="n">RestartNode</span><span class="p">,</span> <span class="s1">&#39;state_manager/restart_node&#39;</span><span class="p">,</span> <span class="n">callback_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">callback_group_state</span><span class="p">)</span>
+        <span class="c1">#initial dummy values, for testing</span>
+        <span class="c1"># self.current_boat_state.latitude = 42.273822</span>
+        <span class="c1"># self.current_boat_state.longitude = -71.805967</span>
+        <span class="c1"># self.current_boat_state.latitude = 42.276842</span>
+        <span class="c1"># self.current_boat_state.longitude = -71.756035</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="mf">42.0396766107111</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="o">-</span><span class="mf">71.84585650616927</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_heading</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">track_degrees_true</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">track_degrees_magnetic</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">speed_knots</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">speed_kmh</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">rate_of_turn</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">true_wind</span><span class="o">.</span><span class="n">speed</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">true_wind</span><span class="o">.</span><span class="n">direction</span> <span class="o">=</span> <span class="mf">270.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">apparent_wind</span><span class="o">.</span><span class="n">speed</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">apparent_wind</span><span class="o">.</span><span class="n">direction</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">pitch</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">roll</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">has_current_path_segment</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">node_indices</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;managed_nodes&#39;</span><span class="p">)</span>
+        <span class="n">node_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;managed_nodes&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">string_array_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Active nodes: </span><span class="si">{</span><span class="n">node_names</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">i</span><span class="o">=</span><span class="mi">0</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">node_names</span><span class="p">:</span>
+
+            <span class="c1">#init state</span>
+            <span class="n">node_info</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeInfo</span><span class="p">()</span>
+            <span class="n">node_info</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+            <span class="n">node_info</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeStatus</span><span class="o">.</span><span class="n">NODE_STATUS_OK</span>
+            <span class="n">node_info</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">node_states</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node_info</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">node_indices</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">=</span><span class="n">i</span>
+            <span class="n">i</span><span class="o">+=</span><span class="mi">1</span>
+
+            <span class="c1">#create lifecycle callback using function generation</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_node_subscription</span><span class="p">(</span><span class="n">node_name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">trace</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_autonomous_mode</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_NONE</span>
+        <span class="c1"># a = boat_state_pb2.Point()</span>
+        <span class="c1"># a.latitude = 5.1</span>
+        <span class="c1"># a.longitude = 4.1</span>
+        <span class="c1"># b=boat_state_pb2.Point()</span>
+        <span class="c1"># b.latitude = 5.2</span>
+        <span class="c1"># b.longitude = 4.1</span>
+        <span class="c1"># self.current_boat_state.current_path.points.append(a)</span>
+        <span class="c1"># self.current_boat_state.current_path.points.append(b)</span>
+        <span class="c1"># c = boat_state_pb2.Point()</span>
+        <span class="c1"># c.latitude = 4.9</span>
+        <span class="c1"># c.longitude = 3.9</span>
+        <span class="c1"># d=boat_state_pb2.Point()</span>
+        <span class="c1"># d.latitude = 4.8</span>
+        <span class="c1"># d.longitude = 3.9</span>
+        <span class="c1"># e=boat_state_pb2.Point()</span>
+        <span class="c1"># e.latitude = 4.7</span>
+        <span class="c1"># e.longitude = 3.8</span>
+        <span class="c1"># self.current_boat_state.previous_positions.points.append(c)</span>
+        <span class="c1"># self.current_boat_state.previous_positions.points.append(d)</span>
+        <span class="c1"># self.current_boat_state.previous_positions.points.append(e)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_pwm_heartbeat</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_ctrl_heartbeat</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_tt_heartbeat</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_grpc_server</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">trace</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">pwm_heartbeat_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Empty</span><span class="p">,</span>
+            <span class="s1">&#39;heartbeat/pwm_controler&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pwm_controller_heartbeat</span><span class="p">,</span>
+            <span class="mi">1</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">control_system_heartbeat_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Empty</span><span class="p">,</span>
+            <span class="s1">&#39;heartbeat/control_system&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">control_system_heartbeat</span><span class="p">,</span>
+            <span class="mi">1</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_heartbeat_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Empty</span><span class="p">,</span>
+            <span class="s1">&#39;heartbeat/trim_tab_comms&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_comms_heartbeat</span><span class="p">,</span>
+            <span class="mi">1</span><span class="p">)</span>
+        <span class="c1">#super().on_configure()</span>
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+
+<div class="viewcode-block" id="NetworkComms.on_activate"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.on_activate">[docs]</a>    <span class="k">def</span> <span class="nf">on_activate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Activating...&quot;</span><span class="p">)</span>
+        <span class="c1"># Start publishers or timers</span>
+        <span class="c1">#self.ballast_position_publisher.on_activate()</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_activate</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NetworkComms.on_deactivate"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.on_deactivate">[docs]</a>    <span class="k">def</span> <span class="nf">on_deactivate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Deactivating...&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_deactivate</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NetworkComms.on_cleanup"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.on_cleanup">[docs]</a>    <span class="k">def</span> <span class="nf">on_cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Cleaning up...&quot;</span><span class="p">)</span>
+        <span class="c1"># Destroy subscribers, publishers, and timers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_lifecycle_publisher</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pwm_control_publisher</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_lifecycle_publisher</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_publisher</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_lifecycle_publisher</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_control_publisher</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_lifecycle_publisher</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_angle_publisher</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_lifecycle_publisher</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_publisher</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rot_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">navsat_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_true_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">track_degrees_magnetic_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">speed_knots_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">speed_kmh_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">heading_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">true_wind_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">apparent_wind_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">roll_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pitch_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pwm_heartbeat_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">control_system_heartbeat_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_heartbeat_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trim_state_subscriber</span><span class="p">)</span></div>
+
+        <span class="c1">#return TransitionCallbackReturn.SUCCESS</span>
+
+<div class="viewcode-block" id="NetworkComms.on_shutdown"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.on_shutdown">[docs]</a>    <span class="k">def</span> <span class="nf">on_shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Shutting down...&quot;</span><span class="p">)</span>
+        <span class="c1"># Perform final cleanup if necessary</span>
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+    
+<div class="viewcode-block" id="NetworkComms.on_error"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.on_error">[docs]</a>    <span class="k">def</span> <span class="nf">on_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">LifecycleState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error caught!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_error</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+     
+    <span class="c1">#end lifecycle callbacks</span>
+
+<div class="viewcode-block" id="NetworkComms.target_position_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.target_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">target_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">GeoPoint</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sending target point: </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_target_point</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">latitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_target_point</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">longitude</span></div>
+
+<div class="viewcode-block" id="NetworkComms.trim_state_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.trim_state_callback">[docs]</a>    <span class="k">def</span> <span class="nf">trim_state_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">TrimState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MIN_LIFT</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_trim_state</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MIN_LIFT</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_LIFT_PORT</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_trim_state</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_LIFT_PORT</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_LIFT_STARBOARD</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_trim_state</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_LIFT_STARBOARD</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_DRAG_PORT</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_trim_state</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_DRAG_PORT</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_DRAG_STARBOARD</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_trim_state</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MAX_DRAG_STARBOARD</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MANUAL</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_trim_state</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">TrimState</span><span class="o">.</span><span class="n">TRIM_STATE_MANUAL</span></div>
+        
+<div class="viewcode-block" id="NetworkComms.current_path_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.current_path_callback">[docs]</a>    <span class="k">def</span> <span class="nf">current_path_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">GeoPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1">#self.get_logger().info(f&quot;Updating boat state with new path of length: {len(msg.points)}&quot;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_path</span><span class="o">.</span><span class="n">ClearField</span><span class="p">(</span><span class="s2">&quot;points&quot;</span><span class="p">)</span><span class="c1"># = command.new_path</span>
+        <span class="c1">#self.get_logger().info(&quot;Cleared old path&quot;)</span>
+        <span class="k">for</span> <span class="n">geo_point</span> <span class="ow">in</span> <span class="n">msg</span><span class="o">.</span><span class="n">points</span><span class="p">:</span>
+            <span class="n">point_msg</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">Point</span><span class="p">(</span><span class="n">latitude</span><span class="o">=</span><span class="n">geo_point</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="n">longitude</span> <span class="o">=</span> <span class="n">geo_point</span><span class="o">.</span><span class="n">longitude</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_path</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">point_msg</span><span class="p">)</span></div>
+        <span class="c1">#self.get_logger().info(&quot;Added new points&quot;)</span>
+
+        <span class="c1">#self.get_logger().info(f&quot;length of boatState path is: {len(self.current_boat_state.current_path.points)}&quot;)</span>
+
+<div class="viewcode-block" id="NetworkComms.create_lifecycle_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.create_lifecycle_callback">[docs]</a>    <span class="k">def</span> <span class="nf">create_lifecycle_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">,</span> <span class="n">TransitionEvent</span><span class="p">],</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="k">def</span> <span class="nf">lifecycle_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+            <span class="n">msg_details</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Received </span><span class="si">{</span><span class="n">node_name</span><span class="si">}</span><span class="s2"> update! State is: </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">goal_state</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg_details</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">node_states</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">node_indices</span><span class="p">[</span><span class="n">node_name</span><span class="p">]]</span><span class="o">.</span><span class="n">lifecycle_state</span> <span class="o">=</span> <span class="n">get_state</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">goal_state</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">lifecycle_callback</span></div>
+    
+<div class="viewcode-block" id="NetworkComms.setup_node_subscription"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.setup_node_subscription">[docs]</a>    <span class="k">def</span> <span class="nf">setup_node_subscription</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">callback_method_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node_name</span><span class="si">}</span><span class="s2">_lifecycle_callback&quot;</span>
+        <span class="c1"># Dynamically create the callback method</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_callback</span><span class="p">(</span><span class="n">node_name</span><span class="p">)</span>
+        <span class="c1"># Bind the method to the instance, ensuring it receives &#39;self&#39; properly</span>
+        <span class="n">bound_method</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">MethodType</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+        <span class="c1"># Attach the bound method to the instance</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback_method_name</span><span class="p">,</span> <span class="n">bound_method</span><span class="p">)</span>
+        
+        <span class="c1"># Set up the subscription using the dynamically created and bound callback</span>
+        <span class="n">subscription_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node_name</span><span class="si">}</span><span class="s2">_lifecycle_subscription&quot;</span>
+        <span class="n">topic_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;/</span><span class="si">{</span><span class="n">node_name</span><span class="si">}</span><span class="s2">/transition_event&quot;</span>
+        <span class="n">subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">TransitionEvent</span><span class="p">,</span>
+            <span class="n">topic_name</span><span class="p">,</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback_method_name</span><span class="p">),</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="c1"># Attach the subscription to this class instance</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subscription_name</span><span class="p">,</span> <span class="n">subscription</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NetworkComms.rate_of_turn_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.rate_of_turn_callback">[docs]</a>    <span class="k">def</span> <span class="nf">rate_of_turn_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">rate_of_turn</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="NetworkComms.lat_long_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.lat_long_callback">[docs]</a>    <span class="k">def</span> <span class="nf">lat_long_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">NavSatFix</span><span class="p">):</span>
+        <span class="c1">#self.get_logger().info(f&quot;Got latlong: {msg.latitude}, {msg.longitude}&quot;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">latitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">longitude</span></div>
+
+<div class="viewcode-block" id="NetworkComms.track_degrees_true_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.track_degrees_true_callback">[docs]</a>    <span class="k">def</span> <span class="nf">track_degrees_true_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">track_degrees_true</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="NetworkComms.track_degrees_magnetic_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.track_degrees_magnetic_callback">[docs]</a>    <span class="k">def</span> <span class="nf">track_degrees_magnetic_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">track_degrees_magnetic</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="NetworkComms.speed_knots_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.speed_knots_callback">[docs]</a>    <span class="k">def</span> <span class="nf">speed_knots_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">speed_knots</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="NetworkComms.speed_kmh_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.speed_kmh_callback">[docs]</a>    <span class="k">def</span> <span class="nf">speed_kmh_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">speed_kmh</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+    
+<div class="viewcode-block" id="NetworkComms.heading_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="NetworkComms.true_wind_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.true_wind_callback">[docs]</a>    <span class="k">def</span> <span class="nf">true_wind_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Wind</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">true_wind</span><span class="o">.</span><span class="n">speed</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">speed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">true_wind</span><span class="o">.</span><span class="n">direction</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">direction</span></div>
+
+<div class="viewcode-block" id="NetworkComms.apparent_wind_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.apparent_wind_callback">[docs]</a>    <span class="k">def</span> <span class="nf">apparent_wind_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Wind</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">apparent_wind</span><span class="o">.</span><span class="n">speed</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">speed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">apparent_wind</span><span class="o">.</span><span class="n">direction</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">direction</span></div>
+
+<div class="viewcode-block" id="NetworkComms.roll_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.roll_callback">[docs]</a>    <span class="k">def</span> <span class="nf">roll_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">roll</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+    
+<div class="viewcode-block" id="NetworkComms.pitch_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.pitch_callback">[docs]</a>    <span class="k">def</span> <span class="nf">pitch_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">pitch</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+    
+<div class="viewcode-block" id="NetworkComms.set_current_image"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.set_current_image">[docs]</a>    <span class="k">def</span> <span class="nf">set_current_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Image</span><span class="p">):</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">current_time</span><span class="o">&gt;</span><span class="bp">self</span><span class="o">.</span><span class="n">last_camera_frame_time</span><span class="o">+</span><span class="mf">0.1</span><span class="p">):</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">frombuffer</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">height</span><span class="p">,</span> <span class="n">msg</span><span class="o">.</span><span class="n">width</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_camera_frame_shape</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">shape</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_camera_frame</span> <span class="o">=</span> <span class="n">encode_frame</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_camera_frame_time</span> <span class="o">=</span> <span class="n">current_time</span></div>
+
+<div class="viewcode-block" id="NetworkComms.camera_color_image_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.camera_color_image_callback">[docs]</a>    <span class="k">def</span> <span class="nf">camera_color_image_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Image</span><span class="p">):</span>
+        <span class="c1"># if(self.do_video_encode == False):</span>
+        <span class="c1">#     return</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_video_source</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_current_image</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NetworkComms.camera_mask_image_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.camera_mask_image_callback">[docs]</a>    <span class="k">def</span> <span class="nf">camera_mask_image_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Image</span><span class="p">):</span>
+        <span class="c1"># if(self.do_video_encode == False):</span>
+        <span class="c1">#     return</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_video_source</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_current_image</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NetworkComms.camera_depth_image_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.camera_depth_image_callback">[docs]</a>    <span class="k">def</span> <span class="nf">camera_depth_image_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Image</span><span class="p">):</span>
+        <span class="c1"># if(self.do_video_encode == False):</span>
+        <span class="c1">#     return</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_video_source</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_current_image</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NetworkComms.buoy_position_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.buoy_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">buoy_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">BuoyDetectionStamped</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_buoy_positions</span><span class="p">[</span><span class="n">msg</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">ClearField</span><span class="p">(</span><span class="s2">&quot;buoy_positions&quot;</span><span class="p">)</span><span class="c1"># = command.new_path</span>
+        <span class="c1">#self.get_logger().info(&quot;Cleared old path&quot;)</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_buoy_positions</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">point</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_buoy_positions</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">position</span>
+            <span class="n">point_msg</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">Point</span><span class="p">(</span><span class="n">latitude</span><span class="o">=</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="n">longitude</span> <span class="o">=</span> <span class="n">point</span><span class="o">.</span><span class="n">longitude</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">buoy_positions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">point_msg</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="NetworkComms.rudder_angle_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.rudder_angle_callback">[docs]</a>    <span class="k">def</span> <span class="nf">rudder_angle_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Int16</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">rudder_position</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="NetworkComms.path_segment_debug_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.path_segment_debug_callback">[docs]</a>    <span class="k">def</span> <span class="nf">path_segment_debug_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">GeoPathSegment</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">has_current_path_segment</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_path_segment</span><span class="o">.</span><span class="n">start</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">start</span><span class="o">.</span><span class="n">latitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_path_segment</span><span class="o">.</span><span class="n">start</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">start</span><span class="o">.</span><span class="n">longitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_path_segment</span><span class="o">.</span><span class="n">end</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">end</span><span class="o">.</span><span class="n">latitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_path_segment</span><span class="o">.</span><span class="n">end</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">end</span><span class="o">.</span><span class="n">longitude</span></div>
+        
+<div class="viewcode-block" id="NetworkComms.target_heading_debug_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.target_heading_debug_callback">[docs]</a>    <span class="k">def</span> <span class="nf">target_heading_debug_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">has_target_heading</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">target_heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got target theading&quot;</span><span class="p">)</span></div>
+        
+    <span class="c1">#new server code</span>
+<div class="viewcode-block" id="NetworkComms.create_grpc_server"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.create_grpc_server">[docs]</a>    <span class="k">def</span> <span class="nf">create_grpc_server</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Creating gRPC server&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span> <span class="o">=</span> <span class="n">grpc</span><span class="o">.</span><span class="n">server</span><span class="p">(</span><span class="n">futures</span><span class="o">.</span><span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteRudderCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteTrimTabCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteBallastCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteAutonomousModeCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteSetWaypointsCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteAddWaypointCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteMarkBuoyCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteSetVFForwardMagnitudeCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">control_pb2_grpc</span><span class="o">.</span><span class="n">add_ExecuteSetRudderKPCommandServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">boat_state_pb2_rpc</span><span class="o">.</span><span class="n">add_SendBoatStateServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">boat_state_pb2_rpc</span><span class="o">.</span><span class="n">add_GetMapServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">boat_state_pb2_rpc</span><span class="o">.</span><span class="n">add_StreamBoatStateServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">node_restart_pb2_grpc</span><span class="o">.</span><span class="n">add_RestartNodeServiceServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+        <span class="n">video_pb2_grpc</span><span class="o">.</span><span class="n">add_VideoStreamerServicer_to_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="p">)</span>
+
+        <span class="c1">#connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="o">.</span><span class="n">add_insecure_port</span><span class="p">(</span><span class="s1">&#39;[::]:50051&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">grpc_server</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></div>
+
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.StreamVideo"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.StreamVideo">[docs]</a>    <span class="k">def</span> <span class="nf">StreamVideo</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">video_pb2</span><span class="o">.</span><span class="n">VideoRequest</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="c1">#self.do_video_encode = True</span>
+        <span class="n">rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_rate</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">videoSource</span> <span class="o">==</span> <span class="s1">&#39;COLOR&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_video_source</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">videoSource</span> <span class="o">==</span> <span class="s1">&#39;MASK&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_video_source</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">videoSource</span> <span class="o">==</span> <span class="s1">&#39;DEPTH&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_video_source</span> <span class="o">=</span> <span class="mi">2</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="n">context</span><span class="o">.</span><span class="n">is_active</span><span class="p">():</span>
+                <span class="k">yield</span> <span class="n">video_pb2</span><span class="o">.</span><span class="n">VideoFrame</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">last_camera_frame</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">last_camera_frame_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">height</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">last_camera_frame_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">timestamp</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()))</span>
+                <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">context</span><span class="o">.</span><span class="n">is_active</span><span class="p">():</span>
+                <span class="c1">#self.do_video_encode = False</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Video stream was cancelled or client disconnected.&quot;</span><span class="p">)</span></div>
+
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteMarkBuoyCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteMarkBuoyCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteMarkBuoyCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">MarkBuoyCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Received mark buoy command&quot;</span><span class="p">)</span></div>
+
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteRudderCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteRudderCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteRudderCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">RudderCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="c1">#center = 75 degrees, full right=40, full left = 113</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="c1">#rudder commands are inverted radians, map to degrees and invert</span>
+        <span class="n">degrees</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">rudder_control_value</span><span class="o">*</span><span class="p">(</span><span class="mi">180</span><span class="o">/</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span><span class="o">*-</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;degrees: </span><span class="si">{</span><span class="n">degrees</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">Int16</span><span class="p">()</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">degrees</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_control_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteTrimTabCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteTrimTabCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteTrimTabCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">TrimTabCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="n">state_msg</span> <span class="o">=</span> <span class="n">Int8</span><span class="p">()</span>
+        <span class="n">state_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="n">angle_msg</span> <span class="o">=</span> <span class="n">Int16</span><span class="p">()</span>
+        <span class="n">angle_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="n">command</span><span class="o">.</span><span class="n">trimtab_control_value</span><span class="o">+</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">*</span><span class="mi">180</span><span class="o">/</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_control_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">state_msg</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trim_tab_angle_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">angle_msg</span><span class="p">)</span>
+        <span class="c1">#self.get_logger().info(&quot;Publishing trimtab command&quot;)</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteBallastCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteBallastCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteBallastCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">BallastCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Publishing ballast command&quot;</span><span class="p">)</span>
+        <span class="n">position_msg</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+        <span class="n">position_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">ballast_control_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">position_msg</span><span class="p">)</span>
+
+        <span class="c1"># current_target = 80 + ((110 - 80) / (1.0 - -1.0)) * (command.ballast_control_value - -1.0)</span>
+        <span class="c1"># ballast_json = {&quot;channel&quot;: &quot;12&quot;, &quot;angle&quot;: current_target}</span>
+        <span class="c1"># self.pwm_control_publisher.publish(make_json_string(ballast_json))</span>
+
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteAutonomousModeCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteAutonomousModeCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteAutonomousModeCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">AutonomousModeCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Received autonomous mode command: </span><span class="si">{</span><span class="n">command</span><span class="o">.</span><span class="n">autonomous_mode</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">AutonomousMode</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">command</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_NONE</span><span class="p">:</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_NONE</span>
+        <span class="k">elif</span> <span class="n">command</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_BALLAST</span><span class="p">:</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_BALLAST</span>
+        <span class="k">elif</span> <span class="n">command</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_TRIMTAB</span><span class="p">:</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_TRIMTAB</span>
+        <span class="k">elif</span> <span class="n">command</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_FULL</span><span class="p">:</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_FULL</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">autonomous_mode</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteSetWaypointsCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteSetWaypointsCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteSetWaypointsCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">SetWaypointsCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Received waypoints command&quot;</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_waypoints</span><span class="o">.</span><span class="n">ClearField</span><span class="p">(</span><span class="s2">&quot;waypoints&quot;</span><span class="p">)</span><span class="c1"># = command.new_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_waypoints</span><span class="o">.</span><span class="n">waypoints</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">new_waypoints</span><span class="o">.</span><span class="n">waypoints</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Received waypoints with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">new_waypoints</span><span class="o">.</span><span class="n">waypoints</span><span class="p">)</span><span class="si">}</span><span class="s2"> points: &quot;</span><span class="p">)</span>
+        <span class="n">waypoints</span> <span class="o">=</span> <span class="n">WaypointPath</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">waypoint</span> <span class="ow">in</span> <span class="n">command</span><span class="o">.</span><span class="n">new_waypoints</span><span class="o">.</span><span class="n">waypoints</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot; : &quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span><span class="p">))</span>
+            <span class="n">fix</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="p">()</span>
+            <span class="n">fix</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span>
+            <span class="n">fix</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">WaypointType</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_INTERSECT</span><span class="p">):</span>
+                <span class="n">fix</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_INTERSECT</span>
+            <span class="k">elif</span><span class="p">(</span><span class="n">waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">WaypointType</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_RIGHT</span><span class="p">):</span>
+                <span class="n">fix</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_RIGHT</span>
+            <span class="k">elif</span><span class="p">(</span><span class="n">waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">WaypointType</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_LEFT</span><span class="p">):</span>
+                <span class="n">fix</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_LEFT</span>
+            <span class="n">waypoints</span><span class="o">.</span><span class="n">waypoints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fix</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Publishing waypoints&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">waypoints_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">waypoints</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">response</span></div>
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteAddWaypointCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteAddWaypointCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteAddWaypointCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">AddWaypointCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Received add single waypoint command&quot;</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">current_waypoints</span><span class="o">.</span><span class="n">waypoints</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">new_waypoint</span><span class="p">)</span>
+        <span class="n">waypoint</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="p">()</span>
+        <span class="n">waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">new_waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span>
+        <span class="n">waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">new_waypoint</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">new_waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">WaypointType</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_INTERSECT</span><span class="p">):</span>
+            <span class="n">waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_INTERSECT</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">new_waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">WaypointType</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_RIGHT</span><span class="p">):</span>
+            <span class="n">waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_RIGHT</span>
+        <span class="k">elif</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">new_waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">WaypointType</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_LEFT</span><span class="p">):</span>
+            <span class="n">waypoint</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">Waypoint</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_CIRCLE_LEFT</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Publishing single waypoint&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">single_waypoint_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">waypoint</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteSetVFForwardMagnitudeCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteSetVFForwardMagnitudeCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteSetVFForwardMagnitudeCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">SetVFForwardMagnitudeCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got VF forward magnitude command&quot;</span><span class="p">)</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">magnitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf_forward_magnitude_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.ExecuteSetRudderKPCommand"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.ExecuteSetRudderKPCommand">[docs]</a>    <span class="k">def</span> <span class="nf">ExecuteSetRudderKPCommand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">SetRudderKPCommand</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got rudder kp command&quot;</span><span class="p">)</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">kp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_kp_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">execution_status</span> <span class="o">=</span> <span class="n">control_pb2</span><span class="o">.</span><span class="n">ControlExecutionStatus</span><span class="o">.</span><span class="n">CONTROL_EXECUTION_SUCCESS</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.GetMap"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.GetMap">[docs]</a>    <span class="k">def</span> <span class="nf">GetMap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">MapRequest</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Received GetMap request&quot;</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">buffer</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">imencode</span><span class="p">(</span><span class="s1">&#39;.png&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_image</span><span class="p">)</span>
+        <span class="c1">#self.get_logger().info(f&quot;Image buffer: {buffer}&quot;)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">MapResponse</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">image_data</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">tobytes</span><span class="p">()</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">north</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;north&#39;</span><span class="p">]</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">south</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;south&#39;</span><span class="p">]</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">east</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;east&#39;</span><span class="p">]</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">west</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="s1">&#39;west&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.SendBoatState"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.SendBoatState">[docs]</a>    <span class="k">def</span> <span class="nf">SendBoatState</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">BoatStateRequest</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span></div>
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.StreamBoatState"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.StreamBoatState">[docs]</a>    <span class="k">def</span> <span class="nf">StreamBoatState</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">BoatStateRequest</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="n">rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_rate</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="n">context</span><span class="o">.</span><span class="n">is_active</span><span class="p">():</span>
+                <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span>
+                <span class="n">rate</span><span class="o">.</span><span class="n">sleep</span><span class="p">()</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">context</span><span class="o">.</span><span class="n">is_active</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Boat state stream was cancelled or client disconnected.&quot;</span><span class="p">)</span></div>
+
+    
+    <span class="c1">#gRPC function, do not rename unless you change proto defs and recompile gRPC files</span>
+<div class="viewcode-block" id="NetworkComms.RestartNode"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.RestartNode">[docs]</a>    <span class="k">def</span> <span class="nf">RestartNode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="n">node_restart_pb2</span><span class="o">.</span><span class="n">RestartNodeRequest</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Received restart command for: &quot;</span><span class="o">+</span><span class="n">command</span><span class="o">.</span><span class="n">node_name</span><span class="p">)</span>
+        <span class="n">restart_node_request</span> <span class="o">=</span> <span class="n">RestartNode</span><span class="o">.</span><span class="n">Request</span><span class="p">()</span>
+        <span class="n">restart_node_request</span><span class="o">.</span><span class="n">node_name</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">node_name</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="n">node_restart_pb2</span><span class="o">.</span><span class="n">RestartNodeResponse</span><span class="p">()</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">restart_node_client</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Client service not available for state manager!&quot;</span><span class="p">)</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">return</span> <span class="n">response</span>
+        
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">restart_node_client</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="n">restart_node_request</span><span class="p">)</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">success</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Restart node: &quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+    
+<div class="viewcode-block" id="NetworkComms.pwm_controller_heartbeat"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.pwm_controller_heartbeat">[docs]</a>    <span class="k">def</span> <span class="nf">pwm_controller_heartbeat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got pwm heartbeat&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_pwm_heartbeat</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="NetworkComms.control_system_heartbeat"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.control_system_heartbeat">[docs]</a>    <span class="k">def</span> <span class="nf">control_system_heartbeat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got control heartbeat&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_ctrl_heartbeat</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="NetworkComms.trim_tab_comms_heartbeat"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.trim_tab_comms_heartbeat">[docs]</a>    <span class="k">def</span> <span class="nf">trim_tab_comms_heartbeat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="c1">#self.get_logger().info(&quot;Got trimtab heartbeat&quot;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_tt_heartbeat</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span></div>
+    
+<div class="viewcode-block" id="NetworkComms.update_node_status_timer_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.update_node_status_timer_callback">[docs]</a>    <span class="k">def</span> <span class="nf">update_node_status_timer_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">current_time</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">last_pwm_heartbeat</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">node_states</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">node_indices</span><span class="p">[</span><span class="s2">&quot;pwm_controller&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">node_status</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeStatus</span><span class="o">.</span><span class="n">NODE_STATUS_ERROR</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">node_states</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">node_indices</span><span class="p">[</span><span class="s2">&quot;pwm_controller&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">node_status</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeStatus</span><span class="o">.</span><span class="n">NODE_STATUS_OK</span>
+        
+        <span class="k">if</span><span class="p">(</span><span class="n">current_time</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">last_ctrl_heartbeat</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">node_states</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">node_indices</span><span class="p">[</span><span class="s2">&quot;control_system&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">node_status</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeStatus</span><span class="o">.</span><span class="n">NODE_STATUS_ERROR</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">node_states</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">node_indices</span><span class="p">[</span><span class="s2">&quot;control_system&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">node_status</span> <span class="o">=</span> <span class="n">boat_state_pb2</span><span class="o">.</span><span class="n">NodeStatus</span><span class="o">.</span><span class="n">NODE_STATUS_OK</span></div></div>
+
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../network_comms.html#network_comms.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">network_comms</span> <span class="o">=</span> <span class="n">NetworkComms</span><span class="p">()</span>
+
+    <span class="c1"># Use the SingleThreadedExecutor to spin the node.</span>
+    <span class="n">executor</span> <span class="o">=</span> <span class="n">rclpy</span><span class="o">.</span><span class="n">executors</span><span class="o">.</span><span class="n">MultiThreadedExecutor</span><span class="p">()</span>
+    <span class="n">executor</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">network_comms</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Spin the node to execute callbacks</span>
+        <span class="n">executor</span><span class="o">.</span><span class="n">spin</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">trace</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
+        <span class="n">network_comms</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Shutdown and cleanup the node</span>
+        <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+        <span class="n">network_comms</span><span class="o">.</span><span class="n">destroy_node</span><span class="p">()</span>
+        <span class="n">rclpy</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Ballast Control Node &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=af2ce170"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Buoy Detection Node" href="buoy_detection.html" />
+    <link rel="prev" title="Airmar Reader Node" href="airmar_reader.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-ballast_control">
+<span id="ballast-control-node"></span><h1>Ballast Control Node<a class="headerlink" href="#module-ballast_control" title="Permalink to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="ballast_control.BallastControl">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ballast_control.</span></span><span class="sig-name descname"><span class="pre">BallastControl</span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">LifecycleNode</span></code></p>
+<p>A ROS 2 lifecycle node for controlling the ballast system of a sailboat, handling dynamic positioning based on sensor inputs
+to maintain boat stability and optimal sailing conditions.</p>
+<p>This node interfaces with hardware through PWM signals to control the ballast motor based on roll data from an Airmar sensor,
+adjusting the ballast’s position to counteract roll induced by wind or other environmental factors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ballast_pwm_publisher</strong> – Publisher for ballast motor PWM values.</p></li>
+<li><p><strong>roll_errors</strong> – (list) Stores recent roll error measurements to compute the average roll error.</p></li>
+<li><p><strong>num_error_readings</strong> – (int) Number of roll readings to keep for averaging.</p></li>
+<li><p><strong>ADC_FULL_STARBOARD</strong> – (int) ADC value corresponding to the full starboard position of the ballast.</p></li>
+<li><p><strong>ADC_FULL_PORT</strong> – (int) ADC value corresponding to the full port position of the ballast.</p></li>
+<li><p><strong>ADC_MAX</strong> – (int) Maximum ADC value for the ballast position.</p></li>
+<li><p><strong>ADC_MIN</strong> – (int) Minimum ADC value for the ballast position.</p></li>
+<li><p><strong>MOTOR_FAST_STARBOARD</strong> – (int) PWM value to move the ballast fast towards starboard.</p></li>
+<li><p><strong>MOTOR_FAST_PORT</strong> – (int) PWM value to move the ballast fast towards port.</p></li>
+<li><p><strong>MOTOR_STOP</strong> – (int) PWM value to stop the ballast motor.</p></li>
+<li><p><strong>CONTROL_FAST_PORT</strong> – (float) Control signal for fast movement towards port.</p></li>
+<li><p><strong>CONTROL_FAST_STARBOARD</strong> – (float) Control signal for fast movement towards starboard.</p></li>
+<li><p><strong>ERROR_MIN_MAGNITUDE</strong> – (int) Minimum magnitude of error necessary to actuate the ballast.</p></li>
+<li><p><strong>RAMP_UP_TIME</strong> – (float) Time period to ramp up the motor to full speed.</p></li>
+<li><p><strong>Kp</strong> – (float) Proportional gain for the PID controller.</p></li>
+<li><p><strong>Kd</strong> – (float) Derivative gain for the PID controller (currently not in use).</p></li>
+<li><p><strong>roll_kp</strong> – (int) Proportional gain for roll correction.</p></li>
+<li><p><strong>current_target</strong> – (int) Current target ADC value for the ballast position.</p></li>
+<li><p><strong>current_ballast_position</strong> – (int) Last known ADC value of the ballast position.</p></li>
+<li><p><strong>move</strong> – (bool) Flag to determine if the ballast needs to be moved.</p></li>
+<li><p><strong>current_wind_dir</strong> – (float) Current wind direction in degrees.</p></li>
+<li><p><strong>autonomous_mode</strong> – (int) Current autonomous mode of the vessel.</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Lifecycle States</strong>:
+- <strong>Configuring</strong>: Sets up subscriptions and publishers.
+- <strong>Activating</strong>: Starts the control loop timer.
+- <strong>Deactivating</strong>: Stops the control loop timer.
+- <strong>Cleaning up</strong>: Shuts down publishers and subscriptions.
+- <strong>Shutting down</strong>: Performs additional cleanup as required.</p>
+<p>The control strategy involves responding to roll data and desired position changes, using a P controller to compute
+the necessary adjustments to the ballast position. The node uses a ramp-up mechanism to smooth out the control signals,
+preventing sudden movements that could destabilize the boat.</p>
+<p><strong>Callback Functions</strong>:
+- <strong>ballast_position_callback</strong>: Handles updates to the desired ballast position.
+- <strong>current_ballast_position_callback</strong>: Updates the internal state with the current ballast position.
+- <strong>airmar_roll_callback</strong>: Responds to new roll data by adjusting the ballast position to counteract the roll.
+- <strong>apparent_wind_callback</strong>: Optional handling of wind data for more sophisticated control strategies.
+- <strong>airmar_heading_callback</strong>: Tracks the boat’s heading to adjust control strategies based on directional changes.
+- <strong>control_loop_callback</strong>: The main control loop that calculates and sends PWM values to the ballast motor based on the PID control strategy.
+- <strong>roll_correction_callback</strong>: Periodically adjusts the target position based on accumulated roll errors to maintain stability.</p>
+<p><strong>Usage</strong>:
+- The node must be managed by state_manager</p>
+<p><strong>Notes</strong>:
+- Currently, moves the ballast every 10 seconds. A shorter period will improve response, but ballast movement is extremely expensive in terms of battery use.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_FULL_PORT">
+<span class="sig-name descname"><span class="pre">ADC_FULL_PORT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2300</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_FULL_PORT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_FULL_STARBOARD">
+<span class="sig-name descname"><span class="pre">ADC_FULL_STARBOARD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">700</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_FULL_STARBOARD" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_MAX">
+<span class="sig-name descname"><span class="pre">ADC_MAX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2300</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_MAX" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_MIN">
+<span class="sig-name descname"><span class="pre">ADC_MIN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">700</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_MIN" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.CONTROL_FAST_PORT">
+<span class="sig-name descname"><span class="pre">CONTROL_FAST_PORT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-1.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.CONTROL_FAST_PORT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.CONTROL_FAST_STARBOARD">
+<span class="sig-name descname"><span class="pre">CONTROL_FAST_STARBOARD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.CONTROL_FAST_STARBOARD" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.ERROR_MIN_MAGNITUDE">
+<span class="sig-name descname"><span class="pre">ERROR_MIN_MAGNITUDE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">20</span></em><a class="headerlink" href="#ballast_control.BallastControl.ERROR_MIN_MAGNITUDE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.Kd">
+<span class="sig-name descname"><span class="pre">Kd</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.1</span></em><a class="headerlink" href="#ballast_control.BallastControl.Kd" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.Kp">
+<span class="sig-name descname"><span class="pre">Kp</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.005</span></em><a class="headerlink" href="#ballast_control.BallastControl.Kp" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.MOTOR_FAST_PORT">
+<span class="sig-name descname"><span class="pre">MOTOR_FAST_PORT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">60</span></em><a class="headerlink" href="#ballast_control.BallastControl.MOTOR_FAST_PORT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.MOTOR_FAST_STARBOARD">
+<span class="sig-name descname"><span class="pre">MOTOR_FAST_STARBOARD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">130</span></em><a class="headerlink" href="#ballast_control.BallastControl.MOTOR_FAST_STARBOARD" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.MOTOR_STOP">
+<span class="sig-name descname"><span class="pre">MOTOR_STOP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">95</span></em><a class="headerlink" href="#ballast_control.BallastControl.MOTOR_STOP" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.RAMP_UP_TIME">
+<span class="sig-name descname"><span class="pre">RAMP_UP_TIME</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.RAMP_UP_TIME" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.airmar_heading_callback">
+<span class="sig-name descname"><span class="pre">airmar_heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.airmar_heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.airmar_heading_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.airmar_roll_callback">
+<span class="sig-name descname"><span class="pre">airmar_roll_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.airmar_roll_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.airmar_roll_callback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Callback function that processes roll data received from the Airmar sensor, adjusts the target roll based on wind direction,
+and stores the roll error for future analysis.</p>
+<p>This method is called automatically whenever a new roll data message is received. It calculates the desired roll target
+based on the relative wind angle, computes the error between the actual and target roll, and logs this error for control purposes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg</strong> (<em>Float64</em>) – The roll data message containing the current roll angle of the boat.</p>
+</dd>
+</dl>
+<p><strong>Key Operations:</strong></p>
+<ul class="simple">
+<li><p><strong>Wind Direction Check</strong>: Determines if the wind direction is known; if not, logs a message and exits.</p></li>
+<li><p><strong>Relative Wind Calculation</strong>: Computes the angle of the wind relative to the boat’s current heading.</p></li>
+<li><dl class="simple">
+<dt><strong>Target Roll Setting</strong>: Sets the roll target based on the relative wind angle:</dt><dd><ul>
+<li><p>20 degrees if wind is from the starboard side.</p></li>
+<li><p>-20 degrees if wind is from the port side.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p><strong>Error Buffer Management</strong>: Ensures that only the most recent ‘self.num_error_readings’ errors are kept.</p></li>
+</ul>
+<p><strong>Notes:</strong>
+- The function handles cases where the wind is directly behind or ahead by not changing the current roll target.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.apparent_wind_callback">
+<span class="sig-name descname"><span class="pre">apparent_wind_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Wind</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.apparent_wind_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.apparent_wind_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.autonomous_mode">
+<span class="sig-name descname"><span class="pre">autonomous_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#ballast_control.BallastControl.autonomous_mode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.autonomous_mode_callback">
+<span class="sig-name descname"><span class="pre">autonomous_mode_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">AutonomousMode</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.autonomous_mode_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.autonomous_mode_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.ballast_position_callback">
+<span class="sig-name descname"><span class="pre">ballast_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.ballast_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.ballast_position_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.constrain_control">
+<span class="sig-name descname"><span class="pre">constrain_control</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">control</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.constrain_control"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.constrain_control" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.control_loop_callback">
+<span class="sig-name descname"><span class="pre">control_loop_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.control_loop_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.control_loop_callback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Periodically adjusts the ballast position based on the target setpoint, handling the motor control based on the error magnitude
+and applying a ramp-up strategy for smoother operation.</p>
+<p>This function forms the control loop for ballast position adjustment. It calculates the error between the current and target
+positions, decides on the motor PWM value based using a proportional controller, and sends the command to the esp comms node.
+The loop also incorporates a ramp-up mechanism to smoothly reach the desired position over a specified time.</p>
+<p><strong>Conditions and Steps</strong>:</p>
+<ul class="simple">
+<li><p><strong>No Movement</strong>: If the system is not in a ‘move’ state, the function returns immediately.</p></li>
+<li><p><strong>Small Error Handling</strong>: Stops the motor if the current error is below a minimal threshold (‘ERROR_MIN_MAGNITUDE’).</p></li>
+<li><p><strong>Ramp-Up Calculation</strong>: If in ramp-up phase, scales the control effort based on the elapsed time from the start of the movement.</p></li>
+<li><p><strong>Control Computation</strong>: Calculates the motor control signal using proportional control (Kp), scaled by the ramp-up factor.</p></li>
+<li><p><strong>Command Publishing</strong>: Sends the computed PWM value to the motor via a ROS publisher.</p></li>
+</ul>
+<p><strong>Motor Control Strategy</strong>:</p>
+<ul class="simple">
+<li><p>The motor command is derived from a simple proportional control law adjusted by a ramp-up factor that ensures smooth transitions when starting movements, to avoid straining the timing belt, which has torn without this system.</p></li>
+<li><p>The actual motor value is constrained within operational PWM bounds.</p></li>
+</ul>
+<p><strong>Note</strong>:</p>
+<ul class="simple">
+<li><p>This callback is scheduled to run at regular intervals by a ROS timer, ensuring periodic updates to the ballast position.</p></li>
+<li><p>Stops the motor and resets the movement flag when the target is achieved within a small error margin, preventing oscillation around the target.</p></li>
+<li><p>Currently, “ramp-down” is provided by the proportional controller. A more robust system would decide if ramp-up or ramp-down was needed based on the target position and current movement direction/velocity, but since this runs only every 10 seconds, it’s not necessary right now.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.control_to_motor_value">
+<span class="sig-name descname"><span class="pre">control_to_motor_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">control</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.control_to_motor_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.control_to_motor_value" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.current_ballast_position">
+<span class="sig-name descname"><span class="pre">current_ballast_position</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1500.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.current_ballast_position" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.current_ballast_position_callback">
+<span class="sig-name descname"><span class="pre">current_ballast_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Int16</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.current_ballast_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.current_ballast_position_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.current_target">
+<span class="sig-name descname"><span class="pre">current_target</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1500.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.current_target" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.current_wind_dir">
+<span class="sig-name descname"><span class="pre">current_wind_dir</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#ballast_control.BallastControl.current_wind_dir" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.in_ramp_up">
+<span class="sig-name descname"><span class="pre">in_ramp_up</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#ballast_control.BallastControl.in_ramp_up" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.median">
+<span class="sig-name descname"><span class="pre">median</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lst</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.median"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.median" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.move">
+<span class="sig-name descname"><span class="pre">move</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#ballast_control.BallastControl.move" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.num_error_readings">
+<span class="sig-name descname"><span class="pre">num_error_readings</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">20</span></em><a class="headerlink" href="#ballast_control.BallastControl.num_error_readings" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.on_activate">
+<span class="sig-name descname"><span class="pre">on_activate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.on_activate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.on_activate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle an activating transition.</p>
+<p>This is the default on_activate() callback.
+It will call all on_activate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_activate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.on_cleanup">
+<span class="sig-name descname"><span class="pre">on_cleanup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.on_cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.on_cleanup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a cleaning up transition.</p>
+<p>This is the default on_cleanup() callback.
+It will call all on_cleanup() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_cleanup() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.on_configure">
+<span class="sig-name descname"><span class="pre">on_configure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.on_configure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.on_configure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a configuring transition.</p>
+<p>This is the default on_configure() callback.
+It will call all on_configure() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_configure() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.on_deactivate">
+<span class="sig-name descname"><span class="pre">on_deactivate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.on_deactivate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.on_deactivate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a deactivating transition.</p>
+<p>This is the default on_deactivate() callback.
+It will call all on_deactivate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_deactivate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.on_error">
+<span class="sig-name descname"><span class="pre">on_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.on_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.on_error" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a transition error.</p>
+<p>This is the default on_error() callback.
+It will call all on_error() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_error() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.on_shutdown">
+<span class="sig-name descname"><span class="pre">on_shutdown</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.on_shutdown"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.on_shutdown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a shutting down transition.</p>
+<p>This is the default on_shutdown() callback.
+It will call all on_shutdown() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_shutdown() in derived classes.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.previous_error">
+<span class="sig-name descname"><span class="pre">previous_error</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#ballast_control.BallastControl.previous_error" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.previous_time">
+<span class="sig-name descname"><span class="pre">previous_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715325781.0274816</span></em><a class="headerlink" href="#ballast_control.BallastControl.previous_time" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.roll_correction_callback">
+<span class="sig-name descname"><span class="pre">roll_correction_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.roll_correction_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.roll_correction_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.roll_errors">
+<span class="sig-name descname"><span class="pre">roll_errors</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#ballast_control.BallastControl.roll_errors" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.roll_kp">
+<span class="sig-name descname"><span class="pre">roll_kp</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">20</span></em><a class="headerlink" href="#ballast_control.BallastControl.roll_kp" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.start_time">
+<span class="sig-name descname"><span class="pre">start_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#ballast_control.BallastControl.start_time" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ballast_control.bound">
+<span class="sig-prename descclassname"><span class="pre">ballast_control.</span></span><span class="sig-name descname"><span class="pre">bound</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">low</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#bound"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.bound" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ballast_control.main">
+<span class="sig-prename descclassname"><span class="pre">ballast_control.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.main" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ballast_control.make_json_string">
+<span class="sig-prename descclassname"><span class="pre">ballast_control.</span></span><span class="sig-name descname"><span class="pre">make_json_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_msg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#make_json_string"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.make_json_string" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Ballast Control Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#ballast_control.BallastControl"><code class="docutils literal notranslate"><span class="pre">BallastControl</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ballast_control.bound"><code class="docutils literal notranslate"><span class="pre">bound()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ballast_control.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ballast_control.make_json_string"><code class="docutils literal notranslate"><span class="pre">make_json_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="airmar_reader.html" title="previous chapter">Airmar Reader Node</a></li>
+      <li>Next: <a href="buoy_detection.html" title="next chapter">Buoy Detection Node</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/ballast_control.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

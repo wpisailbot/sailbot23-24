@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Path Follower Node &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=af2ce170"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="State Manager Node" href="state_manager.html" />
+    <link rel="prev" title="Network Comms Node" href="network_comms.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-path_follower_vf">
+<span id="path-follower-node"></span><h1>Path Follower Node<a class="headerlink" href="#module-path_follower_vf" title="Permalink to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">PathFollower</span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">LifecycleNode</span></code></p>
+<p>A ROS2 lifecycle node that manages pathfinding and navigation for the boat. It processes waypoints, handles dynamic path updates,
+manages threats, and integrates sensor data to navigate efficiently.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>latitude</strong> – Current latitude of the boat.</p></li>
+<li><p><strong>longitude</strong> – Current longitude of the boat.</p></li>
+<li><p><strong>heading</strong> – Current boat heading in degrees.</p></li>
+<li><p><strong>speed_knots</strong> – Current speed of the boat in knots.</p></li>
+<li><p><strong>wind_angle_deg</strong> – Current wind direction in degrees relative to the boat.</p></li>
+<li><p><strong>waypoints</strong> – A ‘WaypointPath’ object containing the waypoints the boat must follow.</p></li>
+<li><p><strong>current_path</strong> – A ‘GeoPath’ object representing the currently planned path.</p></li>
+<li><p><strong>current_grid_path</strong> – List of grid coordinates corresponding to the ‘current_path’.</p></li>
+<li><p><strong>segment_endpoint_indices</strong> – Indices in the ‘current_path’ where path segments end.</p></li>
+<li><p><strong>buoy_rounding_distance_meters</strong> – Distance for rounding buoys during navigation.</p></li>
+<li><p><strong>min_path_recalculation_interval_seconds</strong> – Minimum interval between path recalculations to avoid excessive updates.</p></li>
+<li><p><strong>threat_ids</strong> – List of internal IDs returned from pathfinder node for identified buoy threats.</p></li>
+<li><p><strong>previous_look_ahead_index</strong> – Last path point the boat was at, tracked to avoid issues with self-intersecting paths.</p></li>
+<li><p><strong>grid_points</strong> – The intermediate step between waypoints and the full grid path, passed to the pathfinder node.</p></li>
+<li><p><strong>exact_points</strong> – The intermediate step between waypoints and the full geographical path.</p></li>
+<li><p><strong>current_buoy_positions</strong> – Dictionary containing a mapping between buoy IDs and their current positions.</p></li>
+<li><p><strong>last_waypoint_was_rounding_type</strong> – Internal state to decide if the last few points might need to be trimmed,
+as we don’t always want to go fully around a buoy.</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Lifecycle Management</strong>:
+- <strong>on_configure</strong>: Configures publishers, subscribers, and service clients used for navigation.
+- <strong>on_activate</strong>: Activates the node to start path management and threat detection.
+- <strong>on_deactivate</strong>: Deactivates the node, stopping all navigation and path updates.
+- <strong>on_cleanup</strong>: Cleans up resources, particularly the subscribers and publishers.
+- <strong>on_shutdown</strong>: Handles tasks necessary for node shutdown.</p>
+<p><strong>Subscriptions</strong>:
+- ‘airmar_heading_subscription’: Subscribes to heading updates from the boat’s sensors.
+- ‘airmar_position_subscription’: Subscribes to position updates, updating boat’s geographic location.
+- ‘airmar_speed_knots_subscription’: Subscribes to speed updates in knots.</p>
+<p><strong>Publishers</strong>:
+- ‘current_grid_segment_publisher’: Publishes the current segment of the navigation grid being followed.
+- ‘current_segment_debug_publisher’: Publishes debug information about the current navigation segment.
+- ‘target_position_publisher’: Publishes the target position the boat is navigating towards.
+- ‘current_path_publisher’: Publishes updates to the navigation path as it is recalculated.
+- ‘current_grid_cell_publisher’: Publishes the current grid cell location of the boat within the navigation map.</p>
+<p><strong>Services</strong>:
+- ‘set_map_cli’, ‘get_path_cli’, ‘set_threat_cli’: Service clients for setting the navigation map, retrieving paths, and managing navigation threats.</p>
+<p><strong>Methods</strong>:
+- ‘set_parameters’, ‘get_parameters’: Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.
+- ‘calculate_exact_points_from_waypoint’: Processes waypoints to calculate exact navigation points.
+- ‘recalculate_path_from_exact_points’: Recalculates the navigation path based on new or updated exact navigation points.
+- ‘find_look_ahead’: Determines the boat’s progress along the path.
+- ‘remove_last_points_if_necessary’: Trims unnecessary navigation points if the last waypoint was a rounding type.
+- ‘get_square_corners’: Calculates and orders the four corners of a square about a target position, facing a starting position.</p>
+<p><strong>Usage</strong>:
+- The node must be managed by state_manager</p>
+<p><strong>Notes</strong>:
+- This is the vector-field variant of the boat’s pathfinding. See path_follower.py for the look-ahead variant.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.add_threat">
+<span class="sig-name descname"><span class="pre">add_threat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waypoint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Waypoint</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.add_threat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.add_threat" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds a threat to the system based on a waypoint’s geographic location by converting it into a Gaussian threat model.
+This function also performs a synchronous service call to register the threat in the system and optionally map the threat ID
+back to the waypoint for subsequent adjustments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>waypoint</strong> – A ‘Waypoint’ object that contains the latitude and longitude of the threat location.</p></li>
+<li><p><strong>id</strong> – An optional integer specifying the threat ID. If set to -1, a new threat ID is requested. Default is -1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None. The function updates the system with a new or adjusted threat model and logs the response.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Calculating grid coordinates from the waypoint’s geographic coordinates.
+- Configuring a GaussianThreat object with predefined size and intensity.
+- Making a synchronous service call to set the threat in the pathfinding system.
+- Logging the setting process and the response, including the assigned threat ID.
+- Storing the assigned threat ID for position adjustment and reference.</p>
+<p>This function assumes that ‘buoy_threat_size_map_units’, ‘buoy_threat_gaussian_intensity’,
+‘bbox’, ‘image_width’, ‘image_height’, and ‘set_threat_cli’ (a ROS2 service client) are properly configured and available.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.airmar_heading_callback">
+<span class="sig-name descname"><span class="pre">airmar_heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.airmar_heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.airmar_heading_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.airmar_position_callback">
+<span class="sig-name descname"><span class="pre">airmar_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">NavSatFix</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.airmar_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.airmar_position_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.airmar_speed_knots_callback">
+<span class="sig-name descname"><span class="pre">airmar_speed_knots_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.airmar_speed_knots_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.airmar_speed_knots_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.buoy_position_callback">
+<span class="sig-name descname"><span class="pre">buoy_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BuoyDetectionStamped</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.buoy_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.buoy_position_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.buoy_rounding_distance_meters">
+<span class="sig-name descname"><span class="pre">buoy_rounding_distance_meters</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.buoy_rounding_distance_meters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.calculate_exact_points_from_waypoint">
+<span class="sig-name descname"><span class="pre">calculate_exact_points_from_waypoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waypoint_msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Waypoint</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.calculate_exact_points_from_waypoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.calculate_exact_points_from_waypoint" title="Permalink to this definition">¶</a></dt>
+<dd><p>Processes a waypoint message to calculate exact geographic points that the path follower node should navigate through.
+Depending on the type of waypoint, this function either calculates corner points for rounding maneuvers (either to the right or left),
+snapping to the closest buoy if within a defined proximity, or directly uses the waypoint’s location.</p>
+<p>The function updates the current path with exact geographic points and grid coordinates on the current map.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>waypoint_msg</strong> – A sailbot_msgs/Waypoint message object containing waypoint information such as the latitude, longitude, and type of the waypoint.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None. The function updates the instance’s ‘exact_points’ and ‘grid_points’ lists with the calculated points.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Checking each buoy position for proximity to the waypoint and snapping to the closest buoy if applicable.
+- Handling different types of waypoints like intersection, circle right, and circle left by generating respective path adjustments.
+- Logging various state changes and decisions for debugging and monitoring purposes.
+- Maintaining and updating the internal node state based on the type of the last waypoint processed.</p>
+<p>This function assumes that ‘latitude’, ‘longitude’, ‘bbox’,
+‘image_width’, and ‘image_height’ are available within the class instance and are appropriately set before calling this function.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.calculate_initial_bearing">
+<span class="sig-name descname"><span class="pre">calculate_initial_bearing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point_A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point_B</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.calculate_initial_bearing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.calculate_initial_bearing" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.clear_threats">
+<span class="sig-name descname"><span class="pre">clear_threats</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.clear_threats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.clear_threats" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.current_buoy_positions">
+<span class="sig-name descname"><span class="pre">current_buoy_positions</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.current_buoy_positions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.current_grid_cell">
+<span class="sig-name descname"><span class="pre">current_grid_cell</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">(16,</span> <span class="pre">16)</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.current_grid_cell" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.current_grid_path">
+<span class="sig-name descname"><span class="pre">current_grid_path</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.current_grid_path" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.current_path">
+<span class="sig-name descname"><span class="pre">current_path</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">sailbot_msgs.msg.GeoPath(points=[])</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.current_path" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.exact_points">
+<span class="sig-name descname"><span class="pre">exact_points</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.exact_points" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.find_look_ahead">
+<span class="sig-name descname"><span class="pre">find_look_ahead</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.find_look_ahead"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.find_look_ahead" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determines and updates the vector field target segment based on the current navigation path.
+This function also handles publishing various navigation-related messages to update
+the system’s state and debug information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None. This function modifies the navigation state by publishing the current grid cell, target position,
+and path segments for display or further processing.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Publishing the current grid cell position.
+- Early exit if the path has zero length.
+- Iterating through path points to find the appropriate target path segment based on calculated distance.
+- Conditionally publishing target positions and path segments for system updates and debugging.
+- Checking if the next path point is closer than the current target to avoid backtracking.
+- Managing and removing passed exact points to maintain an updated path.</p>
+<p>This function assumes that instance attributes ‘latitude’, ‘longitude’, ‘current_path’,
+‘current_grid_path’, and ‘exact_points’ are properly initialized and available.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.get_parameters">
+<span class="sig-name descname"><span class="pre">get_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.get_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.get_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a list of parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>names</strong> – Fully-qualified names of the parameters to get, including their namespaces.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The values for the given parameter names.
+A default Parameter will be returned for undeclared parameters if
+undeclared parameters are allowed.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ParameterNotDeclaredException if undeclared parameters are not allowed,
+and at least one parameter hadn’t been declared beforehand.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p>ParameterUninitializedException if at least one parameter is statically typed and
+uninitialized.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.get_path">
+<span class="sig-name descname"><span class="pre">get_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">goal</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">GetPath_Response</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.get_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.get_path" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.get_relevant_square_corners">
+<span class="sig-name descname"><span class="pre">get_relevant_square_corners</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target_point</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GeoPoint</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">previous_point</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GeoPoint</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">next_point</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GeoPoint</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.get_relevant_square_corners"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.get_relevant_square_corners" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.get_square_corners">
+<span class="sig-name descname"><span class="pre">get_square_corners</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">side_length</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.get_square_corners"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.get_square_corners" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the corners of a square around point B, based on the direction from point A to B and a specified side length.
+The square is oriented such that its sides are either perpendicular or parallel to the line from A to B depending on the direction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>A</strong> – A tuple (latitude, longitude) representing the starting point.</p></li>
+<li><p><strong>B</strong> – A tuple (latitude, longitude) representing the end point or the center of the square.</p></li>
+<li><p><strong>side_length</strong> – The side length of the square.</p></li>
+<li><p><strong>direction</strong> – A string indicating the direction to rotate the square (‘right’ or ‘left’) around point B.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of tuples representing the geographic coordinates (latitude, longitude) of the square’s corners.
+The order of corners depends on the specified direction.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Calculating the diagonal distance of the square based on the side length.
+- Determining the initial bearing from point A to point B.
+- Calculating bearings for each corner of the square using the initial bearing and adding specific angles.
+- Using the geodesic method to find the exact locations for each corner based on these bearings.
+- Returning the corners in a specific order depending on whether the direction is ‘right’ or ‘left’.</p>
+<p>This function is used to calculate intermediate targets for buoy rounding maneuvers.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.grid_points">
+<span class="sig-name descname"><span class="pre">grid_points</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.grid_points" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.grid_to_latlong_proj">
+<span class="sig-name descname"><span class="pre">grid_to_latlong_proj</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">image_width</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">image_height</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.grid_to_latlong_proj"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.grid_to_latlong_proj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert grid cell coordinates in an image to latitude/longitude coordinates using specified projections.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – The x-coordinate (pixel position) in the image.</p></li>
+<li><p><strong>y</strong> – The y-coordinate (pixel position) in the image.</p></li>
+<li><p><strong>bbox</strong> – A dictionary with keys ‘north’, ‘south’, ‘east’, ‘west’ representing the bounding box.</p></li>
+<li><p><strong>image_width</strong> – The width of the image in pixels.</p></li>
+<li><p><strong>image_height</strong> – The height of the image in pixels.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple (latitude, longitude) representing the geographic coordinates.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.heading">
+<span class="sig-name descname"><span class="pre">heading</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.heading" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.insert_intermediate_points">
+<span class="sig-name descname"><span class="pre">insert_intermediate_points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_per_unit_distance</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">PoseStamped</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.insert_intermediate_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.insert_intermediate_points" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inserts intermediate points into a given path segment to simplify more granular path following.
+The number of points inserted between each pair of original points is determined by the distance between them
+multiplied by a specified factor (‘num_per_unit_distance’).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> – A list of ‘PoseStamped’ objects representing the waypoints of a path segment.</p></li>
+<li><p><strong>num_per_unit_distance</strong> – A floating point number that determines how many points to insert per unit of distance
+between each pair of consecutive waypoints in the path.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of ‘PoseStamped’ objects with the newly inserted intermediate points included.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Logging a warning and returning the original path if it has zero length.
+- Dynamically calculating the number of intermediate points to insert based on the distance between consecutive waypoints.
+- Using linear interpolation to determine the position of each intermediate point between each consecutive waypoint pair.
+- Returning a new path list that includes both the original and the newly interpolated points.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.last_recalculation_time">
+<span class="sig-name descname"><span class="pre">last_recalculation_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715325785.0107558</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.last_recalculation_time" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.last_waypoint_was_rounding_type">
+<span class="sig-name descname"><span class="pre">last_waypoint_was_rounding_type</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.last_waypoint_was_rounding_type" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.latitude">
+<span class="sig-name descname"><span class="pre">latitude</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">42.0396766107111</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.latitude" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.latlong_to_grid_proj">
+<span class="sig-name descname"><span class="pre">latlong_to_grid_proj</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">latitude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">longitude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">image_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">image_height</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src_proj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'EPSG:4326'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest_proj</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'EPSG:3857'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.latlong_to_grid_proj"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.latlong_to_grid_proj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert latitude and longitude coordinates to grid cell coordinates using pyproj for projection handling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>latitude</strong> – The latitude coordinate to convert.</p></li>
+<li><p><strong>longitude</strong> – The longitude coordinate to convert.</p></li>
+<li><p><strong>bbox</strong> – A dictionary with keys ‘north’, ‘south’, ‘east’, ‘west’ representing the bounding box.</p></li>
+<li><p><strong>image_width</strong> – The width of the image in pixels.</p></li>
+<li><p><strong>image_height</strong> – The height of the image in pixels.</p></li>
+<li><p><strong>src_proj</strong> – Source projection (usually latitude/longitude).</p></li>
+<li><p><strong>dest_proj</strong> – Destination projection for converting geographic coordinates into grid coordinates.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple (x, y) representing the grid cell coordinates in the image.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.longitude">
+<span class="sig-name descname"><span class="pre">longitude</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-71.84585650616927</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.longitude" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.min_path_recalculation_interval_seconds">
+<span class="sig-name descname"><span class="pre">min_path_recalculation_interval_seconds</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.min_path_recalculation_interval_seconds" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.on_activate">
+<span class="sig-name descname"><span class="pre">on_activate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.on_activate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.on_activate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle an activating transition.</p>
+<p>This is the default on_activate() callback.
+It will call all on_activate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_activate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.on_cleanup">
+<span class="sig-name descname"><span class="pre">on_cleanup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.on_cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.on_cleanup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a cleaning up transition.</p>
+<p>This is the default on_cleanup() callback.
+It will call all on_cleanup() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_cleanup() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.on_configure">
+<span class="sig-name descname"><span class="pre">on_configure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.on_configure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.on_configure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a configuring transition.</p>
+<p>This is the default on_configure() callback.
+It will call all on_configure() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_configure() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.on_deactivate">
+<span class="sig-name descname"><span class="pre">on_deactivate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.on_deactivate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.on_deactivate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a deactivating transition.</p>
+<p>This is the default on_deactivate() callback.
+It will call all on_deactivate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_deactivate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.on_error">
+<span class="sig-name descname"><span class="pre">on_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.on_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.on_error" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a transition error.</p>
+<p>This is the default on_error() callback.
+It will call all on_error() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_error() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.on_shutdown">
+<span class="sig-name descname"><span class="pre">on_shutdown</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.on_shutdown"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.on_shutdown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a shutting down transition.</p>
+<p>This is the default on_shutdown() callback.
+It will call all on_shutdown() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_shutdown() in derived classes.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.previous_look_ahead_index">
+<span class="sig-name descname"><span class="pre">previous_look_ahead_index</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.previous_look_ahead_index" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.recalculate_path_from_exact_points">
+<span class="sig-name descname"><span class="pre">recalculate_path_from_exact_points</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.recalculate_path_from_exact_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.recalculate_path_from_exact_points" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recalculates the current path based on exact geographic points and grid coordinates determined by previous processing.
+This function constructs the path segment by segment, updating it with any changes in conditions or coordinates.</p>
+<p>The function checks for wind conditions, recalculates path segments between exact points, and publishes the updated path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None. The function directly updates the ‘current_path’ and ‘current_grid_path’ attributes of the instance,
+and publishes the new path to a designated topic.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Verifying if wind conditions are reported; if not, the function logs a message and exits without updating the path.
+- If there are no waypoints to process (i.e., if ‘grid_points’ is empty), the function clears the current path and logs this event.
+- Creating a new path by connecting all exact points through calculated segments, while taking into account wind angle.
+- Dynamically inserting intermediate points into path segments to enhance navigation precision.
+- Publishing the newly calculated path for use by the navigation system.
+- Logging various state changes and decisions for debugging and monitoring purposes.</p>
+<p>This function assumes that ‘current_grid_cell’ and ‘grid_points’ are available within the class instance
+and are appropriately set before calling this function.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.remove_last_points_if_necessary">
+<span class="sig-name descname"><span class="pre">remove_last_points_if_necessary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">next_point</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.remove_last_points_if_necessary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.remove_last_points_if_necessary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Removes points from the list of exact points and grid points if they are deemed unnecessary based on their distance
+to a new point (‘next_point’). This function is called when adding waypoints, and is intended to remove unwanted rounding
+segments generated around a previous rounding waypoint.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>next_point</strong> – A tuple (latitude, longitude) representing the next point’s geographic coordinates.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None. Modifies the internal lists ‘exact_points’ and ‘grid_points’ by potentially removing points that
+are no longer relevant after analyzing the new point’s proximity to the previous points.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Checking if the last processed waypoint was a rounding type.
+- Comparing distances between consecutive exact points and the next point.
+- Removing points from both ‘exact_points’ and ‘grid_points’ if the conditions indicate that newer points
+have looped back and are curther away than earlier points, requiring a path correction</p>
+<p>This function is intended to ensure buoy rounding paths are sensible.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.segment_endpoint_indices">
+<span class="sig-name descname"><span class="pre">segment_endpoint_indices</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.segment_endpoint_indices" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.set_parameters">
+<span class="sig-name descname"><span class="pre">set_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.set_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.set_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set parameters for the node, and return the result for the set action.</p>
+<p>If any parameter in the list was not declared beforehand and undeclared parameters are not
+allowed for the node, this method will raise a ParameterNotDeclaredException exception.</p>
+<p>Parameters are set in the order they are declared in the list.
+If setting a parameter fails due to not being declared, then the
+parameters which have already been set will stay set, and no attempt will
+be made to set the parameters which come after.</p>
+<p>If undeclared parameters are allowed, then all the parameters will be implicitly
+declared before being set even if they were not declared beforehand.
+Parameter overrides are ignored by this method.</p>
+<p>If a callback was registered previously with <code class="xref py py-func docutils literal notranslate"><span class="pre">add_on_set_parameters_callback()</span></code>, it
+will be called prior to setting the parameters for the node, once for each parameter.
+If the callback prevents a parameter from being set, then it will be reflected in the
+returned result; no exceptions will be raised in this case.
+For each successfully set parameter, a <code class="xref py py-class docutils literal notranslate"><span class="pre">ParameterEvent</span></code> message is
+published.</p>
+<p>If the value type of the parameter is NOT_SET, and the existing parameter type is
+something else, then the parameter will be implicitly undeclared.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameter_list</strong> – The list of parameters to set.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The result for each set action as a list.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ParameterNotDeclaredException if undeclared parameters are not allowed,
+and at least one parameter in the list hadn’t been declared beforehand.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.single_waypoint_callback">
+<span class="sig-name descname"><span class="pre">single_waypoint_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Waypoint</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.single_waypoint_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.single_waypoint_callback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Callback function that processes a single waypoint message. This function updates the waypoint list, calculates exact points,
+recalculates the path, and determines the look-ahead point based on the received waypoint message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg</strong> – A sailbot_msgs/Waypoint object that contains details such as the type of waypoint and its geographic coordinates.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None. This function triggers a series of operations that update the internal state of the navigation system,
+including appending the waypoint to a list, potentially adding a threat to the map based on the waypoint type,
+recalculating the navigation path, and updating the look-ahead mechanism.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Logging receipt of a new waypoint.
+- Appending the new waypoint to the ‘waypoints’ list.
+- Adding the waypoint as a threat if it is a rounding waypoint (either to the right or left).
+- Calling the function to calculate exact points from the new waypoint.
+- Recalculating the entire path based on updated waypoint data.
+- Determining and updating the look-ahead point for navigation.
+- Logging the completion of processing for the waypoint.</p>
+<p>This function is intended to be used as a callback for a waypoint message subscriber in a ROS2 node environment.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.speed_knots">
+<span class="sig-name descname"><span class="pre">speed_knots</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.speed_knots" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.threat_ids">
+<span class="sig-name descname"><span class="pre">threat_ids</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.threat_ids" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.true_wind_callback">
+<span class="sig-name descname"><span class="pre">true_wind_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Wind</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.true_wind_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.true_wind_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.vector_to_heading">
+<span class="sig-name descname"><span class="pre">vector_to_heading</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dy</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.vector_to_heading"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.vector_to_heading" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert vector components (dx, dy) at a grid position to a navigation heading.</p>
+<p>Parameters:
+- dx, dy: Changes in x and y grid coordinates.</p>
+<p>Returns:
+- Navigation bearing in degrees from north.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.waypoint_threat_id_map">
+<span class="sig-name descname"><span class="pre">waypoint_threat_id_map</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.waypoint_threat_id_map" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.waypoints">
+<span class="sig-name descname"><span class="pre">waypoints</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">sailbot_msgs.msg.WaypointPath(waypoints=[])</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.waypoints" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.waypoints_callback">
+<span class="sig-name descname"><span class="pre">waypoints_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">WaypointPath</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.waypoints_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.waypoints_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.wind_angle_deg">
+<span class="sig-name descname"><span class="pre">wind_angle_deg</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">270</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.wind_angle_deg" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="path_follower_vf.distance">
+<span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#distance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.distance" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="path_follower_vf.find_and_load_image">
+<span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">find_and_load_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">directory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">location</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#find_and_load_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.find_and_load_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find an image by location and load it along with its bounding box coordinates.</p>
+<p>Parameters:
+- directory: The directory to search in.
+- location: The location to match.</p>
+<p>Returns:
+- A tuple containing the loaded image and a dictionary with the bounding box coordinates.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="path_follower_vf.get_maps_dir">
+<span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">get_maps_dir</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#get_maps_dir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.get_maps_dir" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="path_follower_vf.interpolate_point">
+<span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">interpolate_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fraction</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#interpolate_point"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.interpolate_point" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="path_follower_vf.main">
+<span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.main" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Path Follower Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.PathFollower"><code class="docutils literal notranslate"><span class="pre">PathFollower</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.distance"><code class="docutils literal notranslate"><span class="pre">distance()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.find_and_load_image"><code class="docutils literal notranslate"><span class="pre">find_and_load_image()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.get_maps_dir"><code class="docutils literal notranslate"><span class="pre">get_maps_dir()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.interpolate_point"><code class="docutils literal notranslate"><span class="pre">interpolate_point()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="network_comms.html" title="previous chapter">Network Comms Node</a></li>
+      <li>Next: <a href="state_manager.html" title="next chapter">State Manager Node</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/path_follower_vf.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

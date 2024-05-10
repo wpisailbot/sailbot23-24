@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Heading Controller Node &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=af2ce170"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Network Comms Node" href="network_comms.html" />
+    <link rel="prev" title="ESP32 Comms Node" href="esp32_comms.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-heading_controller_vf">
+<span id="heading-controller-node"></span><h1>Heading Controller Node<a class="headerlink" href="#module-heading_controller_vf" title="Permalink to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">heading_controller_vf.</span></span><span class="sig-name descname"><span class="pre">HeadingController</span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">LifecycleNode</span></code></p>
+<p>A ROS2 Lifecycle node for controlling the heading of a robotic sailboat based on navigational data and environmental conditions.
+This node integrates fuzzy logic for rudder angle control and uses an adaptive vector field for path following,
+dynamically adjusting the rudder based on computed heading errors and external factors like wind direction.</p>
+<p>The node subscribes to various topics to receive updates on the boat’s heading, wind conditions, and navigation path, and publishes
+commands for rudder angle adjustments. It is capable of handling different autonomous modes, specifically focusing on full autonomous navigation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>heading</strong> – (float) Current heading of the boat.</p></li>
+<li><p><strong>current_grid_cell</strong> – (Optional[Point]) Current grid cell position of the boat.</p></li>
+<li><p><strong>path_segment</strong> – (Optional[PathSegment]) Current path segment for navigation.</p></li>
+<li><p><strong>wind_direction_deg</strong> – (Optional[float]) Current wind direction in degrees.</p></li>
+<li><p><strong>autonomous_mode</strong> – (int) Current autonomous mode of operation.</p></li>
+<li><p><strong>heading_kp</strong> – (float) Proportional gain for heading control.</p></li>
+<li><p><strong>rudder_angle</strong> – (float) Current angle of the rudder.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Functions:</dt><dd><dl class="simple">
+<dt>on_configure(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Configures the node, setting up publishers and subscribers. Initializes the fuzzy control system for rudder angle determination based on heading error and rate of change.</p>
+</dd>
+<dt>on_activate(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Activates the node to start responding to incoming data and controlling the rudder.</p>
+</dd>
+<dt>on_deactivate(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Deactivates the node, stopping its control activities.</p>
+</dd>
+<dt>on_cleanup(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Cleans up by destroying timers, subscribers, and publishers.</p>
+</dd>
+<dt>on_shutdown(self, state: State) -&gt; TransitionCallbackReturn:</dt><dd><p>Performs shutdown procedures, ensuring all resources are cleanly released.</p>
+</dd>
+<dt>compute_rudder_angle(self):</dt><dd><p>Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and
+possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.</p>
+</dd>
+<dt>needs_to_tack(self, boat_heading, target_heading, wind_direction) -&gt; bool:</dt><dd><p>Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat’s heading, target heading, and wind direction.</p>
+</dd>
+<dt>adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -&gt; np.ndarray:</dt><dd><p>Calculates a navigation vector based on the boat’s current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.</p>
+</dd>
+<dt>vector_to_heading(self, dx, dy) -&gt; float:</dt><dd><p>Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.</p>
+</dd>
+<dt>getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -&gt; float:</dt><dd><p>Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.</p>
+</dd>
+</dl>
+</dd>
+<dt>Subscriptions:</dt><dd><p>Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat’s rudder for optimal heading control.</p>
+</dd>
+<dt>Publishers:</dt><dd><p>Publishes the computed rudder angle to a designated topic for execution by the boat’s steering mechanism.</p>
+</dd>
+</dl>
+<p><strong>Usage</strong>:
+- The node must be managed by state_manager</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.adaptive_vector_field">
+<span class="sig-name descname"><span class="pre">adaptive_vector_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">P1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lambda_base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.adaptive_vector_field"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.adaptive_vector_field" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes an adaptive vector field between two points, providing a navigation vector that changes dynamically based on
+the current position relative to a line segment defined by two points (P1 and P2). This method is used for
+path following, where the vector field helps steer the boat towards and along the path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>P1</strong> – Tuple (x1, y1) representing the start point of the line segment.</p></li>
+<li><p><strong>P2</strong> – Tuple (x2, y2) representing the end point of the line segment.</p></li>
+<li><p><strong>x</strong> – Current x-coordinate of the boat.</p></li>
+<li><p><strong>y</strong> – Current y-coordinate of the boat.</p></li>
+<li><p><strong>k_base</strong> – Base proportional gain for the vector field calculation. Default is 1.0.</p></li>
+<li><p><strong>lambda_base</strong> – Base rate for the attraction to the path’s direction. Default is 1.0.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A numpy array representing the vector (V) in the 2D plane, pointing in the direction of movement required
+to reduce the error relative to the path and maintain alignment with the path direction.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Calculating the directional vector (d) from P1 to P2.
+- Projecting the current point (x, y) onto the line defined by P1 and P2 to find the closest point on the line.
+- Calculating the error vector (e) from the current point to this projection.
+- Determining the distance from the current point to the projected point on the line to dynamically adjust the gains.
+- Computing the navigation vector (V) which combines a component to reduce the perpendicular distance to the line
+(corrective force) and a component to move along the line (propulsive force).</p>
+<p>The adaptive nature of the gains k and lambda ensures that the corrective force diminishes as the point approaches
+the line, and the propulsive force increases, aiding in smoother convergence and travel along the path.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.airmar_heading_callback">
+<span class="sig-name descname"><span class="pre">airmar_heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.airmar_heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.airmar_heading_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.airmar_position_callback">
+<span class="sig-name descname"><span class="pre">airmar_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">NavSatFix</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.airmar_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.airmar_position_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.autonomous_mode">
+<span class="sig-name descname"><span class="pre">autonomous_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.autonomous_mode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.autonomous_mode_callback">
+<span class="sig-name descname"><span class="pre">autonomous_mode_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">AutonomousMode</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.autonomous_mode_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.autonomous_mode_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.compute_rudder_angle">
+<span class="sig-name descname"><span class="pre">compute_rudder_angle</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.compute_rudder_angle"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.compute_rudder_angle" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes and publishes the rudder angle based on the current heading, target segment, and other navigational parameters.
+The function adjusts the rudder angle to align the vessel’s heading with the target heading derived from the current path segment.
+The rudder adjustment also considers the rate of change in heading error and conditions such as the need to tack against the wind.</p>
+<p>This function performs several checks and computations:
+- Ensures that the vessel is in full autonomous mode before making any adjustments.
+- Publishes a zero rudder angle if there is no target path segment.
+- Logs and exits if the current grid cell is not available.
+- Computes a target heading from the current path segment using a vector field.
+- Calculates heading error and its rate of change.
+- Uses a fuzzy logic controller to compute the required rudder adjustment.
+- Caps the rudder angle within specified limits and adjusts for tacking if necessary based on wind direction.
+- Publishes the computed rudder angle.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None. This function directly affects the vessel’s steering by publishing rudder angle adjustments to a designated ROS topic.</p>
+</dd>
+</dl>
+<p>The function relies on the following attributes:
+- ‘autonomous_mode’: The current mode of operation, checked against predefined autonomous modes.
+- ‘path_segment’: The current navigation path segment from which the target heading is derived.
+- ‘current_grid_cell’: The vessel’s current position in grid coordinates, necessary for vector field calculations.
+- ‘rudder_simulator’: A fuzzy logic controller for computing the rudder angle based on heading error and rate of change.
+- ‘heading_kp’: A proportional gain used to scale the rudder adjustment.
+- ‘wind_direction_deg’: The current wind direction, used to determine if tacking maneuvers are necessary.</p>
+<p>This method logs significant states and decisions to assist with debugging and operational monitoring.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.current_grid_cell">
+<span class="sig-name descname"><span class="pre">current_grid_cell</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.current_grid_cell" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.current_grid_cell_callback">
+<span class="sig-name descname"><span class="pre">current_grid_cell_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Point</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.current_grid_cell_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.current_grid_cell_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.current_path_callback">
+<span class="sig-name descname"><span class="pre">current_path_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GeoPath</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.current_path_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.current_path_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.forward_magnitude_callback">
+<span class="sig-name descname"><span class="pre">forward_magnitude_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.forward_magnitude_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.forward_magnitude_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.getRotationToPointLatLong">
+<span class="sig-name descname"><span class="pre">getRotationToPointLatLong</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">current_theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">current_lat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">current_long</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_lat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_long</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.getRotationToPointLatLong"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.getRotationToPointLatLong" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.get_parameters">
+<span class="sig-name descname"><span class="pre">get_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.get_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.get_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a list of parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>names</strong> – Fully-qualified names of the parameters to get, including their namespaces.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The values for the given parameter names.
+A default Parameter will be returned for undeclared parameters if
+undeclared parameters are allowed.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ParameterNotDeclaredException if undeclared parameters are not allowed,
+and at least one parameter hadn’t been declared beforehand.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p>ParameterUninitializedException if at least one parameter is statically typed and
+uninitialized.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.heading">
+<span class="sig-name descname"><span class="pre">heading</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.heading" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.heading_kp">
+<span class="sig-name descname"><span class="pre">heading_kp</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.heading_kp" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.last_heading_error">
+<span class="sig-name descname"><span class="pre">last_heading_error</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.last_heading_error" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.needs_to_tack">
+<span class="sig-name descname"><span class="pre">needs_to_tack</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">boat_heading</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_heading</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wind_direction</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.needs_to_tack"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.needs_to_tack" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determines whether a tacking maneuver is required based on the current boat heading, target heading, and the direction
+of the wind. Tacking is necessary when the desired heading would cause the boat to turn through the wind vector.
+This is only relevant for the sail controller, which will direct the sail to switch sides as the boat turns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>boat_heading</strong> – The current heading of the boat in degrees.</p></li>
+<li><p><strong>target_heading</strong> – The desired heading of the boat in degrees.</p></li>
+<li><p><strong>wind_direction</strong> – The current wind direction in degrees.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A boolean value. Returns True if tacking is necessary to reach the target heading; otherwise, False.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Normalizing all heading and direction values to ensure they fall within a 0-360 degree range.
+- Calculating whether the shortest path from the current to the target heading is clockwise or counterclockwise.
+- Checking if the wind direction lies within the arc between the current and target headings in the chosen direction.
+- Publishing a position adjustment to the ballast to aid in tacking, if necessary.
+- Returning True if a tacking maneuver is needed based on the relative positions of the boat heading, target heading, and wind.</p>
+<p>This function also manages the ballast position by publishing to ‘ballast_position_publisher’ to optimize the boat’s
+balance and performance during potential tacking maneuvers.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.on_activate">
+<span class="sig-name descname"><span class="pre">on_activate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.on_activate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.on_activate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle an activating transition.</p>
+<p>This is the default on_activate() callback.
+It will call all on_activate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_activate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.on_cleanup">
+<span class="sig-name descname"><span class="pre">on_cleanup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.on_cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.on_cleanup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a cleaning up transition.</p>
+<p>This is the default on_cleanup() callback.
+It will call all on_cleanup() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_cleanup() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.on_configure">
+<span class="sig-name descname"><span class="pre">on_configure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.on_configure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.on_configure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a configuring transition.</p>
+<p>This is the default on_configure() callback.
+It will call all on_configure() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_configure() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.on_deactivate">
+<span class="sig-name descname"><span class="pre">on_deactivate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.on_deactivate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.on_deactivate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a deactivating transition.</p>
+<p>This is the default on_deactivate() callback.
+It will call all on_deactivate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_deactivate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.on_error">
+<span class="sig-name descname"><span class="pre">on_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.on_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.on_error" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a transition error.</p>
+<p>This is the default on_error() callback.
+It will call all on_error() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_error() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.on_shutdown">
+<span class="sig-name descname"><span class="pre">on_shutdown</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.on_shutdown"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.on_shutdown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a shutting down transition.</p>
+<p>This is the default on_shutdown() callback.
+It will call all on_shutdown() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_shutdown() in derived classes.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.path_segment">
+<span class="sig-name descname"><span class="pre">path_segment</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.path_segment" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.path_segment_callback">
+<span class="sig-name descname"><span class="pre">path_segment_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">PathSegment</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.path_segment_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.path_segment_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.rudder_angle">
+<span class="sig-name descname"><span class="pre">rudder_angle</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.rudder_angle" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.rudder_kp_callback">
+<span class="sig-name descname"><span class="pre">rudder_kp_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.rudder_kp_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.rudder_kp_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.set_parameters">
+<span class="sig-name descname"><span class="pre">set_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.set_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.set_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set parameters for the node, and return the result for the set action.</p>
+<p>If any parameter in the list was not declared beforehand and undeclared parameters are not
+allowed for the node, this method will raise a ParameterNotDeclaredException exception.</p>
+<p>Parameters are set in the order they are declared in the list.
+If setting a parameter fails due to not being declared, then the
+parameters which have already been set will stay set, and no attempt will
+be made to set the parameters which come after.</p>
+<p>If undeclared parameters are allowed, then all the parameters will be implicitly
+declared before being set even if they were not declared beforehand.
+Parameter overrides are ignored by this method.</p>
+<p>If a callback was registered previously with <code class="xref py py-func docutils literal notranslate"><span class="pre">add_on_set_parameters_callback()</span></code>, it
+will be called prior to setting the parameters for the node, once for each parameter.
+If the callback prevents a parameter from being set, then it will be reflected in the
+returned result; no exceptions will be raised in this case.
+For each successfully set parameter, a <code class="xref py py-class docutils literal notranslate"><span class="pre">ParameterEvent</span></code> message is
+published.</p>
+<p>If the value type of the parameter is NOT_SET, and the existing parameter type is
+something else, then the parameter will be implicitly undeclared.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameter_list</strong> – The list of parameters to set.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The result for each set action as a list.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ParameterNotDeclaredException if undeclared parameters are not allowed,
+and at least one parameter in the list hadn’t been declared beforehand.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.timer_callback">
+<span class="sig-name descname"><span class="pre">timer_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.timer_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.timer_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.true_wind_callback">
+<span class="sig-name descname"><span class="pre">true_wind_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Wind</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.true_wind_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.true_wind_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.vector_to_heading">
+<span class="sig-name descname"><span class="pre">vector_to_heading</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dy</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.vector_to_heading"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.vector_to_heading" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert vector components (dx, dy) at a grid position to a navigation heading.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dx</strong> – Change in x grid coordinate.</p></li>
+<li><p><strong>dy</strong> – Change in y grid coordinate.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Navigation bearing in degrees from north.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.wind_direction_deg">
+<span class="sig-name descname"><span class="pre">wind_direction_deg</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.wind_direction_deg" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="heading_controller_vf.main">
+<span class="sig-prename descclassname"><span class="pre">heading_controller_vf.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.main" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="heading_controller_vf.normalRelativeAngle">
+<span class="sig-prename descclassname"><span class="pre">heading_controller_vf.</span></span><span class="sig-name descname"><span class="pre">normalRelativeAngle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">angle</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#normalRelativeAngle"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.normalRelativeAngle" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Heading Controller Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.HeadingController"><code class="docutils literal notranslate"><span class="pre">HeadingController</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.normalRelativeAngle"><code class="docutils literal notranslate"><span class="pre">normalRelativeAngle()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="esp32_comms.html" title="previous chapter">ESP32 Comms Node</a></li>
+      <li>Next: <a href="network_comms.html" title="next chapter">Network Comms Node</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/heading_controller_vf.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

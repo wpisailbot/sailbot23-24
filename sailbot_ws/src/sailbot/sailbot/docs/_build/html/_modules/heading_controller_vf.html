@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>heading_controller_vf &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=af2ce170"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for heading_controller_vf</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="kn">import</span> <span class="nn">rclpy</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">String</span><span class="p">,</span> <span class="n">Float64</span><span class="p">,</span> <span class="n">Int16</span>
+<span class="kn">from</span> <span class="nn">sensor_msgs.msg</span> <span class="kn">import</span> <span class="n">NavSatFix</span>
+<span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Point</span>
+<span class="kn">from</span> <span class="nn">geographic_msgs.msg</span> <span class="kn">import</span> <span class="n">GeoPoint</span>
+<span class="c1"># import json</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">skfuzzy</span> <span class="k">as</span> <span class="nn">fuzz</span>
+<span class="kn">from</span> <span class="nn">skfuzzy</span> <span class="kn">import</span> <span class="n">control</span> <span class="k">as</span> <span class="n">ctrl</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">traceback</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">LifecycleNode</span><span class="p">,</span> <span class="n">LifecycleState</span><span class="p">,</span> <span class="n">TransitionCallbackReturn</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">Publisher</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">State</span>
+<span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">TransitionCallbackReturn</span>
+<span class="kn">from</span> <span class="nn">rclpy.timer</span> <span class="kn">import</span> <span class="n">Timer</span>
+<span class="kn">from</span> <span class="nn">rclpy.subscription</span> <span class="kn">import</span> <span class="n">Subscription</span>
+
+<span class="kn">from</span> <span class="nn">sailbot_msgs.msg</span> <span class="kn">import</span> <span class="n">AutonomousMode</span><span class="p">,</span> <span class="n">GeoPath</span><span class="p">,</span> <span class="n">Wind</span><span class="p">,</span> <span class="n">PathSegment</span>
+
+<span class="n">PI</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">pi</span>
+<span class="n">TWO_PI</span> <span class="o">=</span> <span class="n">PI</span><span class="o">*</span><span class="mi">2</span>
+<span class="c1">#normalizes an angle</span>
+<div class="viewcode-block" id="normalRelativeAngle"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.normalRelativeAngle">[docs]</a><span class="k">def</span> <span class="nf">normalRelativeAngle</span><span class="p">(</span><span class="n">angle</span><span class="p">):</span>
+    <span class="c1">#angle %= TWO_PI &gt;= 0 ? (angle &lt; PI) ? angle : angle - TWO_PI : (angle &gt;= -PI) ? angle : angle + TWO_PI</span>
+    <span class="k">if</span> <span class="n">angle</span><span class="o">&gt;=</span><span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">angle</span><span class="o">&lt;</span><span class="n">PI</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">angle</span><span class="o">-=</span><span class="n">TWO_PI</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">angle</span><span class="o">&gt;=-</span><span class="n">PI</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">angle</span><span class="o">+=</span><span class="n">TWO_PI</span>
+    <span class="k">return</span> <span class="n">angle</span></div>
+
+<div class="viewcode-block" id="HeadingController"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController">[docs]</a><span class="k">class</span> <span class="nc">HeadingController</span><span class="p">(</span><span class="n">LifecycleNode</span><span class="p">):</span>
+
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A ROS2 Lifecycle node for controlling the heading of a robotic sailboat based on navigational data and environmental conditions. </span>
+<span class="sd">    This node integrates fuzzy logic for rudder angle control and uses an adaptive vector field for path following, </span>
+<span class="sd">    dynamically adjusting the rudder based on computed heading errors and external factors like wind direction.</span>
+
+<span class="sd">    The node subscribes to various topics to receive updates on the boat&#39;s heading, wind conditions, and navigation path, and publishes </span>
+<span class="sd">    commands for rudder angle adjustments. It is capable of handling different autonomous modes, specifically focusing on full autonomous navigation.</span>
+
+<span class="sd">    :ivar heading: (float) Current heading of the boat.</span>
+<span class="sd">    :ivar current_grid_cell: (Optional[Point]) Current grid cell position of the boat.</span>
+<span class="sd">    :ivar path_segment: (Optional[PathSegment]) Current path segment for navigation.</span>
+<span class="sd">    :ivar wind_direction_deg: (Optional[float]) Current wind direction in degrees.</span>
+<span class="sd">    :ivar autonomous_mode: (int) Current autonomous mode of operation.</span>
+<span class="sd">    :ivar heading_kp: (float) Proportional gain for heading control.</span>
+<span class="sd">    :ivar rudder_angle: (float) Current angle of the rudder.</span>
+
+
+<span class="sd">    Functions:</span>
+<span class="sd">        on_configure(self, state: State) -&gt; TransitionCallbackReturn:</span>
+<span class="sd">            Configures the node, setting up publishers and subscribers. Initializes the fuzzy control system for rudder angle determination based on heading error and rate of change.</span>
+
+<span class="sd">        on_activate(self, state: State) -&gt; TransitionCallbackReturn:</span>
+<span class="sd">            Activates the node to start responding to incoming data and controlling the rudder.</span>
+
+<span class="sd">        on_deactivate(self, state: State) -&gt; TransitionCallbackReturn:</span>
+<span class="sd">            Deactivates the node, stopping its control activities.</span>
+
+<span class="sd">        on_cleanup(self, state: State) -&gt; TransitionCallbackReturn:</span>
+<span class="sd">            Cleans up by destroying timers, subscribers, and publishers.</span>
+
+<span class="sd">        on_shutdown(self, state: State) -&gt; TransitionCallbackReturn:</span>
+<span class="sd">            Performs shutdown procedures, ensuring all resources are cleanly released.</span>
+
+<span class="sd">        compute_rudder_angle(self):</span>
+<span class="sd">            Computes the desired rudder angle based on the current and target headings, taking into account wind conditions and </span>
+<span class="sd">            possible need for tacking. Utilizes fuzzy logic to determine the appropriate rudder adjustment.</span>
+
+<span class="sd">        needs_to_tack(self, boat_heading, target_heading, wind_direction) -&gt; bool:</span>
+<span class="sd">            Determines whether a change in direction is required that involves tacking, based on the relative angles of the boat&#39;s heading, target heading, and wind direction.</span>
+
+<span class="sd">        adaptive_vector_field(self, P1, P2, x, y, k_base=1.0, lambda_base=1.0) -&gt; np.ndarray:</span>
+<span class="sd">            Calculates a navigation vector based on the boat&#39;s current position relative to a defined path segment, adjusting the vector based on proximity to the desired path.</span>
+
+<span class="sd">        vector_to_heading(self, dx, dy) -&gt; float:</span>
+<span class="sd">            Converts vector components to a navigational heading, adjusting for the coordinate system used in navigation.</span>
+
+<span class="sd">        getRotationToPointLatLong(self, current_theta, current_lat, current_long, target_lat, target_long) -&gt; float:</span>
+<span class="sd">            Computes the necessary rotation to point towards a specific latitude and longitude, given the current heading and position.</span>
+
+<span class="sd">    Subscriptions:</span>
+<span class="sd">        Subscribes to topics for boat heading, wind conditions, current path segment, and autonomous mode status to dynamically adjust the boat&#39;s rudder for optimal heading control.</span>
+
+<span class="sd">    Publishers:</span>
+<span class="sd">        Publishes the computed rudder angle to a designated topic for execution by the boat&#39;s steering mechanism.</span>
+
+<span class="sd">    **Usage**:</span>
+<span class="sd">    - The node must be managed by state_manager</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">heading</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1">#latitude = 42.273822</span>
+    <span class="c1">#longitude = -71.805967</span>
+    <span class="n">current_grid_cell</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">path_segment</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">wind_direction_deg</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">autonomous_mode</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">heading_kp</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">rudder_angle</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">last_heading_error</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;heading_controller&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_parameters</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_parameters</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">path_segment_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_path_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
+
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">timer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Timer</span><span class="p">]</span>
+        <span class="c1"># self.target_position = GeoPoint()</span>
+        <span class="c1"># self.target_position.latitude = 42.273051</span>
+        <span class="c1"># self.target_position.longitude = -71.805049</span>
+
+<div class="viewcode-block" id="HeadingController.set_parameters"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.set_parameters">[docs]</a>    <span class="k">def</span> <span class="nf">set_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.heading_control.heading_kp&#39;</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.heading_control.vector_field_crosstrack_weight&#39;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.heading_control.vector_field_path_dir_weight&#39;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="HeadingController.get_parameters"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.get_parameters">[docs]</a>    <span class="k">def</span> <span class="nf">get_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">heading_kp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.heading_control.heading_kp&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">k_base</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.heading_control.vector_field_crosstrack_weight&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lambda_base</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.heading_control.vector_field_path_dir_weight&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span></div>
+        
+    <span class="c1">#lifecycle node callbacks</span>
+<div class="viewcode-block" id="HeadingController.on_configure"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.on_configure">[docs]</a>    <span class="k">def</span> <span class="nf">on_configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;In configure&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Float64</span><span class="p">,</span> <span class="s1">&#39;ballast_position&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Int16</span><span class="p">,</span> <span class="s1">&#39;rudder_angle&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_heading_debug_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Float64</span><span class="p">,</span> <span class="s1">&#39;target_heading&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">path_Segment_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">PathSegment</span><span class="p">,</span>
+            <span class="s1">&#39;current_path_segment&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">path_segment_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;/airmar_data/heading&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Point</span><span class="p">,</span>
+            <span class="s1">&#39;current_grid_cell&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_path_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">GeoPath</span><span class="p">,</span>
+            <span class="s1">&#39;current_path&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">current_path_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Wind</span><span class="p">,</span>
+            <span class="s1">&#39;true_wind_smoothed&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf_forward_magnitude_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;vf_forward_magnitude&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">forward_magnitude_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_kp_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;rudder_kp&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rudder_kp_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span><span class="n">AutonomousMode</span><span class="p">,</span> <span class="s1">&#39;autonomous_mode&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode_callback</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">timer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_timer</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">timer_callback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Heading controller node configured&quot;</span><span class="p">)</span>
+
+        <span class="n">heading_error</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Antecedent</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">180</span><span class="p">,</span> <span class="mi">181</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;heading_error&#39;</span><span class="p">)</span>
+        <span class="n">rate_of_change</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Antecedent</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="mi">91</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;rate_of_change&#39;</span><span class="p">)</span>
+        <span class="n">rudder_adjustment</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Consequent</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="mi">91</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;rudder_adjustment&#39;</span><span class="p">)</span>
+
+        <span class="c1">#Negative Large (NL), Negative Medium (NM), Zero (ZE), Positive Medium (PM), and Positive Large (PL)</span>
+        <span class="c1"># Membership functions for heading error</span>
+        <span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NL&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">heading_error</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="o">-</span><span class="mi">180</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span>  <span class="c1"># mean = -180, std = 30</span>
+        <span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NM&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">heading_error</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span>  <span class="c1"># mean = -100, std = 30</span>
+        <span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;ZE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">heading_error</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span>     <span class="c1"># mean = 0, std = 30</span>
+        <span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PM&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">heading_error</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span>   <span class="c1"># mean = 100, std = 30</span>
+        <span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PL&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">heading_error</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">180</span><span class="p">,</span> <span class="mi">40</span><span class="p">)</span> 
+
+        <span class="c1"># Membership functions for rate of change</span>
+        <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">zmf</span><span class="p">(</span><span class="n">rate_of_change</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="o">-</span><span class="mi">30</span><span class="p">)</span>
+        <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">rate_of_change</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="o">-</span><span class="mi">45</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+        <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">pimf</span><span class="p">(</span><span class="n">rate_of_change</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="o">-</span><span class="mi">45</span><span class="p">,</span> <span class="o">-</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">45</span><span class="p">)</span>
+        <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">rate_of_change</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">45</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+        <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">smf</span><span class="p">(</span><span class="n">rate_of_change</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">90</span><span class="p">)</span>
+
+        <span class="c1"># Membership functions for rudder angle</span>
+        <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">rudder_adjustment</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>  <span class="c1"># mean = -45, std = 10</span>
+        <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">rudder_adjustment</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>  <span class="c1"># mean = -15, std = 10</span>
+        <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">rudder_adjustment</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>              <span class="c1"># mean = 0, std = 10</span>
+        <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">rudder_adjustment</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="o">-</span><span class="mi">60</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>   <span class="c1"># mean = 15, std = 10</span>
+        <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fuzz</span><span class="o">.</span><span class="n">gaussmf</span><span class="p">(</span><span class="n">rudder_adjustment</span><span class="o">.</span><span class="n">universe</span><span class="p">,</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>   <span class="c1"># mean = 45, std = 10</span>
+
+        <span class="c1"># Define the rules</span>
+        <span class="n">rule1</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;ZE&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">])</span>
+        <span class="n">rule2</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;ZE&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">])</span>
+        <span class="n">rule3</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;ZE&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">])</span>
+        <span class="n">rule4</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;ZE&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">])</span>
+        <span class="n">rule5</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;ZE&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">])</span>
+
+        <span class="n">rule6</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">])</span>
+        <span class="n">rule7</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">])</span>
+        <span class="n">rule8</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">])</span>
+        <span class="n">rule9</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">])</span>
+        <span class="n">rule10</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">])</span>
+
+        <span class="n">rule11</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;PL&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">])</span>
+
+        <span class="n">rule12</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">])</span>
+        <span class="n">rule13</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">])</span>
+        <span class="n">rule14</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Zero&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Small Positive&#39;</span><span class="p">])</span>
+        <span class="n">rule15</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Small Negative&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">])</span>
+        <span class="n">rule16</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NM&#39;</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">rate_of_change</span><span class="p">[</span><span class="s1">&#39;Large Negative&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">])</span>
+
+        <span class="n">rule17</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">Rule</span><span class="p">(</span><span class="n">heading_error</span><span class="p">[</span><span class="s1">&#39;NL&#39;</span><span class="p">],</span> <span class="n">rudder_adjustment</span><span class="p">[</span><span class="s1">&#39;Large Positive&#39;</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_control</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">ControlSystem</span><span class="p">([</span><span class="n">rule1</span><span class="p">,</span> <span class="n">rule2</span><span class="p">,</span> <span class="n">rule3</span><span class="p">,</span> <span class="n">rule4</span><span class="p">,</span> <span class="n">rule5</span><span class="p">,</span> <span class="n">rule6</span><span class="p">,</span> <span class="n">rule7</span><span class="p">,</span> <span class="n">rule8</span><span class="p">,</span> <span class="n">rule9</span><span class="p">,</span> <span class="n">rule10</span><span class="p">,</span> <span class="n">rule11</span><span class="p">,</span> <span class="n">rule12</span><span class="p">,</span> <span class="n">rule13</span><span class="p">,</span> <span class="n">rule14</span><span class="p">,</span> <span class="n">rule15</span><span class="p">,</span> <span class="n">rule16</span><span class="p">,</span> <span class="n">rule17</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_simulator</span> <span class="o">=</span> <span class="n">ctrl</span><span class="o">.</span><span class="n">ControlSystemSimulation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rudder_control</span><span class="p">)</span>
+        <span class="c1">#super().on_configure(state)</span>
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+
+<div class="viewcode-block" id="HeadingController.on_activate"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.on_activate">[docs]</a>    <span class="k">def</span> <span class="nf">on_activate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Activating...&quot;</span><span class="p">)</span>
+        <span class="c1"># Start publishers or timers</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_activate</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="HeadingController.on_deactivate"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.on_deactivate">[docs]</a>    <span class="k">def</span> <span class="nf">on_deactivate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Deactivating...&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_deactivate</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="HeadingController.on_cleanup"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.on_cleanup">[docs]</a>    <span class="k">def</span> <span class="nf">on_cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Cleaning up...&quot;</span><span class="p">)</span>
+        <span class="c1"># Destroy subscribers, publishers, and timers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_timer</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">timer</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_lifecycle_publisher</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_publisher</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path_segment_subscription</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">destroy_subscription</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">airmar_position_subscription</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+
+<div class="viewcode-block" id="HeadingController.on_shutdown"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.on_shutdown">[docs]</a>    <span class="k">def</span> <span class="nf">on_shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Shutting down...&quot;</span><span class="p">)</span>
+        <span class="c1"># Perform final cleanup if necessary</span>
+        <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
+    
+<div class="viewcode-block" id="HeadingController.on_error"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.on_error">[docs]</a>    <span class="k">def</span> <span class="nf">on_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">LifecycleState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Error caught!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_error</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
+    
+    <span class="c1">#end callbacks</span>
+
+<div class="viewcode-block" id="HeadingController.current_path_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.current_path_callback">[docs]</a>    <span class="k">def</span> <span class="nf">current_path_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">GeoPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">points</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="HeadingController.autonomous_mode_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.autonomous_mode_callback">[docs]</a>    <span class="k">def</span> <span class="nf">autonomous_mode_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">AutonomousMode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Got autonomous mode: </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">mode</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">mode</span>
+
+        <span class="c1">#if we&#39;re going into a manual rudder mode, reset it to 0 first</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_NONE</span> <span class="ow">or</span> <span class="n">msg</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="n">AutonomousMode</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_TRIMTAB</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Resetting rudder angle&quot;</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">Int16</span><span class="p">()</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="HeadingController.timer_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.timer_callback">[docs]</a>    <span class="k">def</span> <span class="nf">timer_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">compute_rudder_angle</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="HeadingController.airmar_heading_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.airmar_heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+        <span class="c1">#self.compute_rudder_angle()</span>
+    
+<div class="viewcode-block" id="HeadingController.airmar_position_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.airmar_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">NavSatFix</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">latitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">longitude</span></div>
+        <span class="c1">#self.compute_rudder_angle()</span>
+
+<div class="viewcode-block" id="HeadingController.current_grid_cell_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.current_grid_cell_callback">[docs]</a>    <span class="k">def</span> <span class="nf">current_grid_cell_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Point</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell</span> <span class="o">=</span> <span class="n">msg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got new grid cell!&quot;</span><span class="p">)</span></div>
+        <span class="c1">#self.compute_rudder_angle()</span>
+    
+<div class="viewcode-block" id="HeadingController.path_segment_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.path_segment_callback">[docs]</a>    <span class="k">def</span> <span class="nf">path_segment_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">PathSegment</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span> <span class="o">=</span> <span class="n">msg</span></div>
+        <span class="c1">#self.compute_rudder_angle()</span>
+
+<div class="viewcode-block" id="HeadingController.true_wind_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.true_wind_callback">[docs]</a>    <span class="k">def</span> <span class="nf">true_wind_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Wind</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wind_direction_deg</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">direction</span></div>
+
+<div class="viewcode-block" id="HeadingController.forward_magnitude_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.forward_magnitude_callback">[docs]</a>    <span class="k">def</span> <span class="nf">forward_magnitude_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lambda_base</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="HeadingController.rudder_kp_callback"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.rudder_kp_callback">[docs]</a>    <span class="k">def</span> <span class="nf">rudder_kp_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">heading_kp</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+    
+<div class="viewcode-block" id="HeadingController.needs_to_tack"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.needs_to_tack">[docs]</a>    <span class="k">def</span> <span class="nf">needs_to_tack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">boat_heading</span><span class="p">,</span> <span class="n">target_heading</span><span class="p">,</span> <span class="n">wind_direction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Determines whether a tacking maneuver is required based on the current boat heading, target heading, and the direction</span>
+<span class="sd">        of the wind. Tacking is necessary when the desired heading would cause the boat to turn through the wind vector. </span>
+<span class="sd">        This is only relevant for the sail controller, which will direct the sail to switch sides as the boat turns.</span>
+
+<span class="sd">        :param boat_heading: The current heading of the boat in degrees.</span>
+<span class="sd">        :param target_heading: The desired heading of the boat in degrees.</span>
+<span class="sd">        :param wind_direction: The current wind direction in degrees.</span>
+
+<span class="sd">        :return: A boolean value. Returns True if tacking is necessary to reach the target heading; otherwise, False.</span>
+
+<span class="sd">        Function behavior includes:</span>
+<span class="sd">        - Normalizing all heading and direction values to ensure they fall within a 0-360 degree range.</span>
+<span class="sd">        - Calculating whether the shortest path from the current to the target heading is clockwise or counterclockwise.</span>
+<span class="sd">        - Checking if the wind direction lies within the arc between the current and target headings in the chosen direction.</span>
+<span class="sd">        - Publishing a position adjustment to the ballast to aid in tacking, if necessary.</span>
+<span class="sd">        - Returning True if a tacking maneuver is needed based on the relative positions of the boat heading, target heading, and wind.</span>
+
+<span class="sd">        This function also manages the ballast position by publishing to &#39;ballast_position_publisher&#39; to optimize the boat&#39;s</span>
+<span class="sd">        balance and performance during potential tacking maneuvers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Normalize angles</span>
+        <span class="n">boat_heading</span> <span class="o">%=</span> <span class="mi">360</span>
+        <span class="n">target_heading</span> <span class="o">%=</span> <span class="mi">360</span>
+        <span class="n">wind_direction</span> <span class="o">%=</span> <span class="mi">360</span>
+        
+        <span class="n">clockwise</span> <span class="o">=</span> <span class="p">((</span><span class="n">target_heading</span> <span class="o">-</span> <span class="n">boat_heading</span> <span class="o">+</span> <span class="mi">360</span><span class="p">)</span> <span class="o">%</span> <span class="mi">360</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">180</span>
+        
+        <span class="k">if</span> <span class="n">clockwise</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">boat_heading</span> <span class="o">&lt;=</span> <span class="n">wind_direction</span> <span class="o">&lt;</span> <span class="n">target_heading</span> <span class="ow">or</span> \
+            <span class="p">(</span><span class="n">target_heading</span> <span class="o">&lt;</span> <span class="n">boat_heading</span> <span class="ow">and</span> <span class="p">(</span><span class="n">wind_direction</span> <span class="o">&gt;</span> <span class="n">boat_heading</span> <span class="ow">or</span> <span class="n">wind_direction</span> <span class="o">&lt;</span> <span class="n">target_heading</span><span class="p">)):</span>
+                <span class="n">position_msg</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+                <span class="n">position_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">position_msg</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">target_heading</span> <span class="o">&lt;=</span> <span class="n">wind_direction</span> <span class="o">&lt;</span> <span class="n">boat_heading</span> <span class="ow">or</span> \
+            <span class="p">(</span><span class="n">boat_heading</span> <span class="o">&lt;</span> <span class="n">target_heading</span> <span class="ow">and</span> <span class="p">(</span><span class="n">wind_direction</span> <span class="o">&lt;</span> <span class="n">boat_heading</span> <span class="ow">or</span> <span class="n">wind_direction</span> <span class="o">&gt;</span> <span class="n">target_heading</span><span class="p">)):</span>
+                <span class="n">position_msg</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+                <span class="n">position_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="mf">0.5</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ballast_position_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">position_msg</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        
+        <span class="k">return</span> <span class="kc">False</span></div>
+    
+<div class="viewcode-block" id="HeadingController.adaptive_vector_field"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.adaptive_vector_field">[docs]</a>    <span class="k">def</span> <span class="nf">adaptive_vector_field</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">P1</span><span class="p">,</span> <span class="n">P2</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">k_base</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">lambda_base</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes an adaptive vector field between two points, providing a navigation vector that changes dynamically based on</span>
+<span class="sd">        the current position relative to a line segment defined by two points (P1 and P2). This method is used for</span>
+<span class="sd">        path following, where the vector field helps steer the boat towards and along the path.</span>
+
+<span class="sd">        :param P1: Tuple (x1, y1) representing the start point of the line segment.</span>
+<span class="sd">        :param P2: Tuple (x2, y2) representing the end point of the line segment.</span>
+<span class="sd">        :param x: Current x-coordinate of the boat.</span>
+<span class="sd">        :param y: Current y-coordinate of the boat.</span>
+<span class="sd">        :param k_base: Base proportional gain for the vector field calculation. Default is 1.0.</span>
+<span class="sd">        :param lambda_base: Base rate for the attraction to the path&#39;s direction. Default is 1.0.</span>
+
+<span class="sd">        :return: A numpy array representing the vector (V) in the 2D plane, pointing in the direction of movement required</span>
+<span class="sd">                to reduce the error relative to the path and maintain alignment with the path direction.</span>
+
+<span class="sd">        Function behavior includes:</span>
+<span class="sd">        - Calculating the directional vector (d) from P1 to P2.</span>
+<span class="sd">        - Projecting the current point (x, y) onto the line defined by P1 and P2 to find the closest point on the line.</span>
+<span class="sd">        - Calculating the error vector (e) from the current point to this projection.</span>
+<span class="sd">        - Determining the distance from the current point to the projected point on the line to dynamically adjust the gains.</span>
+<span class="sd">        - Computing the navigation vector (V) which combines a component to reduce the perpendicular distance to the line</span>
+<span class="sd">        (corrective force) and a component to move along the line (propulsive force).</span>
+
+<span class="sd">        The adaptive nature of the gains k and lambda ensures that the corrective force diminishes as the point approaches</span>
+<span class="sd">        the line, and the propulsive force increases, aiding in smoother convergence and travel along the path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x1</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="n">P1</span>
+        <span class="n">x2</span><span class="p">,</span> <span class="n">y2</span> <span class="o">=</span> <span class="n">P2</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x2</span> <span class="o">-</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y2</span> <span class="o">-</span> <span class="n">y1</span><span class="p">])</span>
+        <span class="n">point</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">])</span>
+        <span class="n">projection</span> <span class="o">=</span> <span class="n">P1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">point</span> <span class="o">-</span> <span class="n">P1</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span> <span class="o">*</span> <span class="n">d</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="n">point</span> <span class="o">-</span> <span class="n">projection</span>
+        <span class="n">dist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">k_base</span> <span class="o">/</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">dist</span><span class="p">)</span>  <span class="c1"># Adaptive gain that decreases as distance decreases</span>
+        <span class="n">lambda_param</span> <span class="o">=</span> <span class="n">lambda_base</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">dist</span><span class="p">))</span>  <span class="c1"># Increases as the robot approaches the line</span>
+        <span class="n">V</span> <span class="o">=</span> <span class="o">-</span><span class="n">k</span> <span class="o">*</span> <span class="n">e</span> <span class="o">+</span> <span class="n">lambda_param</span> <span class="o">*</span> <span class="n">d</span>
+        <span class="k">return</span> <span class="n">V</span></div>
+
+<div class="viewcode-block" id="HeadingController.vector_to_heading"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.vector_to_heading">[docs]</a>    <span class="k">def</span> <span class="nf">vector_to_heading</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convert vector components (dx, dy) at a grid position to a navigation heading.</span>
+
+<span class="sd">        :param dx: Change in x grid coordinate.</span>
+<span class="sd">        :param dy: Change in y grid coordinate.</span>
+
+<span class="sd">        :return: Navigation bearing in degrees from north.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">atan2</span><span class="p">(</span><span class="n">dy</span><span class="p">,</span> <span class="n">dx</span><span class="p">)</span>  <span class="c1"># Angle in radians</span>
+        <span class="n">bearing</span> <span class="o">=</span> <span class="p">(</span><span class="mi">90</span> <span class="o">-</span> <span class="n">math</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span> <span class="o">%</span> <span class="mi">360</span>
+        <span class="k">return</span> <span class="n">bearing</span></div>
+
+<div class="viewcode-block" id="HeadingController.compute_rudder_angle"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.compute_rudder_angle">[docs]</a>    <span class="k">def</span> <span class="nf">compute_rudder_angle</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes and publishes the rudder angle based on the current heading, target segment, and other navigational parameters.</span>
+<span class="sd">        The function adjusts the rudder angle to align the vessel&#39;s heading with the target heading derived from the current path segment.</span>
+<span class="sd">        The rudder adjustment also considers the rate of change in heading error and conditions such as the need to tack against the wind.</span>
+
+<span class="sd">        This function performs several checks and computations:</span>
+<span class="sd">        - Ensures that the vessel is in full autonomous mode before making any adjustments.</span>
+<span class="sd">        - Publishes a zero rudder angle if there is no target path segment.</span>
+<span class="sd">        - Logs and exits if the current grid cell is not available.</span>
+<span class="sd">        - Computes a target heading from the current path segment using a vector field.</span>
+<span class="sd">        - Calculates heading error and its rate of change.</span>
+<span class="sd">        - Uses a fuzzy logic controller to compute the required rudder adjustment.</span>
+<span class="sd">        - Caps the rudder angle within specified limits and adjusts for tacking if necessary based on wind direction.</span>
+<span class="sd">        - Publishes the computed rudder angle.</span>
+
+<span class="sd">        :return: None. This function directly affects the vessel&#39;s steering by publishing rudder angle adjustments to a designated ROS topic.</span>
+
+<span class="sd">        The function relies on the following attributes:</span>
+<span class="sd">        - &#39;autonomous_mode&#39;: The current mode of operation, checked against predefined autonomous modes.</span>
+<span class="sd">        - &#39;path_segment&#39;: The current navigation path segment from which the target heading is derived.</span>
+<span class="sd">        - &#39;current_grid_cell&#39;: The vessel&#39;s current position in grid coordinates, necessary for vector field calculations.</span>
+<span class="sd">        - &#39;rudder_simulator&#39;: A fuzzy logic controller for computing the rudder angle based on heading error and rate of change.</span>
+<span class="sd">        - &#39;heading_kp&#39;: A proportional gain used to scale the rudder adjustment.</span>
+<span class="sd">        - &#39;wind_direction_deg&#39;: The current wind direction, used to determine if tacking maneuvers are necessary.</span>
+
+<span class="sd">        This method logs significant states and decisions to assist with debugging and operational monitoring.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">autonomous_modes</span> <span class="o">=</span> <span class="n">AutonomousMode</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autonomous_mode</span> <span class="o">!=</span> <span class="n">autonomous_modes</span><span class="o">.</span><span class="n">AUTONOMOUS_MODE_FULL</span><span class="p">):</span>
+            <span class="c1">#self.get_logger().info(&quot;Not in auto&quot;)</span>
+
+            <span class="k">return</span>
+        
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">Int16</span><span class="p">()</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No target segment&quot;</span><span class="p">)</span>
+
+            <span class="k">return</span>
+        
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Current grid cell is none, cannot operate&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        
+        <span class="n">grid_direction_vector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">adaptive_vector_field</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span><span class="o">.</span><span class="n">start</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span><span class="o">.</span><span class="n">start</span><span class="o">.</span><span class="n">y</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span><span class="o">.</span><span class="n">end</span><span class="o">.</span><span class="n">x</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span><span class="o">.</span><span class="n">end</span><span class="o">.</span><span class="n">y</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">k_base</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">k_base</span><span class="p">,</span> <span class="n">lambda_base</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lambda_base</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Direction vector: </span><span class="si">{</span><span class="n">grid_direction_vector</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">target_heading</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vector_to_heading</span><span class="p">(</span><span class="n">grid_direction_vector</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">grid_direction_vector</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">target_heading_msg</span> <span class="o">=</span> <span class="n">Float64</span><span class="p">()</span>
+        <span class="n">target_heading_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">target_heading</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_heading_debug_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">target_heading_msg</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Target heading: </span><span class="si">{</span><span class="n">target_heading</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">heading_error</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">normalRelativeAngle</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">heading</span><span class="o">-</span><span class="n">target_heading</span><span class="p">)))</span>
+        <span class="n">delta_heading_error</span> <span class="o">=</span> <span class="n">heading_error</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_heading_error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_heading_error</span> <span class="o">=</span> <span class="n">heading_error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Heading error: </span><span class="si">{</span><span class="n">heading_error</span><span class="si">}</span><span class="s2"> from heading: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">heading</span><span class="si">}</span><span class="s2"> grid pos: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell</span><span class="si">}</span><span class="s2"> along segment: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">path_segment</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_simulator</span><span class="o">.</span><span class="n">input</span><span class="p">[</span><span class="s1">&#39;heading_error&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">heading_error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_simulator</span><span class="o">.</span><span class="n">input</span><span class="p">[</span><span class="s1">&#39;rate_of_change&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">delta_heading_error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_simulator</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+        <span class="n">rudder_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rudder_simulator</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="s1">&#39;rudder_adjustment&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span> <span class="o">+=</span> <span class="n">rudder_value</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">heading_kp</span> <span class="c1"># Scale</span>
+
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span><span class="o">&gt;</span><span class="mi">30</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span> <span class="o">=</span> <span class="mi">30</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span><span class="o">&lt;-</span><span class="mi">30</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span> <span class="o">=</span> <span class="o">-</span><span class="mi">30</span>
+
+        <span class="c1"># If we are tacking, turn as hard as possible.</span>
+        <span class="c1"># Trim tab controller will see this and skip over min_lift</span>
+        <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wind_direction_deg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">needs_to_tack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">heading</span><span class="p">,</span> <span class="n">target_heading</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">wind_direction_deg</span><span class="p">)):</span>
+                <span class="k">if</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span> <span class="o">=</span> <span class="mi">31</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span> <span class="o">=</span> <span class="o">-</span><span class="mi">31</span>
+
+        <span class="c1">#self.get_logger().info(f&quot;Computed rudder angle: {rudder_angle}&quot;)</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">Int16</span><span class="p">()</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rudder angle: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rudder_angle_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+    <span class="c1">#gets necessary rotation from an lat, long, theta pose to face a point</span>
+<div class="viewcode-block" id="HeadingController.getRotationToPointLatLong"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.HeadingController.getRotationToPointLatLong">[docs]</a>    <span class="k">def</span> <span class="nf">getRotationToPointLatLong</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">current_theta</span><span class="p">,</span> <span class="n">current_lat</span><span class="p">,</span> <span class="n">current_long</span><span class="p">,</span> <span class="n">target_lat</span><span class="p">,</span> <span class="n">target_long</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="c1"># Convert latitude and longitude from degrees to radians</span>
+        <span class="n">lat1</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">current_lat</span><span class="p">)</span>
+        <span class="n">lon1</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">current_long</span><span class="p">)</span>
+        <span class="n">lat2</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">target_lat</span><span class="p">)</span>
+        <span class="n">lon2</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">target_long</span><span class="p">)</span>
+        
+        <span class="n">delta_lon</span> <span class="o">=</span> <span class="n">lon2</span> <span class="o">-</span> <span class="n">lon1</span>
+        <span class="c1">#self.get_logger().info(f&quot;delta_lon: {delta_lon}&quot;)</span>
+        
+        <span class="c1"># Calculate the bearing from current location to target location</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">delta_lon</span><span class="p">)</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">lat2</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">lat1</span><span class="p">)</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">lat2</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">lat1</span><span class="p">)</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">lat2</span><span class="p">)</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">delta_lon</span><span class="p">))</span>
+        <span class="c1">#self.get_logger().info(f&quot;x: {x}, y: {y}&quot;)</span>
+        <span class="n">initial_bearing</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">atan2</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+        <span class="n">initial_bearing</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">initial_bearing</span><span class="p">)</span>
+        <span class="c1">#self.get_logger().info(f&quot;initial bearing: {initial_bearing}&quot;)</span>
+        
+        <span class="c1">#self.get_logger().info(f&quot;Current theta: {current_theta}&quot;)</span>
+        <span class="c1"># Calculate turn required by normalizing the difference between the bearing and current orientation</span>
+        <span class="n">turn</span> <span class="o">=</span> <span class="n">normalRelativeAngle</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">current_theta</span><span class="o">-</span><span class="n">initial_bearing</span><span class="p">))</span>
+        
+        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">turn</span><span class="p">)</span></div></div>
+
+
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../heading_controller_vf.html#heading_controller_vf.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">heading_control</span> <span class="o">=</span> <span class="n">HeadingController</span><span class="p">()</span>
+
+    <span class="c1"># Use the SingleThreadedExecutor to spin the node.</span>
+    <span class="n">executor</span> <span class="o">=</span> <span class="n">rclpy</span><span class="o">.</span><span class="n">executors</span><span class="o">.</span><span class="n">SingleThreadedExecutor</span><span class="p">()</span>
+    <span class="n">executor</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">heading_control</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Spin the node to execute callbacks</span>
+        <span class="n">executor</span><span class="o">.</span><span class="n">spin</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">trace</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
+        <span class="n">heading_control</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Shutdown and cleanup the node</span>
+        <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+        <span class="n">heading_control</span><span class="o">.</span><span class="n">destroy_node</span><span class="p">()</span>
+        <span class="n">rclpy</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span></div>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

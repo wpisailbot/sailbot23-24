@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>buoy_detection &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=af2ce170"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for buoy_detection</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">rclpy</span>
+<span class="kn">from</span> <span class="nn">rclpy.node</span> <span class="kn">import</span> <span class="n">Node</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">Float64</span>
+<span class="kn">from</span> <span class="nn">sensor_msgs.msg</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">NavSatFix</span>
+<span class="kn">from</span> <span class="nn">geographic_msgs.msg</span> <span class="kn">import</span> <span class="n">GeoPoint</span>
+<span class="kn">from</span> <span class="nn">cv_bridge</span> <span class="kn">import</span> <span class="n">CvBridge</span>
+
+<span class="kn">from</span> <span class="nn">sailbot_msgs.msg</span> <span class="kn">import</span> <span class="n">BuoyDetectionStamped</span>
+
+<span class="kn">import</span> <span class="nn">cv2</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">from</span> <span class="nn">filterpy.kalman</span> <span class="kn">import</span> <span class="n">KalmanFilter</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">linear_sum_assignment</span>
+<span class="kn">import</span> <span class="nn">pyproj</span>
+<span class="kn">from</span> <span class="nn">pyproj</span> <span class="kn">import</span> <span class="n">Transformer</span>
+
+<span class="kn">from</span> <span class="nn">geopy.distance</span> <span class="kn">import</span> <span class="n">geodesic</span>
+
+<span class="n">PIXEL_SIZE</span> <span class="o">=</span> <span class="mf">0.002</span> <span class="c1"># In mm</span>
+<span class="n">CAMERA_RESOLUTION</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2208</span><span class="p">,</span> <span class="mi">1242</span><span class="p">)</span> <span class="c1"># Width, Height</span>
+<span class="n">CAMERA_WORLD_POSITION</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.8</span><span class="p">])</span> <span class="c1"># XYZ in meters</span>
+<span class="n">CAMERA_ORIENTATION</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="c1"># Orientation as pitch, yaw, roll</span>
+
+<span class="c1">#Camera calibration for LEFT camera info from ZED application</span>
+<span class="n">CX</span> <span class="o">=</span> <span class="mf">1099.58</span>
+<span class="n">CY</span> <span class="o">=</span> <span class="mf">634.60</span>
+
+<span class="n">FX</span> <span class="o">=</span> <span class="mf">1053.2</span>
+<span class="n">FY</span> <span class="o">=</span> <span class="mf">1052.39</span>
+
+<span class="n">camera_matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">FX</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">CX</span><span class="p">],</span>
+                          <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">FY</span><span class="p">,</span> <span class="n">CY</span><span class="p">],</span>
+                          <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>
+
+<span class="n">K1</span><span class="p">,</span> <span class="n">K2</span><span class="p">,</span> <span class="n">P1</span><span class="p">,</span> <span class="n">P2</span><span class="p">,</span> <span class="n">K3</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.0393</span><span class="p">,</span> <span class="mf">0.0085</span><span class="p">,</span> <span class="mf">0.0001</span><span class="p">,</span> <span class="mf">0.0004</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.0045</span>
+<span class="n">distortion_coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">K1</span><span class="p">,</span> <span class="n">K2</span><span class="p">,</span> <span class="n">P1</span><span class="p">,</span> <span class="n">P2</span><span class="p">,</span> <span class="n">K3</span><span class="p">])</span>
+
+<span class="c1"># Define geographic coordinate system (WGS84)</span>
+<span class="n">geographic</span> <span class="o">=</span> <span class="n">pyproj</span><span class="o">.</span><span class="n">CRS</span><span class="p">(</span><span class="s1">&#39;EPSG:4326&#39;</span><span class="p">)</span>  <span class="c1"># WGS 84</span>
+
+<span class="c1"># Define local ENU coordinate system based on a specific zone</span>
+<span class="n">local_enu</span> <span class="o">=</span> <span class="n">pyproj</span><span class="o">.</span><span class="n">CRS</span><span class="p">(</span><span class="s1">&#39;EPSG:32619&#39;</span><span class="p">)</span>  <span class="c1"># UTM Zone 19N, North Hemisphere</span>
+
+<span class="c1"># Create a transformer to convert from geographic to local ENU coordinates</span>
+<span class="n">geo_to_enu_transformer</span> <span class="o">=</span> <span class="n">Transformer</span><span class="o">.</span><span class="n">from_crs</span><span class="p">(</span><span class="n">geographic</span><span class="p">,</span> <span class="n">local_enu</span><span class="p">,</span> <span class="n">always_xy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Create a transformer to convert from local ENU back to geographic coordinates</span>
+<span class="n">enu_to_geo_transformer</span> <span class="o">=</span> <span class="n">Transformer</span><span class="o">.</span><span class="n">from_crs</span><span class="p">(</span><span class="n">local_enu</span><span class="p">,</span> <span class="n">geographic</span><span class="p">,</span> <span class="n">always_xy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<div class="viewcode-block" id="geodetic_to_enu"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.geodetic_to_enu">[docs]</a><span class="k">def</span> <span class="nf">geodetic_to_enu</span><span class="p">(</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Transform from lat, lon to ENU coordinates.&quot;&quot;&quot;</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">geo_to_enu_transformer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">lon</span><span class="p">,</span> <span class="n">lat</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span></div>
+
+<div class="viewcode-block" id="enu_to_geodetic"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.enu_to_geodetic">[docs]</a><span class="k">def</span> <span class="nf">enu_to_geodetic</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Transform from ENU coordinates back to geodetic.&quot;&quot;&quot;</span>
+    <span class="n">lon</span><span class="p">,</span> <span class="n">lat</span> <span class="o">=</span> <span class="n">enu_to_geo_transformer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span></div>
+
+<div class="viewcode-block" id="create_kalman_filter"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.create_kalman_filter">[docs]</a><span class="k">def</span> <span class="nf">create_kalman_filter</span><span class="p">(</span><span class="n">initial_x</span><span class="p">,</span> <span class="n">initial_y</span><span class="p">):</span>
+    <span class="n">kf</span> <span class="o">=</span> <span class="n">KalmanFilter</span><span class="p">(</span><span class="n">dim_x</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">dim_z</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">dt</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># time step</span>
+
+    <span class="c1"># State transition matrix</span>
+    <span class="n">kf</span><span class="o">.</span><span class="n">F</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>  <span class="mi">0</span><span class="p">],</span>
+                     <span class="p">[</span><span class="mi">0</span><span class="p">,</span>  <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>  <span class="mi">0</span><span class="p">],</span>
+                     <span class="p">[</span><span class="mi">0</span><span class="p">,</span>  <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dt</span><span class="p">],</span>
+                     <span class="p">[</span><span class="mi">0</span><span class="p">,</span>  <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>  <span class="mi">1</span><span class="p">]])</span>
+
+    <span class="c1"># Measurement function</span>
+    <span class="n">kf</span><span class="o">.</span><span class="n">H</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+                     <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
+
+    <span class="c1"># Measurement uncertainty</span>
+    <span class="n">kf</span><span class="o">.</span><span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+                     <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">]])</span>
+
+    <span class="c1"># Initial state covariance</span>
+    <span class="n">kf</span><span class="o">.</span><span class="n">P</span> <span class="o">*=</span> <span class="mi">1000</span>
+
+    <span class="c1"># Process noise</span>
+    <span class="n">kf</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+
+    <span class="c1"># Initialize state</span>
+    <span class="n">kf</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">initial_x</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">initial_y</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>  <span class="c1"># Positions and velocities</span>
+
+    <span class="k">return</span> <span class="n">kf</span></div>
+
+<div class="viewcode-block" id="Track"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.Track">[docs]</a><span class="k">class</span> <span class="nc">Track</span><span class="p">:</span>
+    <span class="n">id_counter</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">initial_e</span><span class="p">,</span> <span class="n">initial_n</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">Track</span><span class="o">.</span><span class="n">id_counter</span>
+        <span class="n">Track</span><span class="o">.</span><span class="n">id_counter</span> <span class="o">+=</span> <span class="mi">1</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">kf</span> <span class="o">=</span> <span class="n">create_kalman_filter</span><span class="p">(</span><span class="n">initial_e</span><span class="p">,</span> <span class="n">initial_n</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_since_update</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">history</span> <span class="o">=</span> <span class="p">[(</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">])]</span>
+
+<div class="viewcode-block" id="Track.predict"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.Track.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">predict</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_since_update</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="Track.update"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.Track.update">[docs]</a>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">detection_enu</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">detection_enu</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_since_update</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span></div>
+    
+<div class="viewcode-block" id="Track.get_position"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.Track.get_position">[docs]</a>    <span class="k">def</span> <span class="nf">get_position</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span></div></div>
+
+<div class="viewcode-block" id="calculate_offset_position"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.calculate_offset_position">[docs]</a><span class="k">def</span> <span class="nf">calculate_offset_position</span><span class="p">(</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">heading</span><span class="p">,</span> <span class="n">z_distance</span><span class="p">,</span> <span class="n">x_distance</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculates a new geographic position offset by specified distances in the forward (z-axis) and rightward (x-axis) directions</span>
+<span class="sd">    relative to a given heading from an initial latitude and longitude.</span>
+
+<span class="sd">    :param lat: The latitude of the starting point in decimal degrees.</span>
+<span class="sd">    :param lon: The longitude of the starting point in decimal degrees.</span>
+<span class="sd">    :param heading: The current heading in degrees from the North, measured clockwise.</span>
+<span class="sd">    :param z_distance: The distance to move forward from the starting point, in meters.</span>
+<span class="sd">    :param x_distance: The distance to move rightward from the starting point, in meters.</span>
+
+<span class="sd">    :return: A &#39;GeoPoint&#39; object representing the new geographic position in decimal degrees of latitude and longitude.</span>
+
+<span class="sd">    Function behavior includes:</span>
+<span class="sd">    - Converting the heading from degrees to radians for trigonometric calculations.</span>
+<span class="sd">    - Calculating the angle from the original heading to the resultant vector created by the specified distances.</span>
+<span class="sd">    - Determining the total angle by combining the heading with this new angle.</span>
+<span class="sd">    - Computing the resultant distance using the Pythagorean theorem.</span>
+<span class="sd">    - Using the &#39;geodesic&#39; method from the &#39;geopy&#39; library to calculate the new position based on this resultant distance and angle.</span>
+
+<span class="sd">    This function assumes that the &#39;geodesic&#39; method is capable of calculating a destination point given a starting point,</span>
+<span class="sd">    a distance, and a bearing. The &#39;GeoPoint&#39; structure returned should be compatible with the needs of geographic</span>
+<span class="sd">    information systems or other location-based services.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">heading_rad</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">heading</span><span class="p">)</span>
+
+    <span class="c1"># Calculate the effective heading by considering the forward (Z) and rightward (X) distances</span>
+    <span class="n">angle_from_heading</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">atan2</span><span class="p">(</span><span class="n">x_distance</span><span class="p">,</span> <span class="n">z_distance</span><span class="p">)</span>
+
+    <span class="c1"># Calculate angle of the resultant vector relative to the heading direction</span>
+    <span class="n">total_angle</span> <span class="o">=</span> <span class="n">heading_rad</span> <span class="o">+</span> <span class="n">angle_from_heading</span>
+
+    <span class="n">resultant_distance</span> <span class="o">=</span> <span class="p">(</span><span class="n">z_distance</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">x_distance</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">**</span><span class="mf">0.5</span>
+
+    <span class="n">new_location</span> <span class="o">=</span> <span class="n">geodesic</span><span class="p">(</span><span class="n">meters</span><span class="o">=</span><span class="n">resultant_distance</span><span class="p">)</span><span class="o">.</span><span class="n">destination</span><span class="p">((</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">total_angle</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">GeoPoint</span><span class="p">(</span><span class="n">latitude</span><span class="o">=</span><span class="n">new_location</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="n">longitude</span><span class="o">=</span><span class="n">new_location</span><span class="o">.</span><span class="n">longitude</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="BuoyDetection"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection">[docs]</a><span class="k">class</span> <span class="nc">BuoyDetection</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A ROS2 node responsible for detecting buoys using image data from a camera. This node subscribes to image streams,</span>
+<span class="sd">    processes the images to detect objects based on color and shape criteria, and publishes the locations of detected buoys.</span>
+
+<span class="sd">    :ivar current_x_scaling_factor: Scaling factor to adjust the pixel coordinates based on the image width.</span>
+<span class="sd">    :ivar current_y_scaling_factor: Scaling factor to adjust the pixel coordinates based on the image height.</span>
+<span class="sd">    :ivar latitude: Current latitude of the node.</span>
+<span class="sd">    :ivar longitude: Current longitude of the node.</span>
+<span class="sd">    :ivar heading: Current heading of the vehicle in degrees.</span>
+<span class="sd">    :ivar tracks: List of current tracking objects representing detected buoys.</span>
+
+<span class="sd">    **Methods**:</span>
+<span class="sd">    - **publish_tracks**: Publishes the current tracked positions of detected buoys.</span>
+<span class="sd">    - **associate_detections_to_tracks**: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.</span>
+<span class="sd">    - **listener_callback**: Processes each incoming image, detects buoys, and manages tracks.</span>
+<span class="sd">    - **fill_holes**: Fills holes within binary images to create solid objects, improving reliability of object detection.</span>
+<span class="sd">    - **detect_orange_objects**: Detects orange objects in the image by applying a color threshold and shape analysis.</span>
+<span class="sd">    - **calculate_depth**: Estimates the depth of detected objects based on their size in the image.</span>
+<span class="sd">    - **calculate_object_center**: Calculates the center of detected objects in pixel coordinates.</span>
+<span class="sd">    - **pixel_to_world**: Converts pixel coordinates to world coordinates using intrinsic camera parameters.</span>
+
+<span class="sd">    **Node Lifecycle**:</span>
+<span class="sd">    - **on_configure**: Configures the node&#39;s publishers, subscribers, and initializes parameters.</span>
+<span class="sd">    - **on_activate**: Activates the node, enabling the publishing of detection data.</span>
+<span class="sd">    - **on_deactivate**: Deactivates the node, stopping the publishing of detection data.</span>
+<span class="sd">    - **on_cleanup**: Cleans up resources, shutting down publishers and subscribers.</span>
+
+<span class="sd">    **Usage**:</span>
+<span class="sd">    - The node must be managed by state_manager</span>
+
+<span class="sd">    **Notes**:</span>
+<span class="sd">    - The ZED2 ros node must be running in order for this node to receive frames.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">current_x_scaling_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">current_y_scaling_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">latitude</span><span class="p">,</span> <span class="n">longitude</span> <span class="o">=</span> <span class="mf">42.0396766107111</span><span class="p">,</span> <span class="o">-</span><span class="mf">71.84585650616927</span>
+    <span class="n">heading</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">tracks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;object_detection_node&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_parameters</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_parameters</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Image</span><span class="p">,</span>
+            <span class="s1">&#39;/zed/zed_node/rgb/image_rect_color&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">listener_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_position_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+                <span class="n">NavSatFix</span><span class="p">,</span>
+                <span class="s1">&#39;/airmar_data/lat_long&#39;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">airmar_position_callback</span><span class="p">,</span>
+                <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;/airmar_data/heading&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">mask_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_publisher</span><span class="p">(</span>
+            <span class="n">Image</span><span class="p">,</span>
+            <span class="s1">&#39;cv_mask&#39;</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_position_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_publisher</span><span class="p">(</span>
+            <span class="n">BuoyDetectionStamped</span><span class="p">,</span>
+            <span class="s1">&#39;buoy_position&#39;</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bridge</span> <span class="o">=</span> <span class="n">CvBridge</span><span class="p">()</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Setup done&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="BuoyDetection.set_parameters"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.set_parameters">[docs]</a>    <span class="k">def</span> <span class="nf">set_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_h&#39;</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_s&#39;</span><span class="p">,</span> <span class="mi">49</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_v&#39;</span><span class="p">,</span> <span class="mi">120</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_h&#39;</span><span class="p">,</span> <span class="mi">110</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_s&#39;</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_v&#39;</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_circularity_threshold&#39;</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_diameter_meters&#39;</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span></div>
+
+
+
+
+<div class="viewcode-block" id="BuoyDetection.get_parameters"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.get_parameters">[docs]</a>    <span class="k">def</span> <span class="nf">get_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lower_h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_h&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lower_s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_s&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lower_v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_v&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upper_h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_h&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upper_s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_s&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upper_v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_v&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_circularity_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_circularity_threshold&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_diameter_meters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_diameter_meters&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span></div>
+
+
+
+
+
+
+
+<div class="viewcode-block" id="BuoyDetection.airmar_position_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.airmar_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">NavSatFix</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">latitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">longitude</span></div>
+    
+<div class="viewcode-block" id="BuoyDetection.airmar_heading_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.airmar_heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.publish_tracks"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.publish_tracks">[docs]</a>    <span class="k">def</span> <span class="nf">publish_tracks</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1">#self.get_logger().info(f&quot;Num tracks: {len(self.tracks)}&quot;)</span>
+        <span class="k">for</span> <span class="n">track</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tracks</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">time_since_update</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Publish only for tracks updated in the last frame</span>
+                <span class="n">enu_position</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">get_position</span><span class="p">()</span>
+                <span class="n">latlon</span> <span class="o">=</span> <span class="n">enu_to_geodetic</span><span class="p">(</span><span class="n">enu_position</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">enu_position</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="c1">#self.get_logger().info(f&quot;Publishing detection with position: {latlon}&quot;)</span>
+                <span class="n">detection</span> <span class="o">=</span> <span class="n">BuoyDetectionStamped</span><span class="p">()</span>
+                <span class="n">detection</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">latlon</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">detection</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">latlon</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">detection</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">id</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">buoy_position_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">detection</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.associate_detections_to_tracks"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.associate_detections_to_tracks">[docs]</a>    <span class="k">def</span> <span class="nf">associate_detections_to_tracks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tracks</span><span class="p">,</span> <span class="n">detections_enu</span><span class="p">,</span> <span class="n">max_distance</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Associates detections to existing tracks using a cost matrix based on the Euclidean distance between predicted track</span>
+<span class="sd">        positions (from a Kalman filter, but we don&#39;t have velocity detection, so it&#39;s useless for now) and new detections. </span>
+<span class="sd">        The function handles cases where there are no tracks or detections and returns matches and unmatched detections for further processing.</span>
+
+<span class="sd">        :param tracks: A list of track objects which maintain state and prediction methods.</span>
+<span class="sd">        :param detections_enu: A list of detections in East-North-Up (ENU) coordinates.</span>
+<span class="sd">        :param max_distance: The maximum allowable distance for a detection to be considered a match with a track. Default is 3 meters.</span>
+
+<span class="sd">        :return: A tuple containing two elements:</span>
+<span class="sd">                - matches: A list of tuples (track_index, detection_index) where each tuple represents a confirmed match.</span>
+<span class="sd">                - unmatched_detections: A list of indices from &#39;detections_enu&#39; that did not match with any existing track.</span>
+
+<span class="sd">        Function behavior includes:</span>
+<span class="sd">        - Building a cost matrix where each element represents the distance between a track&#39;s predicted position and a detection&#39;s position.</span>
+<span class="sd">        - Using the Hungarian algorithm (linear sum assignment) to find the optimal matching of tracks to detections based on the cost matrix.</span>
+<span class="sd">        - Filtering these matches based on the &#39;max_distance&#39; threshold to ensure only reasonable matches are kept.</span>
+<span class="sd">        - Determining which detections and tracks remain unmatched after the matching process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tracks</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">detections_enu</span><span class="p">)))</span>
+        
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">detections_enu</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="p">[]</span>
+
+        <span class="n">cost_matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">tracks</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">detections_enu</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">track</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">tracks</span><span class="p">):</span>
+            <span class="n">predicted_enu</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">predict</span><span class="p">()</span>
+            <span class="c1">#self.get_logger().info(f&quot;Predicted enu: {predicted_enu}&quot;)</span>
+            <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">detection_enu</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">detections_enu</span><span class="p">):</span>
+                <span class="c1"># Now we use ENU coordinates directly here</span>
+                <span class="n">cost_matrix</span><span class="p">[</span><span class="n">t</span><span class="p">,</span> <span class="n">d</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">predicted_enu</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">detection_enu</span><span class="p">))</span>
+        
+        <span class="n">row_ind</span><span class="p">,</span> <span class="n">col_ind</span> <span class="o">=</span> <span class="n">linear_sum_assignment</span><span class="p">(</span><span class="n">cost_matrix</span><span class="p">)</span>
+
+        <span class="n">matches</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">unmatched_detections</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">detections_enu</span><span class="p">)))</span>
+        <span class="n">unmatched_tracks</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">tracks</span><span class="p">)))</span>
+
+        <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">row_ind</span><span class="p">,</span> <span class="n">col_ind</span><span class="p">):</span>
+            <span class="c1">#self.get_logger().info(f&quot;Cost matrix: {cost_matrix[r, c]}&quot;)</span>
+            <span class="k">if</span> <span class="n">cost_matrix</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">max_distance</span><span class="p">:</span>
+                <span class="n">matches</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">))</span>
+                <span class="n">unmatched_detections</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+                <span class="n">unmatched_tracks</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">matches</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">unmatched_detections</span><span class="p">)</span><span class="c1">#, list(unmatched_tracks)</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.listener_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.listener_callback">[docs]</a>    <span class="k">def</span> <span class="nf">listener_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Callback function for handling image data received from a ROS subscriber. This function processes each image frame to detect,</span>
+<span class="sd">        identify, and track orange objects, likely buoys, based on their color and shape. It converts ROS image messages to OpenCV</span>
+<span class="sd">        format, undistorts the image using camera intrinsics, and utilizes various helper functions to compute the objects&#39; </span>
+<span class="sd">        geographical and relative positions.</span>
+
+<span class="sd">        :param data: A ROS Image message that contains the image data captured by a camera.</span>
+
+<span class="sd">        :return: None. This function directly updates the system&#39;s state by modifying the tracking information and publishing the results.</span>
+
+<span class="sd">        Function behavior includes:</span>
+<span class="sd">        - Converting the ROS image message to an OpenCV image format.</span>
+<span class="sd">        - Calculating scaling factors based on the camera&#39;s resolution.</span>
+<span class="sd">        - Undistorting the image using pre-defined camera matrix and distortion coefficients.</span>
+<span class="sd">        - Detecting orange objects in the image by analyzing their contours.</span>
+<span class="sd">        - Calculating the center of each detected object.</span>
+<span class="sd">        - Converting the pixel coordinates of these centers to world coordinates, then to latitude and longitude.</span>
+<span class="sd">        - Transforming geodetic coordinates to East-North-Up (ENU) coordinates.</span>
+<span class="sd">        - Associating detected objects with existing tracks or creating new tracks for unmatched detections.</span>
+<span class="sd">        - Updating the track information and publishing the updated tracks for further processing or visualization.</span>
+
+<span class="sd">        This function relies on a set of predefined variables and configurations such as camera calibration parameters (&#39;camera_matrix&#39;,</span>
+<span class="sd">        &#39;distortion_coefficients&#39;), and scaling factors (&#39;FX&#39;, &#39;FY&#39;, &#39;CX&#39;, &#39;CY&#39;).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Convert ROS Image message to OpenCV image</span>
+        <span class="n">current_frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridge</span><span class="o">.</span><span class="n">imgmsg_to_cv2</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;bgr8&#39;</span><span class="p">)</span>
+        <span class="c1">#self.get_logger().info(&quot;frame width: &quot;+str(current_frame.shape))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_x_scaling_factor</span> <span class="o">=</span> <span class="n">current_frame</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">/</span><span class="n">CAMERA_RESOLUTION</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_y_scaling_factor</span> <span class="o">=</span> <span class="n">current_frame</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="n">CAMERA_RESOLUTION</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1">#self.get_logger().info(&quot;x scaling factor: &quot;+str(self.current_x_scaling_factor))</span>
+        <span class="c1">#self.get_logger().info(&quot;y scaling factor: &quot;+str(self.current_y_scaling_factor))</span>
+        
+        <span class="n">image</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">undistort</span><span class="p">(</span><span class="n">current_frame</span><span class="p">,</span> <span class="n">camera_matrix</span><span class="p">,</span> <span class="n">distortion_coefficients</span><span class="p">)</span>
+
+        <span class="n">contours</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detect_orange_objects</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+        <span class="n">detections</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">calculate_object_center</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span> <span class="k">for</span> <span class="n">contour</span> <span class="ow">in</span> <span class="n">contours</span><span class="p">]</span>
+        <span class="c1">#self.get_logger().info(f&quot;detections: {detections}&quot;)</span>
+
+        <span class="n">detections_latlon</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">triplet</span> <span class="ow">in</span> <span class="n">detections</span><span class="p">:</span>
+            <span class="n">world_coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pixel_to_world</span><span class="p">(</span><span class="n">triplet</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">triplet</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">triplet</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">FX</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">current_x_scaling_factor</span><span class="p">,</span> <span class="n">FY</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">current_y_scaling_factor</span><span class="p">,</span> <span class="n">CX</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">current_x_scaling_factor</span><span class="p">,</span> <span class="n">CY</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">current_y_scaling_factor</span><span class="p">)</span>
+            <span class="n">latlon</span> <span class="o">=</span> <span class="n">calculate_offset_position</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">heading</span><span class="p">,</span> <span class="n">world_coords</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">world_coords</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">detections_latlon</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">latlon</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="n">latlon</span><span class="o">.</span><span class="n">longitude</span><span class="p">))</span>
+        <span class="c1">#self.get_logger().info(f&quot;detections_latlon: {detections_latlon}&quot;)</span>
+
+        <span class="n">detections_enu</span> <span class="o">=</span> <span class="p">[</span><span class="n">geodetic_to_enu</span><span class="p">(</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">)</span> <span class="k">for</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="ow">in</span> <span class="n">detections_latlon</span><span class="p">]</span>
+        <span class="c1">#self.get_logger().info(f&quot;detections_enu: {detections_enu}&quot;)</span>
+        
+        <span class="n">matches</span><span class="p">,</span> <span class="n">unmatched_detections</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">associate_detections_to_tracks</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tracks</span><span class="p">,</span> <span class="n">detections_enu</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">track_idx</span><span class="p">,</span> <span class="n">detection_idx</span> <span class="ow">in</span> <span class="n">matches</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tracks</span><span class="p">[</span><span class="n">track_idx</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">detections_enu</span><span class="p">[</span><span class="n">detection_idx</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">unmatched_detections</span><span class="p">:</span>
+            <span class="n">enu</span> <span class="o">=</span> <span class="n">detections_enu</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Track</span><span class="p">(</span><span class="n">enu</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">enu</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">publish_tracks</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BuoyDetection.fill_holes"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.fill_holes">[docs]</a>    <span class="k">def</span> <span class="nf">fill_holes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fills holes within binary images to create solid objects, which improves the reliability of subsequent image processing operations.</span>
+<span class="sd">        This function identifies contours within the image that represent both external boundaries and internal holes, filling</span>
+<span class="sd">        the latter to solidify the objects.</span>
+
+<span class="sd">        :param image: A binary image (numpy array) where objects are typically represented by white on a black background.</span>
+
+<span class="sd">        :return: A binary image (numpy array) where internal holes within objects have been filled.</span>
+
+<span class="sd">        Function behavior includes:</span>
+<span class="sd">        - Finding contours in the image using OpenCV&#39;s findContours method, configured to retrieve both external and internal contours.</span>
+<span class="sd">        - Creating a new all-white image of the same size as the input to serve as the base for drawing filled contours.</span>
+<span class="sd">        - Iterating through each contour and its corresponding hierarchy level to determine if it is an internal contour (a hole).</span>
+<span class="sd">        - Filling holes by drawing the internal contours as solid shapes on the new image.</span>
+<span class="sd">        - Returning the complement of the filled image, effectively reversing the colors to match the input format (objects are white).</span>
+
+<span class="sd">        This method is used in preparation for detection of orange circles.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Find contours</span>
+        <span class="n">contours</span><span class="p">,</span> <span class="n">hierarchy</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">findContours</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">RETR_CCOMP</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">CHAIN_APPROX_SIMPLE</span><span class="p">)</span>
+
+        <span class="c1"># Create an all white image to draw filled contours</span>
+        <span class="n">filled_image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span> <span class="o">*</span> <span class="mi">255</span>
+
+        <span class="c1"># Iterate through contours and hierarchy</span>
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">contour</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">contours</span><span class="p">):</span>
+            <span class="c1"># Check if it&#39;s an internal contour</span>
+            <span class="k">if</span> <span class="n">hierarchy</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">idx</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># It&#39;s a hole, fill it</span>
+                <span class="n">cv2</span><span class="o">.</span><span class="n">drawContours</span><span class="p">(</span><span class="n">filled_image</span><span class="p">,</span> <span class="p">[</span><span class="n">contour</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># It&#39;s an external contour, just draw it</span>
+                <span class="n">cv2</span><span class="o">.</span><span class="n">drawContours</span><span class="p">(</span><span class="n">filled_image</span><span class="p">,</span> <span class="p">[</span><span class="n">contour</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="mi">255</span><span class="o">-</span><span class="n">filled_image</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.detect_orange_objects"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.detect_orange_objects">[docs]</a>    <span class="k">def</span> <span class="nf">detect_orange_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Detects orange objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,</span>
+<span class="sd">        converts it to HSV color space, applies a color mask to isolate orange regions, and identifies contours that meet</span>
+<span class="sd">        specific area and circularity criteria.</span>
+
+<span class="sd">        :param image: An image array in BGR format, typically received from an image capturing device or simulation environment.</span>
+
+<span class="sd">        :return: A list of contours that represent detected orange objects which meet the area and circularity thresholds.</span>
+<span class="sd">                These objects are presumed to be circular in shape, fitting the typical characteristics of buoys.</span>
+
+<span class="sd">        Function behavior includes:</span>
+<span class="sd">        - Converting the image to HSV color space for better color segmentation.</span>
+<span class="sd">        - Applying a mask to filter out colors that are not within a specified orange range.</span>
+<span class="sd">        - Refining the mask using morphological operations to reduce noise and improve object isolation.</span>
+<span class="sd">        - Detecting contours in the masked image and filtering these based on their area to remove too small or large objects.</span>
+<span class="sd">        - Further analyzing the filtered contours for circularity to confirm if they match the expected shape of buoys.</span>
+<span class="sd">        - Drawing detected objects on the mask image for visual verification.</span>
+<span class="sd">        - Publishing the result image with detected objects highlighted to a ROS topic for further use or debugging.</span>
+<span class="sd">        - Optionally saving the processed image to disk for analysis (commented out).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Convert to HSV color space</span>
+        <span class="n">hsv</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_BGR2HSV</span><span class="p">)</span>
+
+        <span class="c1"># Define range for orange color and create a mask</span>
+        <span class="c1">#lower_orange = np.array([3, 205, 74])</span>
+        <span class="n">lower_orange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">3</span><span class="p">,</span> <span class="mi">120</span><span class="p">,</span> <span class="mi">74</span><span class="p">])</span>
+        <span class="n">upper_orange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">15</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">])</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">inRange</span><span class="p">(</span><span class="n">hsv</span><span class="p">,</span> <span class="n">lower_orange</span><span class="p">,</span> <span class="n">upper_orange</span><span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_holes</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span>
+        <span class="c1">#mask = cv2.GaussianBlur(mask, (5, 5), 2)</span>
+        <span class="n">kernel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">erode</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">iterations</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">dilate</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">iterations</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">mask_rgb</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">cvtColor</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">COLOR_GRAY2RGB</span><span class="p">)</span>
+        <span class="c1">#edges = cv2.Canny(mask, 50, 150) </span>
+
+        <span class="n">contours</span><span class="p">,</span> <span class="n">hierarchy</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">findContours</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">RETR_TREE</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">CHAIN_APPROX_SIMPLE</span><span class="p">)</span>
+
+        <span class="n">contours_area</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># calculate area and filter into new array</span>
+        <span class="k">for</span> <span class="n">con</span> <span class="ow">in</span> <span class="n">contours</span><span class="p">:</span>
+            <span class="n">area</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">contourArea</span><span class="p">(</span><span class="n">con</span><span class="p">)</span>
+            <span class="k">if</span> <span class="mi">100</span> <span class="o">&lt;</span> <span class="n">area</span> <span class="o">&lt;</span> <span class="mi">10000</span><span class="p">:</span>
+                <span class="n">contours_area</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">con</span><span class="p">)</span>
+        
+        <span class="n">contours_cirles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># check if contour is of circular shape</span>
+        <span class="k">for</span> <span class="n">con</span> <span class="ow">in</span> <span class="n">contours_area</span><span class="p">:</span>
+            <span class="n">perimeter</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">arcLength</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+            <span class="n">area</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">contourArea</span><span class="p">(</span><span class="n">con</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">perimeter</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="n">circularity</span> <span class="o">=</span> <span class="mi">4</span><span class="o">*</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="o">*</span><span class="p">(</span><span class="n">area</span><span class="o">/</span><span class="p">(</span><span class="n">perimeter</span><span class="o">*</span><span class="n">perimeter</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">buoy_circularity_threshold</span> <span class="o">&lt;</span> <span class="n">circularity</span> <span class="o">&lt;</span> <span class="mf">1.2</span><span class="p">:</span>
+                <span class="n">contours_cirles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">con</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">radius</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">minEnclosingCircle</span><span class="p">(</span><span class="n">con</span><span class="p">)</span>
+                <span class="n">center</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+                <span class="n">radius</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">radius</span><span class="p">)</span>
+                <span class="n">cv2</span><span class="o">.</span><span class="n">circle</span><span class="p">(</span><span class="n">mask_rgb</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">radius</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">img_msg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridge</span><span class="o">.</span><span class="n">cv2_to_imgmsg</span><span class="p">(</span><span class="n">mask_rgb</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;rgb8&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mask_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">img_msg</span><span class="p">)</span>
+        <span class="c1">#cv2.imwrite(&#39;/home/sailbot/test_image.jpg&#39;, mask_rgb)</span>
+        <span class="k">return</span> <span class="n">contours_cirles</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.calculate_depth"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.calculate_depth">[docs]</a>    <span class="k">def</span> <span class="nf">calculate_depth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contour</span><span class="p">):</span>
+
+        <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">radius</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">minEnclosingCircle</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span>
+        <span class="c1">#self.get_logger().info(&quot;radius: &quot;+str(radius))</span>
+
+        <span class="c1">#depth = (KNOWN_DIAMETER*PIXEL_SIZE*current_x_scaling_factor/2 * FOCAL_LENGTH*current_x_scaling_factor) / radius</span>
+        <span class="n">depth</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">buoy_diameter_meters</span><span class="o">*</span><span class="n">FX</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">radius</span><span class="o">*</span><span class="mi">2</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">current_x_scaling_factor</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">depth</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.calculate_object_center"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.calculate_object_center">[docs]</a>    <span class="k">def</span> <span class="nf">calculate_object_center</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contour</span><span class="p">):</span>
+        <span class="c1"># Calculate the center of the contour</span>
+        <span class="n">M</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">moments</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">M</span><span class="p">[</span><span class="s2">&quot;m00&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">cX</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">M</span><span class="p">[</span><span class="s2">&quot;m10&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">M</span><span class="p">[</span><span class="s2">&quot;m00&quot;</span><span class="p">])</span>
+            <span class="n">cY</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">M</span><span class="p">[</span><span class="s2">&quot;m01&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">M</span><span class="p">[</span><span class="s2">&quot;m00&quot;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cX</span><span class="p">,</span> <span class="n">cY</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+        
+        <span class="n">cZ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_depth</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cX</span><span class="p">,</span> <span class="n">cY</span><span class="p">,</span> <span class="n">cZ</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.pixel_to_world"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.pixel_to_world">[docs]</a>    <span class="k">def</span> <span class="nf">pixel_to_world</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_pixel</span><span class="p">,</span> <span class="n">y_pixel</span><span class="p">,</span> <span class="n">depth</span><span class="p">,</span> <span class="n">f_x</span><span class="p">,</span> <span class="n">f_y</span><span class="p">,</span> <span class="n">c_x</span><span class="p">,</span> <span class="n">c_y</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts pixel coordinates to world coordinates based on the intrinsic camera parameters and the depth information.</span>
+
+<span class="sd">        :param x_pixel: Pixel x-coordinate of the sphere&#39;s center.</span>
+<span class="sd">        :param y_pixel: Pixel y-coordinate of the sphere&#39;s center.</span>
+<span class="sd">        :param depth: Depth of the sphere from the camera, in the same units used for world coordinates.</span>
+<span class="sd">        :param f_x: Focal length of the camera along the x-axis, in pixels.</span>
+<span class="sd">        :param f_y: Focal length of the camera along the y-axis, in pixels.</span>
+<span class="sd">        :param c_x: x-coordinate of the optical center of the camera, in pixels.</span>
+<span class="sd">        :param c_y: y-coordinate of the optical center of the camera, in pixels.</span>
+
+<span class="sd">        :return: A tuple (x, y, z) representing the real-world coordinates of the sphere, where &#39;z&#39; is the depth,</span>
+<span class="sd">                and &#39;x&#39; and &#39;y&#39; are the corresponding world coordinates derived from the pixel coordinates.</span>
+
+<span class="sd">        This function uses the pinhole camera model to translate pixel coordinates (x_pixel, y_pixel) and a depth measurement</span>
+<span class="sd">        into a 3D point in space relative to the camera. The conversion accounts for camera focal lengths and optical center offsets.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Convert to normalized camera coordinates</span>
+        <span class="n">x_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">x_pixel</span> <span class="o">-</span> <span class="n">c_x</span><span class="p">)</span> <span class="o">/</span> <span class="n">f_x</span>
+        <span class="n">y_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_pixel</span> <span class="o">-</span> <span class="n">c_y</span><span class="p">)</span> <span class="o">/</span> <span class="n">f_y</span>
+
+        <span class="c1"># Convert to world coordinates</span>
+        <span class="n">x_world</span> <span class="o">=</span> <span class="n">x_norm</span> <span class="o">*</span> <span class="n">depth</span>
+        <span class="n">y_world</span> <span class="o">=</span> <span class="n">y_norm</span> <span class="o">*</span> <span class="n">depth</span>
+
+        <span class="k">return</span> <span class="n">x_world</span><span class="p">,</span> <span class="n">y_world</span><span class="p">,</span> <span class="n">depth</span></div></div>
+    
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="n">buoy_detection</span> <span class="o">=</span> <span class="n">BuoyDetection</span><span class="p">()</span>
+
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">spin</span><span class="p">(</span><span class="n">buoy_detection</span><span class="p">)</span>
+
+    <span class="n">buoy_detection</span><span class="o">.</span><span class="n">destroy_node</span><span class="p">()</span>
+
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../airmar_reader.html">Airmar Reader Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

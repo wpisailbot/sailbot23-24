@@ -17,6 +17,34 @@ import time
 import traceback
 
 class WindSmoother(LifecycleNode):
+    """
+    A ROS2 lifecycle node designed to smooth wind data from sensors. It subscribes to raw wind data topics and publishes smoothed
+    versions of this data. Smoothing is achieved by maintaining a running median of the most recent wind readings.
+
+    :ivar last_apparent_winds: A list storing the most recent apparent wind readings.
+    :ivar last_true_winds: A list storing the most recent true wind readings.
+    :ivar num_true_wind_readings: The number of true wind readings to store for smoothing.
+    :ivar num_apparent_wind_readings: The number of apparent wind readings to store for smoothing.
+
+    **Subscriptions**:
+    - 'apparent_wind_subscriber': Subscribes to apparent wind data.
+    - 'true_wind_subscriber': Subscribes to true wind data.
+
+    **Publishers**:
+    - 'smooth_apparent_wind_publisher': Publishes smoothed apparent wind data.
+    - 'smooth_true_wind_publisher': Publishes smoothed true wind data.
+
+    **Methods**:
+    - 'median': Computes the median of a list.
+    - 'update_apparent_winds': Updates the list of recent apparent wind directions.
+    - 'update_true_winds': Updates the list of recent true wind directions.
+    - 'apparent_wind_callback': Callback for apparent wind data, smooths and publishes data.
+    - 'true_wind_callback': Callback for true wind data, smooths and publishes data.
+
+    **Usage**:
+    - The node must be managed by state_manager
+
+    """
 
     last_apparent_winds = []
     last_true_winds = []

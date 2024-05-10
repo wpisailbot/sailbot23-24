@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Airmar Reader Node &#8212; sailbot 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=af2ce170"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Ballast Control Node" href="ballast_control.html" />
+    <link rel="prev" title="Welcome to sailbot’s documentation!" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-airmar_reader">
+<span id="airmar-reader-node"></span><h1>Airmar Reader Node<a class="headerlink" href="#module-airmar_reader" title="Permalink to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">airmar_reader.</span></span><span class="sig-name descname"><span class="pre">AirmarReader</span></span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">LifecycleNode</span></code></p>
+<p>A ROS 2 lifecycle node that handles reading and interpreting NMEA data from an Airmar sensor, publishing the data as
+structured JSON on various ROS topics.</p>
+<p>This node is responsible for establishing a serial connection to an Airmar sensor, parsing the incoming NMEA sentences,
+and distributing the processed data through a set of ROS publishers for various types of data including navigation,
+environmental conditions, and vessel dynamics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>publisher</strong> – General publisher for raw JSON formatted data.</p></li>
+<li><p><strong>rot_publisher</strong> – Publisher for vessel’s rate of turn.</p></li>
+<li><p><strong>navsat_publisher</strong> – Publisher for latitude and longitude data.</p></li>
+<li><p><strong>track_degrees_true_publisher</strong> – Publisher for true heading.</p></li>
+<li><p><strong>track_degrees_magnetic_publisher</strong> – Publisher for magnetic heading.</p></li>
+<li><p><strong>speed_knots_publisher</strong> – Publisher for speed in knots.</p></li>
+<li><p><strong>speed_kmh_publisher</strong> – Publisher for speed in kilometers per hour.</p></li>
+<li><p><strong>heading_publisher</strong> – Publisher for compass heading.</p></li>
+<li><p><strong>true_wind_publisher</strong> – Publisher for true wind data.</p></li>
+<li><p><strong>apparent_wind_publisher</strong> – Publisher for apparent wind data.</p></li>
+<li><p><strong>roll_publisher</strong> – Publisher for vessel roll data.</p></li>
+<li><p><strong>pitch_publisher</strong> – Publisher for vessel pitch data.</p></li>
+</ul>
+</dd>
+</dl>
+<p><strong>Lifecycle States</strong>:
+- <strong>Configuring</strong>: Establishes the serial connection and sets up the publishers.
+- <strong>Activating</strong>: Starts the timers and publishers.
+- <strong>Deactivating</strong>: Stops the timers and publishers.
+- <strong>Cleaning up</strong>: Destroys the timers and publishers.
+- <strong>Shutting down</strong>: Closes the serial port and performs any final cleanup.</p>
+<p>The node subscribes to no topics directly but instead pulls data continuously from the serial port connected to the Airmar sensor.
+It publishes the processed data to various topics depending on the type of data (e.g., navigational, environmental).</p>
+<p><strong>Timer Callbacks</strong>:
+- <strong>timer_callback</strong>: Regularly called to read from the serial port, parse the received data, and publish the results.</p>
+<p><strong>Usage</strong>:
+- The node must be managed by state_manager</p>
+<p><strong>Notes</strong>:
+- Usage of this node requires a serial port connection to an Airmar weatherstation, currently provided by a Maretron USB100.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader.on_activate">
+<span class="sig-name descname"><span class="pre">on_activate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader.on_activate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader.on_activate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle an activating transition.</p>
+<p>This is the default on_activate() callback.
+It will call all on_activate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_activate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader.on_cleanup">
+<span class="sig-name descname"><span class="pre">on_cleanup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader.on_cleanup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader.on_cleanup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a cleaning up transition.</p>
+<p>This is the default on_cleanup() callback.
+It will call all on_cleanup() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_cleanup() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader.on_configure">
+<span class="sig-name descname"><span class="pre">on_configure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader.on_configure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader.on_configure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a configuring transition.</p>
+<p>This is the default on_configure() callback.
+It will call all on_configure() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_configure() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader.on_deactivate">
+<span class="sig-name descname"><span class="pre">on_deactivate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleState</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionCallbackReturnType</span></span></span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader.on_deactivate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader.on_deactivate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle a deactivating transition.</p>
+<p>This is the default on_deactivate() callback.
+It will call all on_deactivate() callbacks of managed entities, giving up at the first
+entity that returns TransitionCallbackReturn.FAILURE or TransitionCallbackReturn.ERROR.</p>
+<p>It’s possible to override this callback if the default behavior is not desired.
+If you only want to extend what this callback does, make sure to call
+super().on_deactivate() in derived classes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader.publishIfValid">
+<span class="sig-name descname"><span class="pre">publishIfValid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">publisher</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader.publishIfValid"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader.publishIfValid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Validates and publishes the given value using the specified publisher based on the data type. This function is designed
+to ensure that only valid data is published to ROS topics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>value</strong> – The value to be published. Depending on the type, this can be a single value or a tuple of values.</p></li>
+<li><p><strong>publisher</strong> – The ROS publisher object used to publish the data.</p></li>
+<li><p><strong>type</strong> – The data type class which defines how to interpret ‘value’. This can be one of several expected ROS message types
+such as ‘Float64’, ‘Wind’, or ‘NavSatFix’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None. This function does not return a value but instead publishes data to a ROS topic if the data is valid.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Checking the specified ‘type’ and constructing a corresponding ROS message object.
+- Attempting to cast ‘value’ to the appropriate type(s) required by the ROS message.
+- If casting is successful and the value is valid, the data is published using the provided ‘publisher’.
+- If an error occurs during casting or validation, the function catches the exception and refrains from publishing,
+optionally logging the error or ignoring invalid data.</p>
+<p>This function supports multiple ROS data types and can be extended to include more types as needed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader.readLineToJson">
+<span class="sig-name descname"><span class="pre">readLineToJson</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader.readLineToJson"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader.readLineToJson" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reads a line from a serial input, decodes it, and interprets various NMEA sentences into structured JSON-like dictionaries
+based on the sentence type. The function handles various NMEA sentence codes by parsing and publishing appropriate data
+while logging relevant information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A dictionary representing the parsed data from the NMEA sentence. This dictionary’s structure varies depending
+on the type of NMEA sentence processed. The function returns an empty dictionary for certain NMEA sentence types
+that are deemed unnecessary or redundant.</p>
+</dd>
+</dl>
+<p>This function primarily processes data for navigation and environmental monitoring, converting raw NMEA sentence inputs
+into more structured data forms. It handles a variety of NMEA sentence types including GPS position data (‘GLL’),
+rate of turn (‘ROT’), speed and heading information (‘VTG’), environmental data like temperature and atmospheric pressure (‘XDR’),
+and wind data (‘MWV’, ‘MWD’). It also includes error handling to manage exceptions during the read and parse operations.</p>
+<p>Function behavior includes:
+- Reading and decoding a line from the serial port.
+- Splitting the line based on commas to differentiate data fields and removing any checksums.
+- Identifying the sentence type through a code in the tag and processing accordingly.
+- Publishing valid data to appropriate ROS topics using helper functions.
+- Logging significant actions and data points for debugging purposes.
+- Returning structured data as a dictionary where applicable, or an empty dictionary for unsupported or unnecessary data types.</p>
+<p>This function assumes the availability of a serial port connection, currently to a Maretron USB100.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="airmar_reader.AirmarReader.timer_callback">
+<span class="sig-name descname"><span class="pre">timer_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/airmar_reader.html#AirmarReader.timer_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.AirmarReader.timer_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="airmar_reader.main">
+<span class="sig-prename descclassname"><span class="pre">airmar_reader.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/airmar_reader.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#airmar_reader.main" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">sailbot</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Airmar Reader Node</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#airmar_reader.AirmarReader"><code class="docutils literal notranslate"><span class="pre">AirmarReader</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#airmar_reader.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ballast_control.html">Ballast Control Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="buoy_detection.html">Buoy Detection Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="esp32_comms.html">ESP32 Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="heading_controller_vf.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="network_comms.html">Network Comms Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="path_follower_vf.html">Path Follower Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to sailbot’s documentation!</a></li>
+      <li>Next: <a href="ballast_control.html" title="next chapter">Ballast Control Node</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2024, Matthew Gomes.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/airmar_reader.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

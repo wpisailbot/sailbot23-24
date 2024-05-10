@@ -125,6 +125,35 @@ def get_state(state_id: int):
     return boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNKNOWN
 
 class NetworkComms(LifecycleNode):
+    """
+    A ROS2 lifecycle node that handles network communications for various telemetry and control tasks
+    for the boat. It handles command executions and telemetry data streaming over gRPC.
+
+    :ivar current_map: An 'OccupancyGrid' object representing the current map used for navigation.
+    :ivar current_boat_state: A protobuf message holding the current state of the boat.
+    :ivar current_video_source: An integer representing the current requested video source
+
+    **Subscriptions**:
+    - Multiple subscriptions for telemetry data such as position, heading, wind conditions, and video streams.
+
+    **Publishers**:
+    - Publishers for various control commands like rudder angle, ballast position, and trim tab angle.
+
+    **Services**:
+    - Service clients and servers for managing commands related to boat state, video streaming, and node restarts.
+
+    **Methods**:
+    - Various callback methods for handling telemetry data.
+    - Methods for sending commands to control systems based on remote or autonomous inputs.
+
+    **Usage**:
+    - The node must be managed by state_manager
+
+    **Notes**:
+    - This node runs before all other lifecycle nodes, so that it can monitor their state transitions.
+    - It utilizes gRPC for robust, efficient, and flexible network communication.
+
+    """
 
     current_map: OccupancyGrid = None
     current_boat_state = boat_state_pb2.BoatState()
@@ -497,7 +526,7 @@ class NetworkComms(LifecycleNode):
         callback_method_name = f"{node_name}_lifecycle_callback"
         # Dynamically create the callback method
         method = self.create_lifecycle_callback(node_name)
-        # Bind the method to the instance, ensuring it receives `self` properly
+        # Bind the method to the instance, ensuring it receives 'self' properly
         bound_method = types.MethodType(method, self)
         # Attach the bound method to the instance
         setattr(self, callback_method_name, bound_method)
