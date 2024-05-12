@@ -57,6 +57,7 @@ class BallastControl(LifecycleNode):
     :ivar autonomous_mode: (int) Current autonomous mode of the vessel.
 
     **Lifecycle States**:
+
     - **Configuring**: Sets up subscriptions and publishers.
     - **Activating**: Starts the control loop timer.
     - **Deactivating**: Stops the control loop timer.
@@ -65,9 +66,10 @@ class BallastControl(LifecycleNode):
 
     The control strategy involves responding to roll data and desired position changes, using a P controller to compute
     the necessary adjustments to the ballast position. The node uses a ramp-up mechanism to smooth out the control signals,
-    preventing sudden movements that could destabilize the boat.
+    preventing sudden movements that could damage the ballast belt or drive shaft.
 
     **Callback Functions**:
+
     - **ballast_position_callback**: Handles updates to the desired ballast position.
     - **current_ballast_position_callback**: Updates the internal state with the current ballast position.
     - **airmar_roll_callback**: Responds to new roll data by adjusting the ballast position to counteract the roll.
@@ -77,9 +79,11 @@ class BallastControl(LifecycleNode):
     - **roll_correction_callback**: Periodically adjusts the target position based on accumulated roll errors to maintain stability.
 
     **Usage**:
+
     - The node must be managed by state_manager
 
     **Notes**:
+    
     - Currently, moves the ballast every 10 seconds. A shorter period will improve response, but ballast movement is extremely expensive in terms of battery use.
 
     """

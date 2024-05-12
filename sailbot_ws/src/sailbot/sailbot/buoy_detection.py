@@ -160,6 +160,7 @@ class BuoyDetection(Node):
     :ivar tracks: List of current tracking objects representing detected buoys.
 
     **Methods**:
+
     - **publish_tracks**: Publishes the current tracked positions of detected buoys.
     - **associate_detections_to_tracks**: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.
     - **listener_callback**: Processes each incoming image, detects buoys, and manages tracks.
@@ -169,17 +170,14 @@ class BuoyDetection(Node):
     - **calculate_object_center**: Calculates the center of detected objects in pixel coordinates.
     - **pixel_to_world**: Converts pixel coordinates to world coordinates using intrinsic camera parameters.
 
-    **Node Lifecycle**:
-    - **on_configure**: Configures the node's publishers, subscribers, and initializes parameters.
-    - **on_activate**: Activates the node, enabling the publishing of detection data.
-    - **on_deactivate**: Deactivates the node, stopping the publishing of detection data.
-    - **on_cleanup**: Cleans up resources, shutting down publishers and subscribers.
-
     **Usage**:
+
     - The node must be managed by state_manager
 
     **Notes**:
+
     - The ZED2 ros node must be running in order for this node to receive frames.
+    
     """
     current_x_scaling_factor = 1.0
     current_y_scaling_factor = 1.0
