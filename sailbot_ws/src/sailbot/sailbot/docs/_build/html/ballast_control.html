@@ -69,27 +69,35 @@ adjusting the ballast’s position to counteract roll induced by wind or other e
 </ul>
 </dd>
 </dl>
-<p><strong>Lifecycle States</strong>:
-- <strong>Configuring</strong>: Sets up subscriptions and publishers.
-- <strong>Activating</strong>: Starts the control loop timer.
-- <strong>Deactivating</strong>: Stops the control loop timer.
-- <strong>Cleaning up</strong>: Shuts down publishers and subscriptions.
-- <strong>Shutting down</strong>: Performs additional cleanup as required.</p>
+<p><strong>Lifecycle States</strong>:</p>
+<ul class="simple">
+<li><p><strong>Configuring</strong>: Sets up subscriptions and publishers.</p></li>
+<li><p><strong>Activating</strong>: Starts the control loop timer.</p></li>
+<li><p><strong>Deactivating</strong>: Stops the control loop timer.</p></li>
+<li><p><strong>Cleaning up</strong>: Shuts down publishers and subscriptions.</p></li>
+<li><p><strong>Shutting down</strong>: Performs additional cleanup as required.</p></li>
+</ul>
 <p>The control strategy involves responding to roll data and desired position changes, using a P controller to compute
 the necessary adjustments to the ballast position. The node uses a ramp-up mechanism to smooth out the control signals,
-preventing sudden movements that could destabilize the boat.</p>
-<p><strong>Callback Functions</strong>:
-- <strong>ballast_position_callback</strong>: Handles updates to the desired ballast position.
-- <strong>current_ballast_position_callback</strong>: Updates the internal state with the current ballast position.
-- <strong>airmar_roll_callback</strong>: Responds to new roll data by adjusting the ballast position to counteract the roll.
-- <strong>apparent_wind_callback</strong>: Optional handling of wind data for more sophisticated control strategies.
-- <strong>airmar_heading_callback</strong>: Tracks the boat’s heading to adjust control strategies based on directional changes.
-- <strong>control_loop_callback</strong>: The main control loop that calculates and sends PWM values to the ballast motor based on the PID control strategy.
-- <strong>roll_correction_callback</strong>: Periodically adjusts the target position based on accumulated roll errors to maintain stability.</p>
-<p><strong>Usage</strong>:
-- The node must be managed by state_manager</p>
-<p><strong>Notes</strong>:
-- Currently, moves the ballast every 10 seconds. A shorter period will improve response, but ballast movement is extremely expensive in terms of battery use.</p>
+preventing sudden movements that could damage the ballast belt or drive shaft.</p>
+<p><strong>Callback Functions</strong>:</p>
+<ul class="simple">
+<li><p><strong>ballast_position_callback</strong>: Handles updates to the desired ballast position.</p></li>
+<li><p><strong>current_ballast_position_callback</strong>: Updates the internal state with the current ballast position.</p></li>
+<li><p><strong>airmar_roll_callback</strong>: Responds to new roll data by adjusting the ballast position to counteract the roll.</p></li>
+<li><p><strong>apparent_wind_callback</strong>: Optional handling of wind data for more sophisticated control strategies.</p></li>
+<li><p><strong>airmar_heading_callback</strong>: Tracks the boat’s heading to adjust control strategies based on directional changes.</p></li>
+<li><p><strong>control_loop_callback</strong>: The main control loop that calculates and sends PWM values to the ballast motor based on the PID control strategy.</p></li>
+<li><p><strong>roll_correction_callback</strong>: Periodically adjusts the target position based on accumulated roll errors to maintain stability.</p></li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<ul class="simple">
+<li><p>The node must be managed by state_manager</p></li>
+</ul>
+<p><strong>Notes</strong>:</p>
+<ul class="simple">
+<li><p>Currently, moves the ballast every 10 seconds. A shorter period will improve response, but ballast movement is extremely expensive in terms of battery use.</p></li>
+</ul>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_FULL_PORT">
 <span class="sig-name descname"><span class="pre">ADC_FULL_PORT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2300</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_FULL_PORT" title="Permalink to this definition">¶</a></dt>
@@ -368,7 +376,7 @@ super().on_shutdown() in derived classes.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.previous_time">
-<span class="sig-name descname"><span class="pre">previous_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715326547.4199927</span></em><a class="headerlink" href="#ballast_control.BallastControl.previous_time" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">previous_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715497809.987738</span></em><a class="headerlink" href="#ballast_control.BallastControl.previous_time" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -443,7 +451,7 @@ super().on_shutdown() in derived classes.</p>
 <li class="toctree-l1"><a class="reference internal" href="network_comms.html">Network Comms Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="path_follower_vf.html">Path Follower Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>
-<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Wind Smoother Node</a></li>
 </ul>
 
 <div class="relations">

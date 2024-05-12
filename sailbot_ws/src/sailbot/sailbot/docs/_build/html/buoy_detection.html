@@ -51,24 +51,25 @@ processes the images to detect objects based on color and shape criteria, and pu
 </ul>
 </dd>
 </dl>
-<p><strong>Methods</strong>:
-- <strong>publish_tracks</strong>: Publishes the current tracked positions of detected buoys.
-- <strong>associate_detections_to_tracks</strong>: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.
-- <strong>listener_callback</strong>: Processes each incoming image, detects buoys, and manages tracks.
-- <strong>fill_holes</strong>: Fills holes within binary images to create solid objects, improving reliability of object detection.
-- <strong>detect_orange_objects</strong>: Detects orange objects in the image by applying a color threshold and shape analysis.
-- <strong>calculate_depth</strong>: Estimates the depth of detected objects based on their size in the image.
-- <strong>calculate_object_center</strong>: Calculates the center of detected objects in pixel coordinates.
-- <strong>pixel_to_world</strong>: Converts pixel coordinates to world coordinates using intrinsic camera parameters.</p>
-<p><strong>Node Lifecycle</strong>:
-- <strong>on_configure</strong>: Configures the node’s publishers, subscribers, and initializes parameters.
-- <strong>on_activate</strong>: Activates the node, enabling the publishing of detection data.
-- <strong>on_deactivate</strong>: Deactivates the node, stopping the publishing of detection data.
-- <strong>on_cleanup</strong>: Cleans up resources, shutting down publishers and subscribers.</p>
-<p><strong>Usage</strong>:
-- The node must be managed by state_manager</p>
-<p><strong>Notes</strong>:
-- The ZED2 ros node must be running in order for this node to receive frames.</p>
+<p><strong>Methods</strong>:</p>
+<ul class="simple">
+<li><p><strong>publish_tracks</strong>: Publishes the current tracked positions of detected buoys.</p></li>
+<li><p><strong>associate_detections_to_tracks</strong>: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.</p></li>
+<li><p><strong>listener_callback</strong>: Processes each incoming image, detects buoys, and manages tracks.</p></li>
+<li><p><strong>fill_holes</strong>: Fills holes within binary images to create solid objects, improving reliability of object detection.</p></li>
+<li><p><strong>detect_orange_objects</strong>: Detects orange objects in the image by applying a color threshold and shape analysis.</p></li>
+<li><p><strong>calculate_depth</strong>: Estimates the depth of detected objects based on their size in the image.</p></li>
+<li><p><strong>calculate_object_center</strong>: Calculates the center of detected objects in pixel coordinates.</p></li>
+<li><p><strong>pixel_to_world</strong>: Converts pixel coordinates to world coordinates using intrinsic camera parameters.</p></li>
+</ul>
+<p><strong>Usage</strong>:</p>
+<ul class="simple">
+<li><p>The node must be managed by state_manager</p></li>
+</ul>
+<p><strong>Notes</strong>:</p>
+<ul class="simple">
+<li><p>The ZED2 ros node must be running in order for this node to receive frames.</p></li>
+</ul>
 <dl class="py method">
 <dt class="sig sig-object py" id="buoy_detection.BuoyDetection.airmar_heading_callback">
 <span class="sig-name descname"><span class="pre">airmar_heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.airmar_heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.airmar_heading_callback" title="Permalink to this definition">¶</a></dt>
@@ -431,7 +432,7 @@ information systems or other location-based services.</p>
 <li class="toctree-l1"><a class="reference internal" href="network_comms.html">Network Comms Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="path_follower_vf.html">Path Follower Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>
-<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wind_smoother.html">Wind Smoother Node</a></li>
 </ul>
 
 <div class="relations">

@@ -88,6 +88,7 @@
 <span class="sd">    :ivar autonomous_mode: (int) Current autonomous mode of the vessel.</span>
 
 <span class="sd">    **Lifecycle States**:</span>
+
 <span class="sd">    - **Configuring**: Sets up subscriptions and publishers.</span>
 <span class="sd">    - **Activating**: Starts the control loop timer.</span>
 <span class="sd">    - **Deactivating**: Stops the control loop timer.</span>
@@ -96,9 +97,10 @@
 
 <span class="sd">    The control strategy involves responding to roll data and desired position changes, using a P controller to compute</span>
 <span class="sd">    the necessary adjustments to the ballast position. The node uses a ramp-up mechanism to smooth out the control signals,</span>
-<span class="sd">    preventing sudden movements that could destabilize the boat.</span>
+<span class="sd">    preventing sudden movements that could damage the ballast belt or drive shaft.</span>
 
 <span class="sd">    **Callback Functions**:</span>
+
 <span class="sd">    - **ballast_position_callback**: Handles updates to the desired ballast position.</span>
 <span class="sd">    - **current_ballast_position_callback**: Updates the internal state with the current ballast position.</span>
 <span class="sd">    - **airmar_roll_callback**: Responds to new roll data by adjusting the ballast position to counteract the roll.</span>
@@ -108,9 +110,11 @@
 <span class="sd">    - **roll_correction_callback**: Periodically adjusts the target position based on accumulated roll errors to maintain stability.</span>
 
 <span class="sd">    **Usage**:</span>
+
 <span class="sd">    - The node must be managed by state_manager</span>
 
 <span class="sd">    **Notes**:</span>
+<span class="sd">    </span>
 <span class="sd">    - Currently, moves the ballast every 10 seconds. A shorter period will improve response, but ballast movement is extremely expensive in terms of battery use.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -449,7 +453,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../network_comms.html">Network Comms Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../path_follower_vf.html">Path Follower Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../state_manager.html">State Manager Node</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Wind Smoother Node</a></li>
 </ul>
 
 <div class="relations">

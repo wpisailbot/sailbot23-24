@@ -191,6 +191,7 @@
 <span class="sd">    :ivar tracks: List of current tracking objects representing detected buoys.</span>
 
 <span class="sd">    **Methods**:</span>
+
 <span class="sd">    - **publish_tracks**: Publishes the current tracked positions of detected buoys.</span>
 <span class="sd">    - **associate_detections_to_tracks**: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.</span>
 <span class="sd">    - **listener_callback**: Processes each incoming image, detects buoys, and manages tracks.</span>
@@ -200,17 +201,14 @@
 <span class="sd">    - **calculate_object_center**: Calculates the center of detected objects in pixel coordinates.</span>
 <span class="sd">    - **pixel_to_world**: Converts pixel coordinates to world coordinates using intrinsic camera parameters.</span>
 
-<span class="sd">    **Node Lifecycle**:</span>
-<span class="sd">    - **on_configure**: Configures the node&#39;s publishers, subscribers, and initializes parameters.</span>
-<span class="sd">    - **on_activate**: Activates the node, enabling the publishing of detection data.</span>
-<span class="sd">    - **on_deactivate**: Deactivates the node, stopping the publishing of detection data.</span>
-<span class="sd">    - **on_cleanup**: Cleans up resources, shutting down publishers and subscribers.</span>
-
 <span class="sd">    **Usage**:</span>
+
 <span class="sd">    - The node must be managed by state_manager</span>
 
 <span class="sd">    **Notes**:</span>
+
 <span class="sd">    - The ZED2 ros node must be running in order for this node to receive frames.</span>
+<span class="sd">    </span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">current_x_scaling_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
     <span class="n">current_y_scaling_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
@@ -609,7 +607,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../network_comms.html">Network Comms Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../path_follower_vf.html">Path Follower Node</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../state_manager.html">State Manager Node</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Heading Controller Node</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../wind_smoother.html">Wind Smoother Node</a></li>
 </ul>
 
 <div class="relations">

@@ -1,4 +1,4 @@
-Heading Controller Node
+Wind Smoother Node
 ========================
 
 .. automodule:: wind_smoother
