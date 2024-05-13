@@ -386,7 +386,7 @@
 
 <div class="viewcode-block" id="PathFollower.airmar_heading_callback"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.airmar_heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1">#self.get_logger().info(&quot;Got heading&quot;)</span>
-        <span class="k">pass</span><span class="c1">#self.heading = msg.data</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
     
 <div class="viewcode-block" id="PathFollower.airmar_position_callback"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.airmar_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">NavSatFix</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">latitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">latitude</span>

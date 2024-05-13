@@ -477,8 +477,8 @@ class HeadingController(LifecycleNode):
         self.target_track_debug_publisher.publish(target_track_msg)
         
         # Adjust for leeway angle, up to a set amount
-        leeway_adjustment = max(-self.leeway_correction_limit, min(self.leeway_angle, self.leeway_correction_limit))
-        target_heading = target_track+leeway_adjustment
+        leeway_adjustment = -max(-self.leeway_correction_limit, min(self.leeway_angle, self.leeway_correction_limit))
+        target_heading = target_track+leeway_adjustment # Whatever our leeway angle is, add the inverse of that to our target heading
 
         target_heading_msg = Float64()
         target_heading_msg.data = target_heading

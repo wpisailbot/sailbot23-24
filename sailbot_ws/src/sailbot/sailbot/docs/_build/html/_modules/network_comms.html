@@ -379,6 +379,13 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">target_heading_debug_callback</span><span class="p">,</span>
             <span class="mi">10</span>
         <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_track_debug_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Float64</span><span class="p">,</span>
+            <span class="s1">&#39;target_track&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_track_debug_callback</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">restart_node_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_client</span><span class="p">(</span><span class="n">RestartNode</span><span class="p">,</span> <span class="s1">&#39;state_manager/restart_node&#39;</span><span class="p">,</span> <span class="n">callback_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">callback_group_state</span><span class="p">)</span>
         <span class="c1">#initial dummy values, for testing</span>
         <span class="c1"># self.current_boat_state.latitude = 42.273822</span>
@@ -666,9 +673,14 @@
         
 <div class="viewcode-block" id="NetworkComms.target_heading_debug_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.target_heading_debug_callback">[docs]</a>    <span class="k">def</span> <span class="nf">target_heading_debug_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">has_target_heading</span> <span class="o">=</span> <span class="kc">True</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">target_heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got target theading&quot;</span><span class="p">)</span></div>
-        
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">target_heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+        <span class="c1">#self.get_logger().info(&quot;Got target heading&quot;)</span>
+
+<div class="viewcode-block" id="NetworkComms.target_track_debug_callback"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.target_track_debug_callback">[docs]</a>    <span class="k">def</span> <span class="nf">target_track_debug_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">has_target_track</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_boat_state</span><span class="o">.</span><span class="n">target_track</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+        <span class="c1">#self.get_logger().info(&quot;Got target track&quot;)</span>
+
     <span class="c1">#new server code</span>
 <div class="viewcode-block" id="NetworkComms.create_grpc_server"><a class="viewcode-back" href="../network_comms.html#network_comms.NetworkComms.create_grpc_server">[docs]</a>    <span class="k">def</span> <span class="nf">create_grpc_server</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
         <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Creating gRPC server&quot;</span><span class="p">)</span>

@@ -54,6 +54,9 @@ commands for rudder angle adjustments. It is capable of handling different auton
 <li><p><strong>rudder_angle</strong> – (float) Current angle of the rudder.</p></li>
 </ul>
 </dd>
+<dt class="field-even">Iver leeway_angle<span class="colon">:</span></dt>
+<dd class="field-even"><p>(float) Current difference between heading and track</p>
+</dd>
 </dl>
 <p><strong>Functions</strong>:</p>
 <ul class="simple">
@@ -118,6 +121,11 @@ the line, and the propulsive force increases, aiding in smoother convergence and
 <span class="sig-name descname"><span class="pre">airmar_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">NavSatFix</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.airmar_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.airmar_position_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.airmar_track_degrees_true_callback">
+<span class="sig-name descname"><span class="pre">airmar_track_degrees_true_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.airmar_track_degrees_true_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.airmar_track_degrees_true_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <dl class="py attribute">
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.autonomous_mode">
 <span class="sig-name descname"><span class="pre">autonomous_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.autonomous_mode" title="Permalink to this definition">¶</a></dt>
@@ -139,6 +147,7 @@ The rudder adjustment also considers the rate of change in heading error and con
 - Publishes a zero rudder angle if there is no target path segment.
 - Logs and exits if the current grid cell is not available.
 - Computes a target heading from the current path segment using a vector field.
+- Applies an offset to correct for calculated leeway angle (heading vs. track)
 - Calculates heading error and its rate of change.
 - Uses a fuzzy logic controller to compute the required rudder adjustment.
 - Caps the rudder angle within specified limits and adjusts for tacking if necessary based on wind direction.
@@ -220,6 +229,11 @@ uninitialized.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.last_heading_error">
 <span class="sig-name descname"><span class="pre">last_heading_error</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.last_heading_error" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.leeway_angle">
+<span class="sig-name descname"><span class="pre">leeway_angle</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.leeway_angle" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
