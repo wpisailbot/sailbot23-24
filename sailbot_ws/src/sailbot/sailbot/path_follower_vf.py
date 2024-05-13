@@ -355,7 +355,7 @@ class PathFollower(LifecycleNode):
 
     def airmar_heading_callback(self, msg: Float64) -> None:
         #self.get_logger().info("Got heading")
-        pass#self.heading = msg.data
+        self.heading = msg.data
     
     def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude

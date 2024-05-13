@@ -50,6 +50,7 @@ class HeadingController(LifecycleNode):
     commands for rudder angle adjustments. It is capable of handling different autonomous modes, specifically focusing on full autonomous navigation.
 
     :ivar heading: (float) Current heading of the boat.
+    :iver leeway_angle: (float) Current difference between heading and track
     :ivar current_grid_cell: (Optional[Point]) Current grid cell position of the boat.
     :ivar path_segment: (Optional[PathSegment]) Current path segment for navigation.
     :ivar wind_direction_deg: (Optional[float]) Current wind direction in degrees.
@@ -81,6 +82,7 @@ class HeadingController(LifecycleNode):
     """
 
     heading = 0
+    leeway_angle = 10
     #latitude = 42.273822
     #longitude = -71.805967
     current_grid_cell = None
@@ -101,6 +103,7 @@ class HeadingController(LifecycleNode):
         self.rudder_angle_publisher: Optional[Publisher]
         self.path_segment_subscription: Optional[Subscription]
         self.airmar_heading_subscription: Optional[Subscription]
+        self.airmar_track_degrees_true_subscription: Optional[Subscription]
         self.current_grid_cell_subscription: Optional[Subscription]
         self.autonomous_mode_subscription: Optional[Subscription]
         self.current_path_subscription: Optional[Subscription]
@@ -115,11 +118,13 @@ class HeadingController(LifecycleNode):
         self.declare_parameter('sailbot.heading_control.heading_kp', 0.1)
         self.declare_parameter('sailbot.heading_control.vector_field_crosstrack_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 1.0)
+        self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
 
     def get_parameters(self) -> None:
         self.heading_kp = self.get_parameter('sailbot.heading_control.heading_kp').get_parameter_value().double_value
         self.k_base = self.get_parameter('sailbot.heading_control.vector_field_crosstrack_weight').get_parameter_value().double_value
         self.lambda_base = self.get_parameter('sailbot.heading_control.vector_field_path_dir_weight').get_parameter_value().double_value
+        self.leeway_correction_limit = self.get_parameter('sailbot.heading_control.leeway_correction_limit_degrees').get_parameter_value().double_value
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -128,6 +133,8 @@ class HeadingController(LifecycleNode):
         self.ballast_position_publisher = self.create_lifecycle_publisher(Float64, 'ballast_position', 10)
 
         self.rudder_angle_publisher = self.create_lifecycle_publisher(Int16, 'rudder_angle', 10)
+
+        self.target_track_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_track', 10)
 
         self.target_heading_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_heading', 10)
 
@@ -141,6 +148,11 @@ class HeadingController(LifecycleNode):
             Float64,
             '/airmar_data/heading',
             self.airmar_heading_callback,
+            10)
+        self.airmar_track_degrees_true_subscription = self.create_subscription(
+            Float64,
+            '/airmar_data/track_degrees_true',
+            self.airmar_track_degrees_true_callback,
             10)
         self.current_grid_cell_subscription = self.create_subscription(
             Point,
@@ -280,6 +292,14 @@ class HeadingController(LifecycleNode):
     def airmar_heading_callback(self, msg: Float64) -> None:
         self.heading = msg.data
         #self.compute_rudder_angle()
+
+    def airmar_track_degrees_true_callback(self, msg: Float64) -> None:
+        difference = msg.data - self.heading
+        difference = (difference + 180) % 360 - 180
+        if difference == -180 and msg.data > self.heading:
+            difference = 180
+        
+        self.leeway_angle = difference
     
     def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude
@@ -413,6 +433,7 @@ class HeadingController(LifecycleNode):
         - Publishes a zero rudder angle if there is no target path segment.
         - Logs and exits if the current grid cell is not available.
         - Computes a target heading from the current path segment using a vector field.
+        - Applies an offset to correct for calculated leeway angle (heading vs. track)
         - Calculates heading error and its rate of change.
         - Uses a fuzzy logic controller to compute the required rudder adjustment.
         - Caps the rudder angle within specified limits and adjusts for tacking if necessary based on wind direction.
@@ -449,17 +470,25 @@ class HeadingController(LifecycleNode):
             return
         
         grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=self.k_base, lambda_base=self.lambda_base)
-        self.get_logger().info(f"Direction vector: {grid_direction_vector}")
-        target_heading = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
+        #self.get_logger().info(f"Direction vector: {grid_direction_vector}")
+        target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
+        target_track_msg = Float64()
+        target_track_msg.data = target_track
+        self.target_track_debug_publisher.publish(target_track_msg)
+        
+        # Adjust for leeway angle, up to a set amount
+        leeway_adjustment = max(-self.leeway_correction_limit, min(self.leeway_angle, self.leeway_correction_limit))
+        target_heading = target_track+leeway_adjustment
+
         target_heading_msg = Float64()
         target_heading_msg.data = target_heading
         self.target_heading_debug_publisher.publish(target_heading_msg)
         
-        self.get_logger().info(f"Target heading: {target_heading}")
+        #self.get_logger().info(f"Target heading: {target_heading}")
         heading_error = math.degrees(normalRelativeAngle(math.radians(self.heading-target_heading)))
         delta_heading_error = heading_error - self.last_heading_error
         self.last_heading_error = heading_error
-        self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} grid pos: {self.current_grid_cell} along segment: {self.path_segment}")
+        #self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} grid pos: {self.current_grid_cell} along segment: {self.path_segment}")
         self.rudder_simulator.input['heading_error'] = heading_error
         self.rudder_simulator.input['rate_of_change'] = delta_heading_error
         self.rudder_simulator.compute()
@@ -483,7 +512,7 @@ class HeadingController(LifecycleNode):
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
         msg.data = int(self.rudder_angle)
-        self.get_logger().info(f"Rudder angle: {self.rudder_angle}")
+        #self.get_logger().info(f"Rudder angle: {self.rudder_angle}")
 
         self.rudder_angle_publisher.publish(msg)
 

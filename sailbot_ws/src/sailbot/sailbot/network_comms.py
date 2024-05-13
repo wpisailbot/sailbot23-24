@@ -348,6 +348,13 @@ class NetworkComms(LifecycleNode):
             self.target_heading_debug_callback,
             10
         )
+
+        self.target_track_debug_subscriber = self.create_subscription(
+            Float64,
+            'target_track',
+            self.target_track_debug_callback,
+            10
+        )
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
         #initial dummy values, for testing
         # self.current_boat_state.latitude = 42.273822
@@ -636,8 +643,13 @@ class NetworkComms(LifecycleNode):
     def target_heading_debug_callback(self, msg: Float64):
         self.current_boat_state.has_target_heading = True
         self.current_boat_state.target_heading = msg.data
-        self.get_logger().info("Got target theading")
-        
+        #self.get_logger().info("Got target heading")
+
+    def target_track_debug_callback(self, msg: Float64):
+        self.current_boat_state.has_target_track = True
+        self.current_boat_state.target_track = msg.data
+        #self.get_logger().info("Got target track")
+
     #new server code
     def create_grpc_server(self): 
         self.get_logger().info("Creating gRPC server")
