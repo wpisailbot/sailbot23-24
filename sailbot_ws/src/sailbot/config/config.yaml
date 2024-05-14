@@ -45,3 +45,16 @@ buoy_detection:
         upper_v: 255
         buoy_circularity_threshold: 0.6
         buoy_diameter_meters: 0.5
+
+network_comms:
+  ros__parameters:
+    sailbot:
+      cv:
+        lower_h: 5
+        lower_s: 49
+        lower_v: 120
+        upper_h: 110
+        upper_s: 255
+        upper_v: 255
+        buoy_circularity_threshold: 0.6
+        buoy_diameter_meters: 0.5

@@ -27,6 +27,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GaussianThreat.msg"
   "msg/PathSegment.msg"
   "msg/BuoyDetectionStamped.msg"
+  "msg/CVParameters.msg"
   "srv/GetPath.srv"
   "srv/SetMap.srv"
   "srv/RestartNode.srv"

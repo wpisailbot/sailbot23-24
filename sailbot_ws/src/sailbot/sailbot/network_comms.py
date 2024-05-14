@@ -18,7 +18,7 @@ from sensor_msgs.msg import NavSatFix, Image
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
-from sailbot_msgs.msg import Wind, GeoPath, AutonomousMode, TrimState, Waypoint, WaypointPath, GeoPathSegment, BuoyDetectionStamped
+from sailbot_msgs.msg import Wind, GeoPath, AutonomousMode, TrimState, Waypoint, WaypointPath, GeoPathSegment, BuoyDetectionStamped, CVParameters
 import grpc
 from concurrent import futures
 import json
@@ -163,6 +163,7 @@ class NetworkComms(LifecycleNode):
 
     current_map: OccupancyGrid = None
     current_boat_state = boat_state_pb2.BoatState()
+    current_cv_parameters = boat_state_pb2.CVParameters()
     last_camera_frame = None
     last_camera_frame_shape = None
     last_camera_frame_time = time.time()
@@ -179,6 +180,7 @@ class NetworkComms(LifecycleNode):
         self.autonomous_mode_publisher: Optional[Publisher]
         self.waypoints_publisher: Optional[Publisher]
         self.single_waypoint_publisher: Optional[Publisher]
+        self.cv_parameters_publisher: Optional[Publisher]
 
         self.rot_subscription: Optional[Subscription]
         self.navsat_subscription: Optional[Subscription]
@@ -202,12 +204,35 @@ class NetworkComms(LifecycleNode):
         self.airmar_reader_lifecycle_state_subscriber: Optional[Subscription]
 
         self.callback_group_state = MutuallyExclusiveCallbackGroup()
+        
+        self.set_parameters()
+        self.get_parameters()
 
         self.declare_parameter('map_name', 'quinsigamond')
         self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
         self.get_logger().info(f'Map name: {self.map_name}')
         self.get_logger().info("Getting map image")
         self.map_image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
+
+    def set_parameters(self) -> None:
+        self.declare_parameter('sailbot.cv.lower_h', 5)
+        self.declare_parameter('sailbot.cv.lower_s', 49)
+        self.declare_parameter('sailbot.cv.lower_v', 120)
+        self.declare_parameter('sailbot.cv.upper_h', 110)
+        self.declare_parameter('sailbot.cv.upper_s', 255)
+        self.declare_parameter('sailbot.cv.upper_v', 255)
+        self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
+        self.declare_parameter('sailbot.cv.buoy_diameter_meters', 0.5)
+
+    def get_parameters(self) -> None:
+        self.current_cv_parameters.lower_h = self.get_parameter('sailbot.cv.lower_h').get_parameter_value().integer_value/255
+        self.current_cv_parameters.lower_s = self.get_parameter('sailbot.cv.lower_s').get_parameter_value().integer_value/255
+        self.current_cv_parameters.lower_v = self.get_parameter('sailbot.cv.lower_v').get_parameter_value().integer_value/255
+        self.current_cv_parameters.upper_h = self.get_parameter('sailbot.cv.upper_h').get_parameter_value().integer_value/255
+        self.current_cv_parameters.upper_s = self.get_parameter('sailbot.cv.upper_s').get_parameter_value().integer_value/255
+        self.current_cv_parameters.upper_v  = self.get_parameter('sailbot.cv.upper_v').get_parameter_value().integer_value/255
+        self.current_cv_parameters.circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
+        self.current_cv_parameters.buoy_diameter  = self.get_parameter('sailbot.cv.buoy_diameter_meters').get_parameter_value().double_value
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -227,6 +252,8 @@ class NetworkComms(LifecycleNode):
 
         self.vf_forward_magnitude_publisher = self.create_lifecycle_publisher(Float64, 'vf_forward_magnitude', 10)
         self.rudder_kp_publisher = self.create_lifecycle_publisher(Float64, 'rudder_kp', 10)
+
+        self.cv_parameters_publisher = self.create_lifecycle_publisher(CVParameters, 'cv_parameters', 10)
 
         self.rot_subscription = self.create_subscription(
             Float64,
@@ -663,8 +690,10 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetVFForwardMagnitudeCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetRudderKPCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteSetCVParametersCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
+        boat_state_pb2_rpc.add_GetCVParametersServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_StreamBoatStateServiceServicer_to_server(self, self.grpc_server)
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
         video_pb2_grpc.add_VideoStreamerServicer_to_server(self, self.grpc_server)
@@ -827,6 +856,32 @@ class NetworkComms(LifecycleNode):
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         return response
+    
+    def ExecuteSetCVParametersCommand(self, command: control_pb2.SetCVParametersCommand, context):        
+        self.current_cv_parameters.lower_h = command.parameters.lower_h
+        self.current_cv_parameters.lower_s = command.parameters.lower_s
+        self.current_cv_parameters.lower_v = command.parameters.lower_v
+        self.current_cv_parameters.upper_h = command.parameters.upper_h
+        self.current_cv_parameters.upper_s = command.parameters.upper_s
+        self.current_cv_parameters.upper_v = command.parameters.upper_v
+        self.current_cv_parameters.circularity_threshold = command.parameters.circularity_threshold
+        self.current_cv_parameters.buoy_diameter = command.parameters.buoy_diameter
+
+
+        newParams = CVParameters()
+        newParams.lh = command.parameters.lower_h
+        newParams.ls = command.parameters.lower_s
+        newParams.lv = command.parameters.lower_v
+        newParams.uh = command.parameters.upper_h
+        newParams.us = command.parameters.upper_s
+        newParams.uv = command.parameters.upper_v
+        newParams.buoy_diameter_meters = command.parameters.buoy_diameter
+        newParams.circularity_threshold = command.parameters.circularity_threshold
+        self.cv_parameters_publisher.publish(newParams)
+        
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
+        return response
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def GetMap(self, command: boat_state_pb2.MapRequest, context):
@@ -840,6 +895,11 @@ class NetworkComms(LifecycleNode):
         response.east = self.bbox['east']
         response.west = self.bbox['west']
         return response
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def GetCVParameters(self, command: boat_state_pb2.GetCVParametersRequest, context):
+        self.get_logger().info("Received Get CV Params request")
+        return self.current_cv_parameters
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest, context):

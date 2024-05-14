@@ -5,7 +5,7 @@ from sensor_msgs.msg import Image, NavSatFix
 from geographic_msgs.msg import GeoPoint
 from cv_bridge import CvBridge
 
-from sailbot_msgs.msg import BuoyDetectionStamped
+from sailbot_msgs.msg import BuoyDetectionStamped, CVParameters
 
 import cv2
 import numpy as np
@@ -205,7 +205,12 @@ class BuoyDetection(Node):
             '/airmar_data/heading',
             self.airmar_heading_callback,
             10)
-
+        self.cv_parameters_subscription = self.create_subscription(
+            CVParameters,
+            'cv_parameters',
+            self.cv_parameters_callback,
+            10)
+        
         self.mask_publisher = self.create_publisher(
             Image,
             'cv_mask',
@@ -230,9 +235,6 @@ class BuoyDetection(Node):
         self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
         self.declare_parameter('sailbot.cv.buoy_diameter_meters', 0.5)
 
-
-
-
     def get_parameters(self) -> None:
         self.lower_h = self.get_parameter('sailbot.cv.lower_h').get_parameter_value().integer_value
         self.lower_s = self.get_parameter('sailbot.cv.lower_s').get_parameter_value().integer_value
@@ -243,18 +245,22 @@ class BuoyDetection(Node):
         self.buoy_circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
         self.buoy_diameter_meters = self.get_parameter('sailbot.cv.buoy_diameter_meters').get_parameter_value().double_value
 
-
-
-
-
-
-
     def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude
         self.longitude = msg.longitude
     
     def airmar_heading_callback(self, msg: Float64) -> None:
         self.heading = msg.data
+    
+    def cv_parameters_callback(self, msg: CVParameters) -> None:
+        self.lower_h = int(msg.lh*255)
+        self.lower_s = int(msg.ls*255)
+        self.lower_v = int(msg.lv*255)
+        self.upper_h = int(msg.uh*255)
+        self.upper_s = int(msg.us*255)
+        self.upper_v = int(msg.uv*255)
+        self.buoy_circularity_threshold = msg.circularity_threshold
+        self.buoy_diameter_meters = msg.buoy_diameter_meters
 
     def publish_tracks(self) -> None:
         #self.get_logger().info(f"Num tracks: {len(self.tracks)}")
@@ -443,8 +449,8 @@ class BuoyDetection(Node):
 
         # Define range for orange color and create a mask
         #lower_orange = np.array([3, 205, 74])
-        lower_orange = np.array([3, 120, 74])
-        upper_orange = np.array([15, 255, 255])
+        lower_orange = np.array([self.lower_h, self.lower_s, self.lower_v])
+        upper_orange = np.array([self.upper_h, self.upper_s, self.upper_v])
         mask = cv2.inRange(hsv, lower_orange, upper_orange)
         mask = self.fill_holes(mask)
         #mask = cv2.GaussianBlur(mask, (5, 5), 2)
