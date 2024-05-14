@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import String, Float64, Int16
+from std_msgs.msg import String, Float64, Int16, Empty
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point
 from geographic_msgs.msg import GeoPoint
@@ -39,12 +39,54 @@ def normalRelativeAngle(angle):
             angle+=TWO_PI
     return angle
 
+# Computes if a given bearing is inside a no-sail zone
+def is_in_nogo(bearing_rad, wind_angle_rad, nogo_angle_rad):
+
+    opposite_angle = math.fmod(bearing_rad + math.pi, 2 * math.pi)
+
+    difference = abs(wind_angle_rad - opposite_angle)
+    if difference > math.pi:
+        difference = 2 * math.pi - difference
+    
+    return difference < nogo_angle_rad
+
+def closest_edge_heading(target_track_rad, wind_angle_rad, nogo_angle_rad):
+    """
+    Calculate the closest edge heading to sail along the no-sail zone.
+
+    :param target_track: Desired track angle in radians
+    :param wind_direction_deg: Wind direction in degrees
+    :param wind_restriction_replan_cutoff_degrees: Wind restriction cutoff angle in degrees
+    :return: Heading along the closest edge of the no-sail zone in radians
+    """
+    
+    # Calculate the boundaries of the no-sail zone
+    no_sail_zone_left_bound = wind_angle_rad - nogo_angle_rad
+    no_sail_zone_right_bound = wind_angle_rad + nogo_angle_rad
+    
+    # Normalize the target track to the range [0, 2*pi]
+    target_track = target_track % (2 * math.pi)
+    
+    # Calculate the difference between target track and the boundaries
+    diff_left = min((target_track - no_sail_zone_left_bound) % (2 * math.pi),
+                    (no_sail_zone_left_bound - target_track) % (2 * math.pi))
+    diff_right = min((target_track - no_sail_zone_right_bound) % (2 * math.pi),
+                     (no_sail_zone_right_bound - target_track) % (2 * math.pi))
+    
+    # Determine which edge is closer
+    if diff_left < diff_right:
+        return no_sail_zone_left_bound
+    else:
+        return no_sail_zone_right_bound
+
 class HeadingController(LifecycleNode):
 
     """
     A ROS2 Lifecycle node for controlling the heading of a robotic sailboat based on navigational data and environmental conditions. 
     This node integrates fuzzy logic for rudder angle control and uses an adaptive vector field for path following, 
     dynamically adjusting the rudder based on computed heading errors and external factors like wind direction.
+    It also triggers path replanning if cross-track error and VF settings make the boat unable to converge with the path
+    without going upwind.
 
     The node subscribes to various topics to receive updates on the boat's heading, wind conditions, and navigation path, and publishes 
     commands for rudder angle adjustments. It is capable of handling different autonomous modes, specifically focusing on full autonomous navigation.
@@ -119,12 +161,14 @@ class HeadingController(LifecycleNode):
         self.declare_parameter('sailbot.heading_control.vector_field_crosstrack_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
+        self.declare_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees', 30.0)
 
     def get_parameters(self) -> None:
         self.heading_kp = self.get_parameter('sailbot.heading_control.heading_kp').get_parameter_value().double_value
         self.k_base = self.get_parameter('sailbot.heading_control.vector_field_crosstrack_weight').get_parameter_value().double_value
         self.lambda_base = self.get_parameter('sailbot.heading_control.vector_field_path_dir_weight').get_parameter_value().double_value
         self.leeway_correction_limit = self.get_parameter('sailbot.heading_control.leeway_correction_limit_degrees').get_parameter_value().double_value
+        self.wind_restriction_replan_cutoff_degrees = self.get_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees').get_parameter_value().double_value
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -138,6 +182,7 @@ class HeadingController(LifecycleNode):
 
         self.target_heading_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_heading', 10)
 
+        self.request_replan_publisher = self.create_lifecycle_publisher(Empty, 'request_replan', 10)
 
         self.path_Segment_subscription = self.create_subscription(
             PathSegment,
@@ -405,7 +450,7 @@ class HeadingController(LifecycleNode):
         e = point - projection
         dist = np.linalg.norm(e)
         k = k_base / 1/(1 + dist)  # Adaptive gain that decreases as distance decreases
-        lambda_param = lambda_base * (1 / (1 + dist))  # Increases as the robot approaches the line
+        lambda_param = lambda_base * (1 / (1 + dist))  # Increases as the boat approaches the line
         V = -k * e + lambda_param * d
         return V
 
@@ -425,26 +470,28 @@ class HeadingController(LifecycleNode):
     def compute_rudder_angle(self) -> None:
         """
         Computes and publishes the rudder angle based on the current heading, target segment, and other navigational parameters.
-        The function adjusts the rudder angle to align the vessel's heading with the target heading derived from the current path segment.
+        The function adjusts the rudder angle to align the boat's heading with the target heading derived from the current path segment.
         The rudder adjustment also considers the rate of change in heading error and conditions such as the need to tack against the wind.
 
         This function performs several checks and computations:
-        - Ensures that the vessel is in full autonomous mode before making any adjustments.
+        - Ensures that the boat is in full autonomous mode before making any adjustments.
         - Publishes a zero rudder angle if there is no target path segment.
         - Logs and exits if the current grid cell is not available.
-        - Computes a target heading from the current path segment using a vector field.
+        - Computes a target track from the current path segment using a vector field.
+        - Checks if track would bring the boat upwind. Reuqests path replanning if that happens, and sets the boat to sail 
+        along the edge of the no-sail zone
         - Applies an offset to correct for calculated leeway angle (heading vs. track)
         - Calculates heading error and its rate of change.
         - Uses a fuzzy logic controller to compute the required rudder adjustment.
         - Caps the rudder angle within specified limits and adjusts for tacking if necessary based on wind direction.
         - Publishes the computed rudder angle.
 
-        :return: None. This function directly affects the vessel's steering by publishing rudder angle adjustments to a designated ROS topic.
+        :return: None. This function directly affects the boat's steering by publishing rudder angle adjustments to a designated ROS topic.
 
         The function relies on the following attributes:
         - 'autonomous_mode': The current mode of operation, checked against predefined autonomous modes.
         - 'path_segment': The current navigation path segment from which the target heading is derived.
-        - 'current_grid_cell': The vessel's current position in grid coordinates, necessary for vector field calculations.
+        - 'current_grid_cell': The boat's current position in grid coordinates, necessary for vector field calculations.
         - 'rudder_simulator': A fuzzy logic controller for computing the rudder angle based on heading error and rate of change.
         - 'heading_kp': A proportional gain used to scale the rudder adjustment.
         - 'wind_direction_deg': The current wind direction, used to determine if tacking maneuvers are necessary.
@@ -472,6 +519,13 @@ class HeadingController(LifecycleNode):
         grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=self.k_base, lambda_base=self.lambda_base)
         #self.get_logger().info(f"Direction vector: {grid_direction_vector}")
         target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
+        
+        # If the necessary track would bring us too far upwind, request a replan
+        if(is_in_nogo(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))):
+            self.request_replan_publisher.publish(Empty())
+            # Set track to bring us along edge of nogo zone
+            target_track = closest_edge_heading(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))
+
         target_track_msg = Float64()
         target_track_msg.data = target_track
         self.target_track_debug_publisher.publish(target_track_msg)

@@ -6,6 +6,7 @@ heading_controller:
         vector_field_crosstrack_weight: 1.0
         vector_field_path_dir_weight: 1.0
         leeway_correction_limit_degrees: 10.0
+        wind_restriction_replan_cutoff_degrees: 30.0
     
 esp32_comms:
   ros__parameters:

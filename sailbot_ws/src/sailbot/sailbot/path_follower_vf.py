@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import String, Float64, Int16, Header
+from std_msgs.msg import String, Float64, Int16, Header, Empty
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
@@ -106,6 +106,11 @@ class PathFollower(LifecycleNode):
     - 'airmar_heading_subscription': Subscribes to heading updates from the boat's sensors.
     - 'airmar_position_subscription': Subscribes to position updates, updating boat's geographic location.
     - 'airmar_speed_knots_subscription': Subscribes to speed updates in knots.
+    - 'waypoints_subscription': Subscribes to lists of waypoints. Currently only used for clearing all waypoints.
+    - 'single_waypoint_subscription': Subscribes to single waypoints. Used to add waypoints.
+    - 'true_wind_subscription': Subscribes to smoothed true wind data.
+    - 'buoy_position_subscription': Subscribes to buoy positions, used for snapping waypoints.
+    - 'request_recalculation_subscription': Allows other nodes to request path recalculation.
 
     **Publishers**:
 
@@ -288,30 +293,38 @@ class PathFollower(LifecycleNode):
                 self.airmar_speed_knots_callback,
                 10,
                 callback_group=self.subscription_callback_group)
-            self.waypoints_subscriber = self.create_subscription(
+            self.waypoints_subscription = self.create_subscription(
                 WaypointPath, 
                 'waypoints',
                 self.waypoints_callback,
                 10, 
                 callback_group=self.subscription_callback_group)
-            self.single_waypoint_subscriber = self.create_subscription(
+            self.single_waypoint_subscription = self.create_subscription(
                 Waypoint, 
                 'single_waypoint',
                 self.single_waypoint_callback,
                 10, 
                 callback_group=self.subscription_callback_group)
-            self.true_wind_subscriber = self.create_subscription(
+            self.true_wind_subscription = self.create_subscription(
                 Wind,
                 'true_wind_smoothed',
                 self.true_wind_callback,
                 10,
                 callback_group=self.subscription_callback_group)
-            self.buoy_position_subscriber = self.create_subscription(
+            self.buoy_position_subscription = self.create_subscription(
                 BuoyDetectionStamped,
                 'buoy_position',
                 self.buoy_position_callback,
                 10,
                 callback_group = self.subscription_callback_group)
+            
+            self.request_replan_subscription = self.create_subscription(
+                Empty,
+                'request_replan',
+                self.request_replan_callback,
+                10,
+                callback_group = self.subscription_callback_group)
+            
             #self.timer = self.create_timer(0.1, self.control_loop_callback)
             #super().on_configure(state)
         
@@ -773,6 +786,16 @@ class PathFollower(LifecycleNode):
 
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg
+
+    def request_replan_callback(self, msg: Empty) -> None:
+        current_time = time.time()
+        # Allow this recalculation at most once per second
+        if(current_time-self.last_recalculation_time<1.0):
+            return
+        
+        self.last_recalculation_time = time.time()
+        self.recalculate_path_from_exact_points()
+        self.find_look_ahead()
     
     def find_look_ahead(self) -> None:
         """
