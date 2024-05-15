@@ -2,7 +2,7 @@ heading_controller:
   ros__parameters:
     sailbot:
       heading_control:
-        heading_kp: 0.1
+        heading_kp: 0.01
         vector_field_crosstrack_weight: 1.0
         vector_field_path_dir_weight: 1.0
         leeway_correction_limit_degrees: 10.0

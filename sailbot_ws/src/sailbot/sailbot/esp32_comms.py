@@ -261,7 +261,7 @@ class ESPComms(LifecycleNode):
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
             self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_PORT
-            self.get_logger().info("Max lift port")
+            #self.get_logger().info("Max lift port")
         elif 100 <= relative_wind < 180:
             # Max drag port
             msg = {
@@ -269,7 +269,7 @@ class ESPComms(LifecycleNode):
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_PORT
             #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_PORT
-            self.get_logger().info("Max drag port")
+            #self.get_logger().info("Max drag port")
 
         elif 180 <= relative_wind < 260:
             # Max drag starboard
@@ -278,7 +278,7 @@ class ESPComms(LifecycleNode):
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
             #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
-            self.get_logger().info("Max drag starboard")
+            #self.get_logger().info("Max drag starboard")
         elif 260 <= relative_wind < 335:
             # Max lift starboard
             msg = {
@@ -288,7 +288,7 @@ class ESPComms(LifecycleNode):
             self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
             self.get_logger().info("Max lift starboard")
         else:
-            self.get_logger().info("In Min lift")
+            #self.get_logger().info("In Min lift")
             # In irons
             
             # Adjust behavior to not stop during a tack

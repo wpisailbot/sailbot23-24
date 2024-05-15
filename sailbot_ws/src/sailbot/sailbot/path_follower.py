@@ -412,8 +412,6 @@ class PathFollower(LifecycleNode):
     def calculate_exact_points_from_waypoint(self, waypoint_msg) -> None:
         #self.waypoint_indices = []
         
-        self.grid_points = []
-        self.exact_points = []
         closestDistance = float('inf')
         closestBuoyKey = None
         for key in self.current_buoy_positions.keys():

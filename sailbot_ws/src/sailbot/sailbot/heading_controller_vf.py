@@ -65,7 +65,7 @@ def closest_edge_heading(target_track_rad, wind_angle_rad, nogo_angle_rad):
     no_sail_zone_right_bound = wind_angle_rad + nogo_angle_rad
     
     # Normalize the target track to the range [0, 2*pi]
-    target_track = target_track % (2 * math.pi)
+    target_track = target_track_rad % (2 * math.pi)
     
     # Calculate the difference between target track and the boundaries
     diff_left = min((target_track - no_sail_zone_left_bound) % (2 * math.pi),
@@ -129,7 +129,7 @@ class HeadingController(LifecycleNode):
     #longitude = -71.805967
     current_grid_cell = None
     path_segment = None
-    wind_direction_deg = None
+    wind_direction_deg = 270
     autonomous_mode = 0
     heading_kp = None
     rudder_angle = 0
@@ -157,7 +157,7 @@ class HeadingController(LifecycleNode):
         # self.target_position.longitude = -71.805049
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_control.heading_kp', 0.1)
+        self.declare_parameter('sailbot.heading_control.heading_kp', 0.01)
         self.declare_parameter('sailbot.heading_control.vector_field_crosstrack_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
@@ -323,6 +323,7 @@ class HeadingController(LifecycleNode):
     def autonomous_mode_callback(self, msg: AutonomousMode) -> None:
         self.get_logger().info(f"Got autonomous mode: {msg.mode}")
         self.autonomous_mode = msg.mode
+        self.rudder_angle = 0 # Reset rudder angle when auto mode changes
 
         #if we're going into a manual rudder mode, reset it to 0 first
         if(msg.mode == AutonomousMode.AUTONOMOUS_MODE_NONE or msg.mode == AutonomousMode.AUTONOMOUS_MODE_TRIMTAB):
@@ -353,7 +354,7 @@ class HeadingController(LifecycleNode):
 
     def current_grid_cell_callback(self, msg: Point) -> None:
         self.current_grid_cell = msg
-        self.get_logger().info("Got new grid cell!")
+        #self.get_logger().info("Got new grid cell!")
         #self.compute_rudder_angle()
     
     def path_segment_callback(self, msg: PathSegment) -> None:
@@ -501,7 +502,6 @@ class HeadingController(LifecycleNode):
         autonomous_modes = AutonomousMode()
         if (self.autonomous_mode != autonomous_modes.AUTONOMOUS_MODE_FULL):
             #self.get_logger().info("Not in auto")
-
             return
         
         if(self.path_segment is None):
@@ -521,10 +521,11 @@ class HeadingController(LifecycleNode):
         target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
         
         # If the necessary track would bring us too far upwind, request a replan
-        if(is_in_nogo(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))):
-            self.request_replan_publisher.publish(Empty())
-            # Set track to bring us along edge of nogo zone
-            target_track = closest_edge_heading(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))
+        if(self.wind_direction_deg is not None):
+            if(is_in_nogo(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))):
+                self.request_replan_publisher.publish(Empty())
+                # Set track to bring us along edge of nogo zone
+                target_track = closest_edge_heading(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))
 
         target_track_msg = Float64()
         target_track_msg.data = target_track
@@ -538,7 +539,7 @@ class HeadingController(LifecycleNode):
         target_heading_msg.data = target_heading
         self.target_heading_debug_publisher.publish(target_heading_msg)
         
-        #self.get_logger().info(f"Target heading: {target_heading}")
+        self.get_logger().info(f"Target heading: {target_heading}")
         heading_error = math.degrees(normalRelativeAngle(math.radians(self.heading-target_heading)))
         delta_heading_error = heading_error - self.last_heading_error
         self.last_heading_error = heading_error
@@ -566,7 +567,7 @@ class HeadingController(LifecycleNode):
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
         msg.data = int(self.rudder_angle)
-        #self.get_logger().info(f"Rudder angle: {self.rudder_angle}")
+        self.get_logger().info(f"Rudder angle: {self.rudder_angle}")
 
         self.rudder_angle_publisher.publish(msg)
 

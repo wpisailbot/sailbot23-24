@@ -375,7 +375,7 @@ class PathFollower(LifecycleNode):
         self.longitude = msg.longitude
         new_grid_cell = self.latlong_to_grid_proj(self.latitude, self.longitude, self.bbox, self.image_width, self.image_height)
         current_time = time.time()
-        self.get_logger().info("Got new position")
+        #self.get_logger().info("Got new position")
 
         if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
             self.get_logger().info("Recalculating path")
@@ -555,8 +555,6 @@ class PathFollower(LifecycleNode):
         'image_width', and 'image_height' are available within the class instance and are appropriately set before calling this function.
         """
         
-        self.grid_points = []
-        self.exact_points = []
         closestDistance = float('inf')
         closestBuoyKey = None
         for key in self.current_buoy_positions.keys():
@@ -567,11 +565,16 @@ class PathFollower(LifecycleNode):
                 closestBuoyKey = key
         
         if (waypoint_msg.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
+            self.get_logger().info(f"before: Num grid points: {len(self.grid_points)}, num exact points: {len(self.exact_points)}")
+
             self.get_logger().info(f"Intersect")
             self.grid_points.append(self.latlong_to_grid_proj(waypoint_msg.point.latitude, waypoint_msg.point.longitude, self.bbox, self.image_width, self.image_height))
             self.remove_last_points_if_necessary(next_point=(waypoint_msg.point.latitude, waypoint_msg.point.longitude))
+
             self.last_waypoint_was_rounding_type = False
             self.exact_points.append(waypoint_msg.point)
+            self.get_logger().info(f"after: num grid points: {len(self.grid_points)}, num exact points: {len(self.exact_points)}")
+
         else:
 
             previousPoint = None
@@ -631,7 +634,6 @@ class PathFollower(LifecycleNode):
         
         # Reset look-ahead, since previous values are not relevant anymore
         self.previous_look_ahead_index = 0
-
         if len(self.grid_points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
             self.current_path = GeoPath()
@@ -826,17 +828,17 @@ class PathFollower(LifecycleNode):
             #self.get_logger().info("No lookAhead point for zero-length path")
             return
         
-        self.get_logger().info(f"Grid path length: {len(self.current_grid_path)}")
+        #self.get_logger().info(f"Grid path length: {len(self.current_grid_path)}")
         num_points = len(self.current_path.points) 
         for i in range(self.previous_look_ahead_index, num_points-1):
             point = self.current_path.points[i]
             distance = great_circle((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
             # Check if the next point is closer. If so, we probably skipped some points. Don't target them. 
             next_is_closer = False if i>=num_points else (True if great_circle((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
-            self.get_logger().info(f"next_is_closer: {next_is_closer}")
+            #self.get_logger().info(f"next_is_closer: {next_is_closer}")
             if(not next_is_closer):
                 self.previous_look_ahead_index = i
-                self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
+                #self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
                 self.target_position_publisher.publish(point) # In this version, this is just for display in the UI. This is NOT an input to heading_controller_vf 
                 segment = PathSegment()
                 segment.start = self.current_grid_path[i]
@@ -850,7 +852,7 @@ class PathFollower(LifecycleNode):
                 return
             else:
                 #remove exact points if we've passed them
-                self.get_logger().info(f"Point is: {point}")
+                #self.get_logger().info(f"Point is: {point}")
                 if(point.latitude == self.exact_points[0].latitude and point.longitude == self.exact_points[0].longitude):
                     self.get_logger().info("Removing passed exact point")
                     self.grid_points.pop(0)

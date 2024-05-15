@@ -526,7 +526,7 @@ class NetworkComms(LifecycleNode):
     #end lifecycle callbacks
 
     def target_position_callback(self, msg: GeoPoint) -> None:
-        self.get_logger().info(f"Sending target point: {msg}")
+        #self.get_logger().info(f"Sending target point: {msg}")
         self.current_boat_state.current_target_point.latitude = msg.latitude
         self.current_boat_state.current_target_point.longitude = msg.longitude
 
