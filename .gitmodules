@@ -7,3 +7,6 @@
 [submodule "sailbot_ws/src/sailbot/sailbot/trim_tab_messages"]
 	path = sailbot_ws/src/sailbot/sailbot/trim_tab_messages
 	url = https://github.com/wpisailbot/trim_tab_messages
+[submodule "startup/startup_messages"]
+	path = startup/startup_messages
+	url = https://github.com/wpisailbot/startup_messages

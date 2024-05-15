@@ -11,7 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name, glob('launch/*.py')),
+        ('share/' + package_name + '/launch/', glob('launch/*.py')),
         ('share/' + package_name + '/config/', glob('config/*.yaml')),
         ('share/' + package_name +'/maps/', glob('maps/*.png')),
         ('lib/'+package_name+'/telemetry_messages/python/', glob('sailbot/telemetry_messages/python/*')),

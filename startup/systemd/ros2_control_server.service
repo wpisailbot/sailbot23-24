@@ -1,0 +1,14 @@
+[Unit]
+Description=ROS2 Control gRPC Server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/sailbot/ros2_control_server.py
+WorkingDirectory=/opt/sailbot/
+Restart=always
+RestartSec=1
+User=sailbot
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

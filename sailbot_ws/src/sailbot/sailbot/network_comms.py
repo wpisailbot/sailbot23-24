@@ -32,6 +32,7 @@ import numpy as np
 import traceback
 import types
 from typing import Callable, Any
+import signal
 
 from sailbot_msgs.srv import RestartNode
 
@@ -701,6 +702,11 @@ class NetworkComms(LifecycleNode):
         #connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
         self.grpc_server.add_insecure_port('[::]:50051')
         self.grpc_server.start()
+    
+    def shutdown_handler(self, signum, frame):
+        rclpy.logging.get_logger("network_comms").info("Received shutdown signal, shutting down...")
+        self.grpc_server.stop(0)
+        rclpy.shutdown()
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def StreamVideo(self, command: video_pb2.VideoRequest, context):
@@ -962,6 +968,7 @@ class NetworkComms(LifecycleNode):
 def main(args=None):
     rclpy.init(args=args)
     network_comms = NetworkComms()
+    signal.signal(signal.SIGINT, network_comms.shutdown_handler)
 
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.MultiThreadedExecutor()
