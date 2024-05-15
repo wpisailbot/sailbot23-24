@@ -54,7 +54,7 @@ class BallastControl(LifecycleNode):
     :ivar current_ballast_position: (int) Last known ADC value of the ballast position.
     :ivar move: (bool) Flag to determine if the ballast needs to be moved.
     :ivar current_wind_dir: (float) Current wind direction in degrees.
-    :ivar autonomous_mode: (int) Current autonomous mode of the vessel.
+    :ivar autonomous_mode: (int) Current autonomous mode of the boat.
 
     **Lifecycle States**:
 
