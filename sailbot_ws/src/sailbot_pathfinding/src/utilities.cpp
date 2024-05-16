@@ -101,7 +101,7 @@ bool is_in_nogo(MapNode* start, MapNode* goal, float wind_angle_rad, float nogo_
     return(difference < nogo_angle_rad);
 }
 
-bool is_in_nogo(std::pair<double, double> start, std::pair<double, double> goal, float wind_angle_rad, float nogo_angle_rad) {
+bool is_in_nogo(std::pair<double, double>& start, std::pair<double, double>& goal, float wind_angle_rad, float nogo_angle_rad) {
     auto a = goal.first - start.first;
     auto b = goal.second - start.second;
     double angle_a_b = fmod(atan2(b, a) + M_TAU, M_TAU);

@@ -22,7 +22,7 @@ std::vector<std::pair<double, double>> path_to_doubles(std::vector<MapNode*> pat
 std::vector<std::pair<double, double>> simplify_path(std::vector<std::pair<double, double>> originalPath, double wind_angle_deg, Map& map);
 int randomAngleDeg();
 bool is_in_nogo(MapNode* start, MapNode* goal, float wind_angle_rad, float nogo_angle_rad);
-bool is_in_nogo(std::pair<double, double> start, std::pair<double, double> goal, float wind_angle_rad, float nogo_angle_rad);
+bool is_in_nogo(std::pair<double, double>& start, std::pair<double, double>& goal, float wind_angle_rad, float nogo_angle_rad);
 void displayGrid(std::shared_ptr<std::vector<float>> grid, int width, int height, const std::vector<std::pair<double, double>>& path, float windAngle, const char* name);
 void drawPRM(std::shared_ptr<std::vector<MapNode*>> PRMMapNodes, int maxX, int maxY);
 cv::Mat createLocalizedGaussianThreat(const Threat& threat, int& offsetX, int& offsetY);
