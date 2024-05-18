@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import String, Float64, Int16, Empty
-from sensor_msgs.msg import NavSatFix
-from geometry_msgs.msg import Point
-from geographic_msgs.msg import GeoPoint
+from std_msgs.msg import Float64
+
 # import json
-import numpy as np
-import skfuzzy as fuzz
-from skfuzzy import control as ctrl
+
 import math
 import traceback
-import numpy as np
-import time
 
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -21,7 +15,6 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 
-from sailbot_msgs.msg import AutonomousMode, GeoPath, Wind, PathSegment
 from sensor_msgs.msg import MagneticField
 
 class HeadingSelect(LifecycleNode):
@@ -102,6 +95,7 @@ class HeadingSelect(LifecycleNode):
     #end callbacks
 
     def airmar_heading_callback(self, msg: Float64) -> None:
+        #raise ValueError
         if(self.use_camera_heading == False):
             self.heading = msg.data
             heading_msg = Float64()

@@ -12,6 +12,8 @@ from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackRet
 from rclpy.lifecycle import Publisher
 from rclpy.lifecycle import State
 from rclpy.lifecycle import TransitionCallbackReturn
+from lifecycle_msgs.srv import ChangeState
+from lifecycle_msgs.msg import Transition
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 from rclpy.node import ParameterType
@@ -278,7 +280,7 @@ class PathFollower(LifecycleNode):
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
                 'heading',
-                self.airmar_heading_callback,
+                self.heading_callback,
                 10,
                 callback_group=self.subscription_callback_group)
             self.airmar_position_subscription = self.create_subscription(
@@ -366,7 +368,7 @@ class PathFollower(LifecycleNode):
     
     #end callbacks
 
-    def airmar_heading_callback(self, msg: Float64) -> None:
+    def heading_callback(self, msg: Float64) -> None:
         #self.get_logger().info("Got heading")
         self.heading = msg.data
     
@@ -977,13 +979,28 @@ class PathFollower(LifecycleNode):
         appended.append(path[-1])
         return appended
 
+def trigger_error_transition(node: LifecycleNode):
+    client = node.create_client(ChangeState, f'{node.get_name()}/change_state')
+    while not client.wait_for_service(timeout_sec=1.0):
+        node.get_logger().info('Service not available, waiting again...')
+
+    request = ChangeState.Request()
+    request.transition.id = Transition.TRANSITION_DEACTIVATE # Transition to inactive state
+
+    future = client.call_async(request)
+    rclpy.spin_until_future_complete(node, future)
+
+    if future.result() is not None:
+        node.get_logger().info('Transition to error state successful')
+    else:
+        node.get_logger().info('Failed to transition to error state')
 
 
 def main(args=None):
     rclpy.init(args=args)
     path_follower = PathFollower()
 
-    # Use the SingleThreadedExecutor to spin the node.
+    # Use the MultiThreadedExecutor to spin the node.
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(path_follower)
 
@@ -1000,5 +1017,6 @@ def main(args=None):
         executor.shutdown()
         path_follower.destroy_node()
         rclpy.shutdown()
+
 if __name__ == "__main__":
     main()

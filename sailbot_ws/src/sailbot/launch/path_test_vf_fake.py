@@ -76,6 +76,7 @@ def generate_launch_description():
         name='heading_select',
         namespace='',
         output='screen',
+        respawn=True,
         parameters=[config_file_path]
     )
     path_follower_node = LifecycleNode(

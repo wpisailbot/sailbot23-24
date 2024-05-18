@@ -80,7 +80,7 @@ class ROS2ControlServicer(ros2_control_pb2_grpc.ROS2ControlServicer):
         if node_pids:
             for pid in node_pids:
                 try:
-                    os.kill(pid, signal.SIGINT)
+                    os.kill(pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
 
