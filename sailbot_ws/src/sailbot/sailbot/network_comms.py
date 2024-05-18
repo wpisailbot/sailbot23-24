@@ -980,7 +980,7 @@ def main(args=None):
     rclpy.init(args=args)
     network_comms = NetworkComms()
     signal.signal(signal.SIGINT, network_comms.shutdown_handler)
-
+    signal.signal(signal.SIGTERM, network_comms.shutdown_handler)
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(network_comms)

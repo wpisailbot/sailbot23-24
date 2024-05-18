@@ -29,8 +29,16 @@ class ROS2ControlServicer(ros2_control_pb2_grpc.ROS2ControlServicer):
         self.launch_task = None
         self.log_handler = logging.StreamHandler(self.logs)
         self.log_handler.setLevel(logging.INFO)
-        logging.getLogger().addHandler(self.log_handler)
-        logging.getLogger().setLevel(logging.INFO)
+
+        sys.stdout = self.log_handler.stream
+        sys.stderr = self.log_handler.stream
+
+        # Configure rclpy logging to use the Python logging system
+        rclpy.logging.initialize()
+        rclpy_logging_logger = rclpy.logging.get_logger('ros2_control')
+        rclpy_logging_logger.set_level(rclpy.logging.LoggingSeverity.INFO)
+        for handler in logging.getLogger().handlers:
+            rclpy_logging_logger.add_handler(handler)
 
     async def Start(self, request, context):
         if self.launch_service and self.launch_task and not self.launch_task.done():
@@ -89,17 +97,30 @@ class ROS2ControlServicer(ros2_control_pb2_grpc.ROS2ControlServicer):
         return ros2_control_pb2.StopResponse(success=True, message="Launch stopped")
 
     async def StreamLogs(self, request, context):
+        print("Got log stream request")
         last_read_pos = self.logs.tell()
         while True:
-            await asyncio.sleep(1)  # Adjust the sleep time as necessary
+            await asyncio.sleep(0.1)
             self.logs.seek(last_read_pos)
             new_logs = self.logs.read()
             last_read_pos = self.logs.tell()
-            if new_logs:
-                yield ros2_control_pb2.LogMessage(message=new_logs)
+
+            # Process new logs line-by-line
+            for line in new_logs.splitlines():
+                yield ros2_control_pb2.LogMessage(log=line)
 
 async def serve():
-    server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
+    server = grpc.aio.server(
+    futures.ThreadPoolExecutor(max_workers=10),
+    options=[
+        ('grpc.keepalive_time_ms', 10000),
+        ('grpc.keepalive_timeout_ms', 5000),
+        ('grpc.keepalive_permit_without_calls', True),
+        ('grpc.http2.max_pings_without_data', 0),
+        ('grpc.http2.min_time_between_pings_ms', 10000),
+        ('grpc.http2.min_ping_interval_without_data_ms', 10000),
+    ]
+)
     ros2_control_pb2_grpc.add_ROS2ControlServicer_to_server(ROS2ControlServicer(), server)
     server.add_insecure_port('[::]:50052')
     await server.start()
