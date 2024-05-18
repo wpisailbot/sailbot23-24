@@ -99,7 +99,7 @@ class HeadingController(LifecycleNode):
     :ivar path_segment: (Optional[PathSegment]) Current path segment for navigation.
     :ivar wind_direction_deg: (Optional[float]) Current wind direction in degrees.
     :ivar autonomous_mode: (int) Current autonomous mode of operation.
-    :ivar heading_kp: (float) Proportional gain for heading control.
+    :ivar rudder_adjustment_scale: (float) Proportional gain for heading control.
     :ivar rudder_angle: (float) Current angle of the rudder.
 
 
@@ -133,7 +133,7 @@ class HeadingController(LifecycleNode):
     path_segment = None
     wind_direction_deg = 270
     autonomous_mode = 0
-    heading_kp = None
+    rudder_adjustment_scale = None
     rudder_angle = 0
 
     last_heading_error = 0
@@ -161,16 +161,16 @@ class HeadingController(LifecycleNode):
         # self.target_position.longitude = -71.805049
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_control.heading_kp', 1.0)
-        self.declare_parameter('sailbot.heading_control.heading_kd', 10.0)
+        self.declare_parameter('sailbot.heading_control.rudder_adjustment_scale', 1.0)
+        self.declare_parameter('sailbot.heading_control.rudder_overshoot_bias', 10.0)
         self.declare_parameter('sailbot.heading_control.vector_field_crosstrack_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
         self.declare_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees', 30.0)
 
     def get_parameters(self) -> None:
-        self.heading_kp = self.get_parameter('sailbot.heading_control.heading_kp').get_parameter_value().double_value
-        self.heading_kd = self.get_parameter('sailbot.heading_control.heading_kd').get_parameter_value().double_value
+        self.rudder_adjustment_scale = self.get_parameter('sailbot.heading_control.rudder_adjustment_scale').get_parameter_value().double_value
+        self.rudder_overshoot_bias = self.get_parameter('sailbot.heading_control.rudder_overshoot_bias').get_parameter_value().double_value
         self.k_base = self.get_parameter('sailbot.heading_control.vector_field_crosstrack_weight').get_parameter_value().double_value
         self.lambda_base = self.get_parameter('sailbot.heading_control.vector_field_path_dir_weight').get_parameter_value().double_value
         self.leeway_correction_limit = self.get_parameter('sailbot.heading_control.leeway_correction_limit_degrees').get_parameter_value().double_value
@@ -225,15 +225,15 @@ class HeadingController(LifecycleNode):
             'vf_forward_magnitude',
             self.forward_magnitude_callback,
             10)
-        self.rudder_kp_subscription = self.create_subscription(
+        self.rudder_adjustment_scale_subscription = self.create_subscription(
             Float64,
-            'rudder_kp',
-            self.rudder_kp_callback,
+            'rudder_adjustment_scale',
+            self.rudder_adjustment_scale_callback,
             10)
-        self.rudder_kp_subscription = self.create_subscription(
+        self.rudder_overshoot_bias_subscription = self.create_subscription(
             Float64,
-            'rudder_kd',
-            self.rudder_kd_callback,
+            'rudder_overshoot_bias',
+            self.rudder_overshoot_bias_callback,
             10)
         self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
@@ -397,11 +397,11 @@ class HeadingController(LifecycleNode):
     def forward_magnitude_callback(self, msg: Float64) -> None:
         self.lambda_base = msg.data
 
-    def rudder_kp_callback(self, msg: Float64) -> None:
-        self.heading_kp = msg.data
+    def rudder_adjustment_scale_callback(self, msg: Float64) -> None:
+        self.rudder_adjustment_scale = msg.data
 
-    def rudder_kd_callback(self, msg: Float64) -> None:
-        self.heading_kd = msg.data
+    def rudder_overshoot_bias_callback(self, msg: Float64) -> None:
+        self.rudder_overshoot_bias = msg.data
     
     def needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
         """
@@ -527,7 +527,7 @@ class HeadingController(LifecycleNode):
         - 'path_segment': The current navigation path segment from which the target heading is derived.
         - 'current_grid_cell': The boat's current position in grid coordinates, necessary for vector field calculations.
         - 'rudder_simulator': A fuzzy logic controller for computing the rudder angle based on heading error and rate of change.
-        - 'heading_kp': A proportional gain used to scale the rudder adjustment.
+        - 'rudder_adjustment_scale': A proportional gain used to scale the rudder adjustment.
         - 'wind_direction_deg': The current wind direction, used to determine if tacking maneuvers are necessary.
 
         This method logs significant states and decisions to assist with debugging and operational monitoring.
@@ -583,10 +583,10 @@ class HeadingController(LifecycleNode):
         self.last_heading_error = heading_error
         #self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} grid pos: {self.current_grid_cell} along segment: {self.path_segment}")
         self.rudder_simulator.input['heading_error'] = heading_error
-        self.rudder_simulator.input['rate_of_change'] = heading_rate_of_change * self.heading_kd
+        self.rudder_simulator.input['rate_of_change'] = heading_rate_of_change * self.rudder_overshoot_bias
         self.rudder_simulator.compute()
         rudder_value = self.rudder_simulator.output['rudder_adjustment']
-        self.rudder_angle += rudder_value*self.heading_kp # Scale
+        self.rudder_angle += rudder_value*self.rudder_adjustment_scale # Scale
 
         if(self.rudder_angle>30):
             self.rudder_angle = 30

@@ -46,7 +46,7 @@ class HeadingController(LifecycleNode):
     target_position = None
     wind_direction_deg = None
     autonomous_mode = 0
-    heading_kp = None
+    rudder_adjustment_scale = None
     rudder_angle = 0
 
     def __init__(self):
@@ -69,10 +69,10 @@ class HeadingController(LifecycleNode):
         # self.target_position.longitude = -71.805049
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_kp', 0.1)
+        self.declare_parameter('sailbot.rudder_adjustment_scale', 0.1)
 
     def get_parameters(self) -> None:
-        self.heading_kp = self.get_parameter('sailbot.heading_kp').get_parameter_value().double_value
+        self.rudder_adjustment_scale = self.get_parameter('sailbot.rudder_adjustment_scale').get_parameter_value().double_value
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("In configure")
@@ -285,7 +285,7 @@ class HeadingController(LifecycleNode):
         #self.rudder_simulator.input['rate_of_change'] = 0 # Heading rate-of-change, not sure if Airmar provides this directly. Zero for now.
         #self.rudder_simulator.compute()
         #rudder_angle = self.rudder_simulator.output['rudder_angle']
-        self.rudder_angle + heading_error*self.heading_kp # P controller for now
+        self.rudder_angle + heading_error*self.rudder_adjustment_scale # P controller for now
         if(self.rudder_angle>30):
             self.rudder_angle = 30
         elif self.rudder_angle<-30:

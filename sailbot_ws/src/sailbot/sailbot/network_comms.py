@@ -252,8 +252,8 @@ class NetworkComms(LifecycleNode):
         self.autonomous_mode_publisher = self.create_lifecycle_publisher(AutonomousMode, 'autonomous_mode', 10)
 
         self.vf_forward_magnitude_publisher = self.create_lifecycle_publisher(Float64, 'vf_forward_magnitude', 10)
-        self.rudder_kp_publisher = self.create_lifecycle_publisher(Float64, 'rudder_kp', 10)
-        self.rudder_kd_publisher = self.create_lifecycle_publisher(Float64, 'rudder_kd', 10)
+        self.rudder_adjustment_scale_publisher = self.create_lifecycle_publisher(Float64, 'rudder_adjustment_scale', 10)
+        self.rudder_overshoot_bias_publisher = self.create_lifecycle_publisher(Float64, 'rudder_overshoot_bias', 10)
 
 
         self.cv_parameters_publisher = self.create_lifecycle_publisher(CVParameters, 'cv_parameters', 10)
@@ -684,22 +684,17 @@ class NetworkComms(LifecycleNode):
     def create_grpc_server(self): 
         self.get_logger().info("Creating gRPC server")
         self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        control_pb2_grpc.add_ExecuteRudderCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteTrimTabCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteBallastCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteAutonomousModeCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteSetWaypointsCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteAddWaypointCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteSetVFForwardMagnitudeCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteSetRudderKDCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteSetRudderKPCommandServiceServicer_to_server(self, self.grpc_server)
-        control_pb2_grpc.add_ExecuteSetCVParametersCommandServiceServicer_to_server(self, self.grpc_server)
+
+        control_pb2_grpc.add_ControlCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_SetParameterServiceServicer_to_server(self, self.grpc_server)
+
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetMapServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_GetCVParametersServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_StreamBoatStateServiceServicer_to_server(self, self.grpc_server)
+        
         node_restart_pb2_grpc.add_RestartNodeServiceServicer_to_server(self, self.grpc_server)
+        
         video_pb2_grpc.add_VideoStreamerServicer_to_server(self, self.grpc_server)
 
         #connect_pb2_grpc.add_ConnectToBoatServiceServicer_to_server(self, self.grpc_server)
@@ -855,24 +850,24 @@ class NetworkComms(LifecycleNode):
         return response
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def ExecuteSetRudderKPCommand(self, command: control_pb2.SetRudderKPCommand, context):
-        self.get_logger().info("Got rudder kp command")
+    def ExecuteSetRudderAdjustmentScaleCommand(self, command: control_pb2.SetRudderAdjustmentScaleCommand, context):
+        self.get_logger().info("Got rudder adjustment scale command")
 
         msg = Float64()
-        msg.data = command.kp
-        self.rudder_kp_publisher.publish(msg)
+        msg.data = command.scale
+        self.rudder_adjustment_scale_publisher.publish(msg)
 
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         return response
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
-    def ExecuteSetRudderKDCommand(self, command: control_pb2.SetRudderKPCommand, context):
-        self.get_logger().info("Got rudder kd command")
+    def ExecuteSetRudderOvershootBiasCommand(self, command: control_pb2.SetRudderOvershootBiasCommand, context):
+        self.get_logger().info("Got rudder overshoot bias command")
 
         msg = Float64()
-        msg.data = command.kd
-        self.rudder_kd_publisher.publish(msg)
+        msg.data = command.bias
+        self.rudder_overshoot_bias_publisher.publish(msg)
 
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
