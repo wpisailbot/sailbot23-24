@@ -325,8 +325,8 @@ class PathFollower(LifecycleNode):
         req.end = end_point
         req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_ASTAR
         
-        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along +y axis.
-        wind_angle_adjusted = self.wind_angle_deg-90
+        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.
+        wind_angle_adjusted = self.wind_angle_deg+90
 
 
         req.wind_angle_deg = float(wind_angle_adjusted)
@@ -635,8 +635,8 @@ class PathFollower(LifecycleNode):
         #self.get_logger().info(f"lat_pct: {lat_pct}, long_pct: {long_pct}")
         
         # Convert percentages to pixel positions
-        x = int(long_pct * image_width)
-        y = int(lat_pct * image_height)
+        x = (long_pct * image_width)
+        y = (lat_pct * image_height)
         
         return x, y
 

@@ -549,6 +549,8 @@ class HeadingController(LifecycleNode):
             self.get_logger().info("Current grid cell is none, cannot operate")
             return
         
+        self.get_logger().info(f"Current segment: {self.path_segment.start}, {self.path_segment.end}")
+        
         grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=self.k_base, lambda_base=self.lambda_base)
         #self.get_logger().info(f"Direction vector: {grid_direction_vector}")
         target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
