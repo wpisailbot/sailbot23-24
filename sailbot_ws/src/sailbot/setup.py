@@ -44,6 +44,7 @@ setup(
             'wind_smoother = sailbot.wind_smoother:main',
             'buoy_detection = sailbot.buoy_detection:main',
             'fake_movement = sailbot.fake_movement:main',
+            'heading_select = sailbot.heading_select:main',
         ],
     },
 )

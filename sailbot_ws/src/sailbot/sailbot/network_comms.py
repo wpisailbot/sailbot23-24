@@ -253,6 +253,8 @@ class NetworkComms(LifecycleNode):
 
         self.vf_forward_magnitude_publisher = self.create_lifecycle_publisher(Float64, 'vf_forward_magnitude', 10)
         self.rudder_kp_publisher = self.create_lifecycle_publisher(Float64, 'rudder_kp', 10)
+        self.rudder_kd_publisher = self.create_lifecycle_publisher(Float64, 'rudder_kd', 10)
+
 
         self.cv_parameters_publisher = self.create_lifecycle_publisher(CVParameters, 'cv_parameters', 10)
 
@@ -294,7 +296,7 @@ class NetworkComms(LifecycleNode):
         
         self.heading_subscription = self.create_subscription(
             Float64,
-            'airmar_data/heading',
+            'heading',
             self.heading_callback,
             10)
         
@@ -690,6 +692,7 @@ class NetworkComms(LifecycleNode):
         control_pb2_grpc.add_ExecuteAddWaypointCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteMarkBuoyCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetVFForwardMagnitudeCommandServiceServicer_to_server(self, self.grpc_server)
+        control_pb2_grpc.add_ExecuteSetRudderKDCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetRudderKPCommandServiceServicer_to_server(self, self.grpc_server)
         control_pb2_grpc.add_ExecuteSetCVParametersCommandServiceServicer_to_server(self, self.grpc_server)
         boat_state_pb2_rpc.add_SendBoatStateServiceServicer_to_server(self, self.grpc_server)
@@ -863,6 +866,19 @@ class NetworkComms(LifecycleNode):
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
         return response
     
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteSetRudderKDCommand(self, command: control_pb2.SetRudderKPCommand, context):
+        self.get_logger().info("Got rudder kd command")
+
+        msg = Float64()
+        msg.data = command.kd
+        self.rudder_kd_publisher.publish(msg)
+
+        response = control_pb2.ControlResponse()
+        response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
+        return response
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteSetCVParametersCommand(self, command: control_pb2.SetCVParametersCommand, context):        
         self.current_cv_parameters.lower_h = command.parameters.lower_h
         self.current_cv_parameters.lower_s = command.parameters.lower_s

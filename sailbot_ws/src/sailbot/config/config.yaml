@@ -2,11 +2,18 @@ heading_controller:
   ros__parameters:
     sailbot:
       heading_control:
-        heading_kp: 0.01
+        heading_kp: 1.0
+        heading_kd: 10.0
         vector_field_crosstrack_weight: 1.0
         vector_field_path_dir_weight: 1.0
         leeway_correction_limit_degrees: 10.0
         wind_restriction_replan_cutoff_degrees: 30.0
+
+heading_select:
+  ros__parameters:
+    sailbot:
+      heading_select:
+        use_camera_heading: False
     
 esp32_comms:
   ros__parameters:

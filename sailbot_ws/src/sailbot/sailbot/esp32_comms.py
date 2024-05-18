@@ -463,7 +463,7 @@ class ESPComms(LifecycleNode):
                     #self.get_logger().info("Ballast potentiometer is not working!")
                     pass
                 else:
-                    #self.get_logger().info(f"Ballast position: {pos.data}")
+                    self.get_logger().info(f"Ballast position: {pos.data}")
                     pass
                 #publish even if it's broken, ballast_control will detect it
                 self.ballast_pos_publisher.publish(pos)

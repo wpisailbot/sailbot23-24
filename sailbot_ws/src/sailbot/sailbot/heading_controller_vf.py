@@ -11,6 +11,7 @@ from skfuzzy import control as ctrl
 import math
 import traceback
 import numpy as np
+import time
 
 from typing import Optional
 from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
@@ -21,6 +22,7 @@ from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 
 from sailbot_msgs.msg import AutonomousMode, GeoPath, Wind, PathSegment
+from sensor_msgs.msg import MagneticField
 
 PI = math.pi
 TWO_PI = PI*2
@@ -136,6 +138,8 @@ class HeadingController(LifecycleNode):
 
     last_heading_error = 0
 
+    last_rudder_time = time.time()
+
     def __init__(self):
         super().__init__('heading_controller')
 
@@ -157,7 +161,8 @@ class HeadingController(LifecycleNode):
         # self.target_position.longitude = -71.805049
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_control.heading_kp', 0.01)
+        self.declare_parameter('sailbot.heading_control.heading_kp', 1.0)
+        self.declare_parameter('sailbot.heading_control.heading_kd', 10.0)
         self.declare_parameter('sailbot.heading_control.vector_field_crosstrack_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 1.0)
         self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
@@ -165,6 +170,7 @@ class HeadingController(LifecycleNode):
 
     def get_parameters(self) -> None:
         self.heading_kp = self.get_parameter('sailbot.heading_control.heading_kp').get_parameter_value().double_value
+        self.heading_kd = self.get_parameter('sailbot.heading_control.heading_kd').get_parameter_value().double_value
         self.k_base = self.get_parameter('sailbot.heading_control.vector_field_crosstrack_weight').get_parameter_value().double_value
         self.lambda_base = self.get_parameter('sailbot.heading_control.vector_field_path_dir_weight').get_parameter_value().double_value
         self.leeway_correction_limit = self.get_parameter('sailbot.heading_control.leeway_correction_limit_degrees').get_parameter_value().double_value
@@ -191,7 +197,7 @@ class HeadingController(LifecycleNode):
             10)
         self.airmar_heading_subscription = self.create_subscription(
             Float64,
-            '/airmar_data/heading',
+            'heading',
             self.airmar_heading_callback,
             10)
         self.airmar_track_degrees_true_subscription = self.create_subscription(
@@ -223,6 +229,11 @@ class HeadingController(LifecycleNode):
             Float64,
             'rudder_kp',
             self.rudder_kp_callback,
+            10)
+        self.rudder_kp_subscription = self.create_subscription(
+            Float64,
+            'rudder_kd',
+            self.rudder_kd_callback,
             10)
         self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
@@ -339,6 +350,25 @@ class HeadingController(LifecycleNode):
         self.heading = msg.data
         #self.compute_rudder_angle()
 
+    def magnetic_field_callback(self, msg):
+        # Extract magnetic field components
+        x = msg.magnetic_field.x
+        y = msg.magnetic_field.y
+
+        # Compute heading
+        heading = math.atan2(y, x)
+        
+        # Convert heading to degrees
+        heading_degrees = math.degrees(heading)
+        
+        # Normalize heading to [0, 360) degrees
+        if heading_degrees < 0:
+            heading_degrees += 360
+
+        self.heading = heading_degrees
+
+        self.get_logger().info("Heading: {:.2f} degrees".format(heading_degrees))
+
     def airmar_track_degrees_true_callback(self, msg: Float64) -> None:
         difference = msg.data - self.heading
         difference = (difference + 180) % 360 - 180
@@ -369,6 +399,9 @@ class HeadingController(LifecycleNode):
 
     def rudder_kp_callback(self, msg: Float64) -> None:
         self.heading_kp = msg.data
+
+    def rudder_kd_callback(self, msg: Float64) -> None:
+        self.heading_kd = msg.data
     
     def needs_to_tack(self, boat_heading, target_heading, wind_direction) -> bool:
         """
@@ -541,11 +574,14 @@ class HeadingController(LifecycleNode):
         
         self.get_logger().info(f"Target heading: {target_heading}")
         heading_error = math.degrees(normalRelativeAngle(math.radians(self.heading-target_heading)))
-        delta_heading_error = heading_error - self.last_heading_error
+
+        current_time = time.time()
+        delta_time = current_time-self.last_rudder_time
+        heading_rate_of_change = (heading_error - self.last_heading_error)/delta_time
         self.last_heading_error = heading_error
         #self.get_logger().info(f"Heading error: {heading_error} from heading: {self.heading} grid pos: {self.current_grid_cell} along segment: {self.path_segment}")
         self.rudder_simulator.input['heading_error'] = heading_error
-        self.rudder_simulator.input['rate_of_change'] = delta_heading_error
+        self.rudder_simulator.input['rate_of_change'] = heading_rate_of_change * self.heading_kd
         self.rudder_simulator.compute()
         rudder_value = self.rudder_simulator.output['rudder_adjustment']
         self.rudder_angle += rudder_value*self.heading_kp # Scale

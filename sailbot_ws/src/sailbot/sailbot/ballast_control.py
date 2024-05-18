@@ -90,8 +90,8 @@ class BallastControl(LifecycleNode):
     roll_errors = []
     num_error_readings = 20
 
-    ADC_FULL_STARBOARD = 700
-    ADC_FULL_PORT = 2300
+    ADC_FULL_STARBOARD = 1247
+    ADC_FULL_PORT = 2847
     ADC_MAX = ADC_FULL_PORT
     ADC_MIN = ADC_FULL_STARBOARD
     
