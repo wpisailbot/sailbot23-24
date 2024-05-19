@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-import struct
-import asyncio
-import os
 
 import rclpy
 from typing import Optional
@@ -11,19 +8,16 @@ from rclpy.lifecycle import State
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
-from enum import Enum
 from time import time as get_time
 
-from std_msgs.msg import Int8, Int16, Empty, Float64
+from std_msgs.msg import Int8, Int16, Empty, Float64, String
 from sailbot_msgs.msg import Wind, AutonomousMode, GeoPath, TrimState
 
 import serial
 import json
-import time
 import traceback
 import serial.tools.list_ports
 import subprocess
-import math
 
 serial_port = '/dev/ttyTHS0'
 baud_rate = 115200 
@@ -81,6 +75,8 @@ class ESPComms(LifecycleNode):
         self.ballast_pos_publisher: Optional[Publisher]
         self.trim_state_debug_publisher: Optional[Publisher]
 
+        self.error_publisher: Optional[Publisher]
+
         self.tt_control_subscriber: Optional[Subscription]
         self.tt_angle_subscriber: Optional[Subscription]
         self.rudder_angle_subscriber: Optional[Subscription]
@@ -123,6 +119,9 @@ class ESPComms(LifecycleNode):
 
         self.tt_battery_publisher = self.create_lifecycle_publisher(Int8, 'tt_battery', 10)  # Battery level
         self.trim_state_debug_publisher = self.create_lifecycle_publisher(TrimState, 'trim_state', 10)
+
+        self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
+
 
         self.tt_angle_subscriber = self.create_subscription(Int16, 'tt_angle', self.tt_angle_callback, 10)
 
@@ -471,6 +470,11 @@ class ESPComms(LifecycleNode):
                 self.get_logger().warn("Error decoding JSON")
         else:
             self.get_logger().warn("No data received within the timeout period.")
+    
+    def publish_error(self, string: str):
+        error_msg = String()
+        error_msg.data = string
+        self.error_publisher.publish(error_msg)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -482,7 +486,9 @@ def main(args=None):
         ser.close()
     except Exception as e:
         trace = traceback.format_exc()
-        esp_comms.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        error_string = f'Unhandled exception: {e}\n{trace}'
+        esp_comms.get_logger().fatal(error_string)
+        esp_comms.publish_error(error_string)
     # Use the SingleThreadedExecutor to spin the node.
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(esp_comms)

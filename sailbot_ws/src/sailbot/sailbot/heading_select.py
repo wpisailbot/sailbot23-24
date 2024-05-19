@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, String
 
 # import json
 
@@ -8,16 +8,12 @@ import math
 import traceback
 
 from typing import Optional
-from rclpy.lifecycle import LifecycleNode, LifecycleState, TransitionCallbackReturn
-from rclpy.lifecycle import Publisher
-from rclpy.lifecycle import State
-from rclpy.lifecycle import TransitionCallbackReturn
+from rclpy.node import Node
 from rclpy.timer import Timer
-from rclpy.subscription import Subscription
 
 from sensor_msgs.msg import MagneticField
 
-class HeadingSelect(LifecycleNode):
+class HeadingSelect(Node):
 
     use_camera_heading = False
 
@@ -27,32 +23,9 @@ class HeadingSelect(LifecycleNode):
         self.set_parameters()
         self.get_parameters()
 
-        self.rudder_angle_publisher: Optional[Publisher]
-        self.path_segment_subscription: Optional[Subscription]
-        self.airmar_heading_subscription: Optional[Subscription]
-        self.airmar_track_degrees_true_subscription: Optional[Subscription]
-        self.current_grid_cell_subscription: Optional[Subscription]
-        self.autonomous_mode_subscription: Optional[Subscription]
-        self.current_path_subscription: Optional[Subscription]
-
-
-        self.timer: Optional[Timer]
-        # self.target_position = GeoPoint()
-        # self.target_position.latitude = 42.273051
-        # self.target_position.longitude = -71.805049
-
-    def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_select.use_camera_heading', False)
-
-    def get_parameters(self) -> None:
-        self.use_camera_heading = self.get_parameter('sailbot.heading_select.use_camera_heading').get_parameter_value().bool_value
+        self.heading_publisher = self.create_publisher(Float64, 'heading', 10)
+        self.error_publisher = self.create_publisher(String, f'{self.get_name()}/error', 10)
         
-    #lifecycle node callbacks
-    def on_configure(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("In configure")
-
-        self.heading_publisher = self.create_lifecycle_publisher(Float64, 'heading', 10)
-
         self.airmar_heading_subscription = self.create_subscription(
             Float64,
             '/airmar_data/heading',
@@ -63,39 +36,16 @@ class HeadingSelect(LifecycleNode):
             '/zed/zed_node/imu/mag',
             self.magnetic_field_callback,
             10)
- 
-        #super().on_configure(state)
-        return TransitionCallbackReturn.SUCCESS
 
-    def on_activate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("Activating...")
-        # Start publishers or timers
-        return super().on_activate(state)
+        self.timer: Optional[Timer]
 
+    def set_parameters(self) -> None:
+        self.declare_parameter('sailbot.heading_select.use_camera_heading', False)
 
-    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("Deactivating...")
-        return super().on_deactivate(state)
-
-    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("Cleaning up...")
-        # Destroy subscribers, publishers, and timers
-
-        return TransitionCallbackReturn.SUCCESS
-
-    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("Shutting down...")
-        # Perform final cleanup if necessary
-        return TransitionCallbackReturn.SUCCESS
-    
-    def on_error(self, state: LifecycleState) -> TransitionCallbackReturn:
-        self.get_logger().info("Error caught!")
-        return super().on_error(state)
-    
-    #end callbacks
+    def get_parameters(self) -> None:
+        self.use_camera_heading = self.get_parameter('sailbot.heading_select.use_camera_heading').get_parameter_value().bool_value
 
     def airmar_heading_callback(self, msg: Float64) -> None:
-        #raise ValueError
         if(self.use_camera_heading == False):
             self.heading = msg.data
             heading_msg = Float64()
@@ -126,7 +76,10 @@ class HeadingSelect(LifecycleNode):
 
             self.get_logger().info("Heading: {:.2f} degrees".format(heading_degrees))
 
-
+    def publish_error(self, string: str):
+        error_msg = String()
+        error_msg.data = string
+        self.error_publisher.publish(error_msg)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -143,7 +96,9 @@ def main(args=None):
         pass
     except Exception as e:
         trace = traceback.format_exc()
-        heading_select.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        error_string = f'Unhandled exception: {e}\n{trace}'
+        heading_select.get_logger().fatal(error_string)
+        heading_select.publish_error(error_string)
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

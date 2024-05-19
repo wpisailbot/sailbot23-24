@@ -4,8 +4,6 @@ from std_msgs.msg import String, Float64, Int16
 from sailbot_msgs.msg import Wind, AutonomousMode
 
 import json
-import board
-import busio
 from time import time as get_time
 from typing import Optional
 import traceback
@@ -126,6 +124,8 @@ class BallastControl(LifecycleNode):
     def __init__(self):
         super().__init__('ballast_control')
         self.ballast_pwm_publisher: Optional[Publisher]
+        self.error_publisher: Optional[Publisher]
+
         self.position_subscription: Optional[Subscription]
         self.current_ballast_position_subscription: Optional[Subscription]
         self.airmar_roll_subscription: Optional[Subscription]
@@ -136,6 +136,7 @@ class BallastControl(LifecycleNode):
         self.get_logger().info("In configure")
 
         self.ballast_pwm_publisher = self.create_lifecycle_publisher(Int16, 'ballast_pwm', 1)
+        self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
         self.position_subscription = self.create_subscription(
             Float64,
@@ -370,6 +371,10 @@ class BallastControl(LifecycleNode):
         self.ballast_pwm_publisher.publish(msg)
         pass
 
+    def publish_error(self, string: str):
+        error_msg = String()
+        error_msg.data = string
+        self.error_publisher.publish(error_msg)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -386,7 +391,9 @@ def main(args=None):
         pass
     except Exception as e:
         trace = traceback.format_exc()
-        ballast_control.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        error_string = f'Unhandled exception: {e}\n{trace}'
+        ballast_control.get_logger().fatal(error_string)
+        ballast_control.publish_error(error_string)
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

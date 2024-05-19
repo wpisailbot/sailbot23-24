@@ -424,7 +424,7 @@ class NetworkComms(LifecycleNode):
 
             #create lifecycle callback using function generation
             try:
-                self.setup_node_subscription(node_name=name)
+                self.setup_node_subscriptions(node_name=name)
             except Exception as e:
                 trace = traceback.format_exc()
                 self.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
@@ -559,13 +559,28 @@ class NetworkComms(LifecycleNode):
         #self.get_logger().info(f"length of boatState path is: {len(self.current_boat_state.current_path.points)}")
 
     def create_lifecycle_callback(self, node_name: str) -> Callable[[Any, TransitionEvent], None]:
-        def lifecycle_callback(self, msg):
+        def lifecycle_callback(self, msg: TransitionEvent):
             msg_details = f"Received {node_name} update! State is: {msg.goal_state.id}"
             self.get_logger().info(msg_details)
-            self.current_boat_state.node_states[self.node_indices[node_name]].lifecycle_state = get_state(msg.goal_state.id)
+            state = get_state(msg.goal_state.id)
+            if(state == boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_ERROR_PROCESSING):
+                self.current_boat_state.node_states[self.node_indices[node_name]].status = boat_state_pb2.NodeStatus.NODE_STATUS_ERROR
+            elif (state==boat_state_pb2.NodeLifecycleState.NODE_LIFECYCLE_STATE_UNKNOWN):
+                self.current_boat_state.node_states[self.node_indices[node_name]].status = boat_state_pb2.NodeStatus.NODE_STATUS_WARN
+            else:
+                self.current_boat_state.node_states[self.node_indices[node_name]].status = boat_state_pb2.NodeStatus.NODE_STATUS_OK
+            self.current_boat_state.node_states[self.node_indices[node_name]].lifecycle_state = state
+
         return lifecycle_callback
     
-    def setup_node_subscription(self, node_name: str) -> None:
+    def create_error_callback(self, node_name: str) -> Callable[[Any, String], None]:
+        def error_callback(self, msg: String):
+            msg_details = f"Received {node_name} error! String is: {msg.data}"
+            self.get_logger().info(msg_details)
+            self.current_boat_state.node_states[self.node_indices[node_name]].status = boat_state_pb2.NodeStatus.NODE_STATUS_ERROR
+        return error_callback
+
+    def create_and_bind_lifecycle_callback(self, node_name: str) -> None:
         callback_method_name = f"{node_name}_lifecycle_callback"
         # Dynamically create the callback method
         method = self.create_lifecycle_callback(node_name)
@@ -584,6 +599,30 @@ class NetworkComms(LifecycleNode):
             10)
         # Attach the subscription to this class instance
         setattr(self, subscription_name, subscription)
+    
+    def create_and_bind_error_callback(self, node_name: str) -> None:
+        callback_method_name = f"{node_name}_error_callback"
+        # Dynamically create the callback method
+        method = self.create_error_callback(node_name)
+        # Bind the method to the instance, ensuring it receives 'self' properly
+        bound_method = types.MethodType(method, self)
+        # Attach the bound method to the instance
+        setattr(self, callback_method_name, bound_method)
+        
+        # Set up the subscription using the dynamically created and bound callback
+        subscription_name = f"{node_name}_error_subscription"
+        topic_name = f"/{node_name}/error"
+        subscription = self.create_subscription(
+            String,
+            topic_name,
+            getattr(self, callback_method_name),
+            10)
+        # Attach the subscription to this class instance
+        setattr(self, subscription_name, subscription)
+
+    def setup_node_subscriptions(self, node_name: str) -> None:
+        self.create_and_bind_lifecycle_callback(node_name)
+        self.create_and_bind_error_callback(node_name)
 
     def rate_of_turn_callback(self, msg: Float64):
         self.current_boat_state.rate_of_turn = msg.data

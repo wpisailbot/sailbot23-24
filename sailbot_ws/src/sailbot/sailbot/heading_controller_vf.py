@@ -3,7 +3,6 @@ import rclpy
 from std_msgs.msg import String, Float64, Int16, Empty
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point
-from geographic_msgs.msg import GeoPoint
 # import json
 import numpy as np
 import skfuzzy as fuzz
@@ -22,7 +21,6 @@ from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 
 from sailbot_msgs.msg import AutonomousMode, GeoPath, Wind, PathSegment
-from sensor_msgs.msg import MagneticField
 
 PI = math.pi
 TWO_PI = PI*2
@@ -147,6 +145,9 @@ class HeadingController(LifecycleNode):
         self.get_parameters()
 
         self.rudder_angle_publisher: Optional[Publisher]
+        self.error_publisher: Optional[Publisher]
+
+
         self.path_segment_subscription: Optional[Subscription]
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_track_degrees_true_subscription: Optional[Subscription]
@@ -189,6 +190,8 @@ class HeadingController(LifecycleNode):
         self.target_heading_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_heading', 10)
 
         self.request_replan_publisher = self.create_lifecycle_publisher(Empty, 'request_replan', 10)
+
+        self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
         self.path_Segment_subscription = self.create_subscription(
             PathSegment,
@@ -635,6 +638,10 @@ class HeadingController(LifecycleNode):
         
         return math.degrees(turn)
 
+    def publish_error(self, string: str):
+        error_msg = String()
+        error_msg.data = string
+        self.error_publisher.publish(error_msg)
 
 
 def main(args=None):
@@ -652,7 +659,9 @@ def main(args=None):
         pass
     except Exception as e:
         trace = traceback.format_exc()
-        heading_control.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        error_string = f'Unhandled exception: {e}\n{trace}'
+        heading_control.get_logger().fatal(error_string)
+        heading_control.publish_error(error_string)
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

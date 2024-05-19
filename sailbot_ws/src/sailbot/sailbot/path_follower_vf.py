@@ -187,6 +187,8 @@ class PathFollower(LifecycleNode):
         self.current_path_publisher: Optional[Publisher]
         self.current_grid_cell_publisher: Optional[Publisher]
 
+        self.error_publisher: Optional[Publisher]
+
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
         self.airmar_speed_knots_subscription: Optional[Subscription]
@@ -276,6 +278,8 @@ class PathFollower(LifecycleNode):
             self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
             self.current_path_publisher = self.create_lifecycle_publisher(GeoPath, 'current_path', 10)
             self.current_grid_cell_publisher = self.create_lifecycle_publisher(Point, 'current_grid_cell', 10)
+
+            self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
             self.airmar_heading_subscription = self.create_subscription(
                 Float64,
@@ -978,6 +982,11 @@ class PathFollower(LifecycleNode):
                     appended.append(new_point)
         appended.append(path[-1])
         return appended
+    
+    def publish_error(self, string: str):
+        error_msg = String()
+        error_msg.data = string
+        self.error_publisher.publish(error_msg)
 
 def trigger_error_transition(node: LifecycleNode):
     client = node.create_client(ChangeState, f'{node.get_name()}/change_state')
@@ -1011,7 +1020,9 @@ def main(args=None):
         pass
     except Exception as e:
         trace = traceback.format_exc()
-        path_follower.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        error_string = f'Unhandled exception: {e}\n{trace}'
+        path_follower.get_logger().fatal(error_string)
+        path_follower.publish_error(error_string)
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

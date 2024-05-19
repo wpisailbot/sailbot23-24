@@ -56,6 +56,8 @@ class HeadingController(LifecycleNode):
         self.get_parameters()
 
         self.rudder_angle_publisher: Optional[Publisher]
+        self.error_publisher: Optional[Publisher]
+
         self.target_position_subscription: Optional[Subscription]
         self.airmar_heading_subscription: Optional[Subscription]
         self.airmar_position_subscription: Optional[Subscription]
@@ -83,6 +85,7 @@ class HeadingController(LifecycleNode):
 
         self.target_heading_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_heading', 10)
 
+        self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
         self.target_position_subscription = self.create_subscription(
             GeoPoint,
@@ -332,7 +335,10 @@ class HeadingController(LifecycleNode):
         
         return math.degrees(turn)
 
-
+    def publish_error(self, string: str):
+        error_msg = String()
+        error_msg.data = string
+        self.error_publisher.publish(error_msg)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -349,7 +355,9 @@ def main(args=None):
         pass
     except Exception as e:
         trace = traceback.format_exc()
-        heading_control.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        error_string = f'Unhandled exception: {e}\n{trace}'
+        heading_control.get_logger().fatal(error_string)
+        heading_control.publish_error(error_string)
     finally:
         # Shutdown and cleanup the node
         executor.shutdown()

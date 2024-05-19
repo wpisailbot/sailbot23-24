@@ -78,6 +78,7 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         self.roll_publisher: Optional[Publisher]
         self.pitch_publisher: Optional[Publisher]
 
+        self.error_publisher: Optional[Publisher]
 
     #lifecycle node callbacks
     def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
@@ -106,6 +107,9 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         self.apparent_wind_publisher = self.create_lifecycle_publisher(Wind, 'airmar_data/apparent_wind', 10)
         self.roll_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/roll', 10)
         self.pitch_publisher = self.create_lifecycle_publisher(Float64, 'airmar_data/pitch', 10)
+        
+        self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
+
         self.timer = self.create_timer(0.01, self.timer_callback)
 
         return TransitionCallbackReturn.SUCCESS
@@ -339,6 +343,11 @@ class AirmarReader(LifecycleNode): #translates airmar data into json and publish
         except Exception as e:
             print(e)
             return({})
+    
+    def publish_error(self, string: str):
+        error_msg = String()
+        error_msg.data = string
+        self.error_publisher.publish(error_msg)
 
 
 def main(args=None):
@@ -362,7 +371,9 @@ def main(args=None):
         pass
     except Exception as e:
         trace = traceback.format_exc()
-        airmar_reader.get_logger().fatal(f'Unhandled exception: {e}\n{trace}')
+        error_string = f'Unhandled exception: {e}\n{trace}'
+        airmar_reader.get_logger().fatal(error_string)
+        airmar_reader.publish_error(error_string)
     finally:
         # Shutdown and cleanup the node
         airmar_reader.ser.close()
