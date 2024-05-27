@@ -65,7 +65,7 @@ class ESPComms(LifecycleNode):
     last_lift_state = TrimState.TRIM_STATE_MIN_LIFT
     rudder_angle_limit_deg = None
 
-    request_tack_timer_duration = 5.0  # seconds
+    request_tack_timer_duration = 3.0  # seconds
     request_tack_timer: Timer = None
     request_tack_override = False
 
@@ -266,9 +266,13 @@ class ESPComms(LifecycleNode):
         msg = None
         trim_state_msg = TrimState()
 
+        force_tack = False
         if(self.request_tack_override):
-            relative_wind = 0
-        if 25.0 <= relative_wind < 100:
+            # Only tack if we're going upwind
+            if (25.0 <= relative_wind < 100) or (260 <= relative_wind < 335):
+                force_tack = True
+
+        if 25.0 <= relative_wind < 100 and force_tack is False:
             # Max lift port
             msg = {
                 "state": "max_lift_port"
@@ -293,7 +297,7 @@ class ESPComms(LifecycleNode):
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
             #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
             #self.get_logger().info("Max drag starboard")
-        elif 260 <= relative_wind < 335:
+        elif 260 <= relative_wind < 335 and force_tack is False:
             # Max lift starboard
             msg = {
                 "state": "max_lift_starboard"
@@ -306,7 +310,7 @@ class ESPComms(LifecycleNode):
             # In irons
             
             # Adjust behavior to not stop during a tack
-            if(self.could_be_tacking):
+            if(self.could_be_tacking or force_tack):
                 self.get_logger().info("Tacking detected!")
                 if(self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
                     trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
