@@ -177,7 +177,7 @@ class NetworkComms(LifecycleNode):
 
     current_map: OccupancyGrid = None
     current_boat_state = boat_state_pb2.BoatState()
-    current_cv_parameters = boat_state_pb2.CVParameters()
+    current_cv_parameters = None
     last_camera_frame = None
     last_camera_frame_shape = None
     last_camera_frame_time = time.time()
@@ -233,7 +233,7 @@ class NetworkComms(LifecycleNode):
         self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
 
     def get_parameters(self) -> None:
-        self.current_cv_parameters.circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
+        self.circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -738,7 +738,8 @@ class NetworkComms(LifecycleNode):
         #self.get_logger().info("Got target track")
     
     def initial_cv_parameters_callback(self, msg: CVParameters):
-        self.current_cv_parameters.ClearField("buoy_types")
+
+        self.current_cv_parameters = boat_state_pb2.CVParameters()
         buoy_type: BuoyTypeInfo
         for buoy_type in msg.buoy_types:
             type_bounds: HSVBounds = buoy_type.hsv_bounds
@@ -940,25 +941,30 @@ class NetworkComms(LifecycleNode):
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteSetCVParametersCommand(self, command: control_pb2.SetCVParametersCommand, context):        
-        self.current_cv_parameters = command.parameters
+        try:
+            self.current_cv_parameters = command.parameters
 
-        newParams = CVParameters()
-        for buoy_type in command.parameters.buoy_types:
-            this_type = BuoyTypeInfo()
-            this_type.hsv_bounds.lower_h = buoy_type.hsv_bounds.lower_h*255
-            this_type.hsv_bounds.lower_s = buoy_type.hsv_bounds.lower_s*255
-            this_type.hsv_bounds.lower_v = buoy_type.hsv_bounds.lower_v*255
-            this_type.hsv_bounds.upper_h = buoy_type.hsv_bounds.upper_h*255
-            this_type.hsv_bounds.upper_s = buoy_type.hsv_bounds.upper_s*255
-            this_type.hsv_bounds.upper_v = buoy_type.hsv_bounds.upper_v*255
+            newParams = CVParameters()
+            for buoy_type in command.parameters.buoy_types:
+                this_type = BuoyTypeInfo()
+                this_type.hsv_bounds.lower_h = int(buoy_type.hsv_bounds.lower_h*255)
+                this_type.hsv_bounds.lower_s = int(buoy_type.hsv_bounds.lower_s*255)
+                this_type.hsv_bounds.lower_v = int(buoy_type.hsv_bounds.lower_v*255)
+                this_type.hsv_bounds.upper_h = int(buoy_type.hsv_bounds.upper_h*255)
+                this_type.hsv_bounds.upper_s = int(buoy_type.hsv_bounds.upper_s*255)
+                this_type.hsv_bounds.upper_v = int(buoy_type.hsv_bounds.upper_v*255)
 
-            this_type.name = buoy_type.name
-            this_type.buoy_diameter = buoy_type.buoy_diameter
+                this_type.name = buoy_type.name
+                this_type.buoy_diameter = buoy_type.buoy_diameter
 
-            newParams.buoy_types.append(this_type)
+                newParams.buoy_types.append(this_type)
 
-        newParams.circularity_threshold = command.parameters.circularity_threshold
-        self.cv_parameters_publisher.publish(newParams)
+            newParams.circularity_threshold = command.parameters.circularity_threshold
+            self.get_logger().info(f"Got new CV parameters: {newParams}")
+            self.cv_parameters_publisher.publish(newParams)
+        except Exception as e:
+            trace = traceback.format_exc()
+            self.get_logger().error(f'Caught exception: {e}\n{trace}')
         
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
@@ -979,8 +985,16 @@ class NetworkComms(LifecycleNode):
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def GetCVParameters(self, command: boat_state_pb2.GetCVParametersRequest, context):
-        self.get_logger().info("Received Get CV Params request")
-        return self.current_cv_parameters
+        try:
+            self.get_logger().info("Received Get CV Params request")
+            response = boat_state_pb2.GetCVParametersResponse()
+            if(self.current_cv_parameters is not None):
+                self.current_cv_parameters.circularity_threshold = self.circularity_threshold
+                response = boat_state_pb2.GetCVParametersResponse(parameters=self.current_cv_parameters)
+            return response
+        except Exception as e:
+            trace = traceback.format_exc()
+            self.get_logger().error(f'Caught exception: {e}\n{trace}')
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def SendBoatState(self, command: boat_state_pb2.BoatStateRequest, context):

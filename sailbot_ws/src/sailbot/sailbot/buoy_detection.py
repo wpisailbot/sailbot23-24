@@ -289,6 +289,7 @@ class BuoyDetection(Node):
         self.heading = msg.data
     
     def cv_parameters_callback(self, msg: CVParameters) -> None:
+        self.get_logger().info(f"Got new CV parameters: {msg}")
         self.buoy_types = msg.buoy_types
         self.buoy_circularity_threshold = msg.circularity_threshold
 
