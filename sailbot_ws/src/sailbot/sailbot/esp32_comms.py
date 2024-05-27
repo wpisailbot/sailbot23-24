@@ -65,6 +65,10 @@ class ESPComms(LifecycleNode):
     last_lift_state = TrimState.TRIM_STATE_MIN_LIFT
     rudder_angle_limit_deg = None
 
+    request_tack_timer_duration = 5.0  # seconds
+    request_tack_timer: Timer = None
+    request_tack_override = False
+
     def __init__(self):
         super(ESPComms, self).__init__('esp32_comms')
 
@@ -85,6 +89,8 @@ class ESPComms(LifecycleNode):
         self.current_path_subscription: Optional[Subscription]
         self.apparent_wind_subscriber: Optional[Subscription]
         self.roll_subscription: Optional[Subscription]
+
+        self.request_tack_subscription: Optional[Subscription]
 
         self.timer_pub: Optional[Publisher]
 
@@ -141,6 +147,12 @@ class ESPComms(LifecycleNode):
             Float64,
             'airmar_data/roll',
             self.roll_callback,
+            10)
+        
+        self.request_tack_subscription = self.create_subscription(
+            Empty,
+            'request_tack',
+            self.request_tack_callback,
             10)
         
 
@@ -253,6 +265,9 @@ class ESPComms(LifecycleNode):
 
         msg = None
         trim_state_msg = TrimState()
+
+        if(self.request_tack_override):
+            relative_wind = 0
         if 25.0 <= relative_wind < 100:
             # Max lift port
             msg = {
@@ -404,12 +419,27 @@ class ESPComms(LifecycleNode):
         message_string = json.dumps(message)+'\n'
         self.ser.write(message_string.encode())
     
-    def roll_callback(self, msg: Float64):
+    def roll_callback(self, msg: Float64) -> None:
         msg = {
                 "roll": msg.data
         }
         message_string = json.dumps(msg)+'\n'
         self.ser.write(message_string.encode())
+    
+    def request_tack_timer_callback(self):
+        self.request_tack_override = False
+        self.get_logger().info('Tack timer expired.')
+
+        # Cancel the timer to clean up
+        if self.request_tack_timer is not None:
+            self.request_tack_timer.cancel()
+            self.request_tack_timer = None
+
+    def request_tack_callback(self, msg: Empty) -> None:
+        self.request_tack_override = True
+        if self.request_tack_timer is not None:
+            self.request_tack_timer.cancel()
+        self.request_tack_override = self.create_timer(self.request_tack_timer_duration, self.request_tack_timer_callback)
 
     def ballast_timer_callback(self) -> None:
         """

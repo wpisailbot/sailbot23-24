@@ -11,7 +11,13 @@ from rclpy.lifecycle import State
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.timer import Timer
 from rclpy.subscription import Subscription
-from std_msgs.msg import String,  Int8, Int16, Empty, Float64
+from std_msgs.msg import (
+    String,
+    Int8,
+    Int16,
+    Empty,
+    Float64,
+)
 from lifecycle_msgs.msg import TransitionEvent
 from lifecycle_msgs.msg import State as StateMsg
 from sensor_msgs.msg import NavSatFix, Image
@@ -255,6 +261,7 @@ class NetworkComms(LifecycleNode):
         self.rudder_adjustment_scale_publisher = self.create_lifecycle_publisher(Float64, 'rudder_adjustment_scale', 10)
         self.rudder_overshoot_bias_publisher = self.create_lifecycle_publisher(Float64, 'rudder_overshoot_bias', 10)
 
+        self.request_tack_publisher = self.create_lifecycle_publisher(Empty, 'request_tack', 10)
 
         self.cv_parameters_publisher = self.create_lifecycle_publisher(CVParameters, 'cv_parameters', 10)
 
@@ -795,6 +802,12 @@ class NetworkComms(LifecycleNode):
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteMarkBuoyCommand(self, command: control_pb2.MarkBuoyCommand, context):
         self.get_logger().info("Received mark buoy command")
+    
+    #gRPC function, do not rename unless you change proto defs and recompile gRPC files
+    def ExecuteRequestTackCommand(self, command: control_pb2.RequestTackCommand, context):
+        self.get_logger().info("Received request tack command")
+        self.request_tack_publisher.publish(Empty())
+
 
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteRudderCommand(self, command: control_pb2.RudderCommand, context):
