@@ -5,7 +5,7 @@ from sensor_msgs.msg import Image, NavSatFix
 from geographic_msgs.msg import GeoPoint
 from cv_bridge import CvBridge
 
-from sailbot_msgs.msg import BuoyDetectionStamped, CVParameters
+from sailbot_msgs.msg import BuoyDetectionStamped, CVParameters, BuoyTypeInfo, AnnotatedImage
 
 import cv2
 import numpy as np
@@ -14,7 +14,8 @@ from filterpy.kalman import KalmanFilter
 from scipy.optimize import linear_sum_assignment
 import pyproj
 from pyproj import Transformer
-
+from typing import List
+import time
 from geopy.distance import geodesic
 
 PIXEL_SIZE = 0.002 # In mm
@@ -165,7 +166,7 @@ class BuoyDetection(Node):
     - **associate_detections_to_tracks**: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.
     - **listener_callback**: Processes each incoming image, detects buoys, and manages tracks.
     - **fill_holes**: Fills holes within binary images to create solid objects, improving reliability of object detection.
-    - **detect_orange_objects**: Detects orange objects in the image by applying a color threshold and shape analysis.
+    - **detect_colored_objects**: Detects colored objects in the image by applying a color threshold and shape analysis.
     - **calculate_depth**: Estimates the depth of detected objects based on their size in the image.
     - **calculate_object_center**: Calculates the center of detected objects in pixel coordinates.
     - **pixel_to_world**: Converts pixel coordinates to world coordinates using intrinsic camera parameters.
@@ -183,9 +184,43 @@ class BuoyDetection(Node):
     current_y_scaling_factor = 1.0
     latitude, longitude = 42.0396766107111, -71.84585650616927
     heading = 0
-    tracks = []
+    tracks: List[Track] = []
+    buoy_types: List[BuoyTypeInfo] = []
     def __init__(self):
         super().__init__('object_detection_node')
+
+        orangeType = BuoyTypeInfo()
+        orangeType.buoy_diameter = 0.5
+        orangeType.name = "orange"
+        orangeType.hsv_bounds.lower_h = 5
+        orangeType.hsv_bounds.lower_s = 49
+        orangeType.hsv_bounds.lower_v = 120
+        orangeType.hsv_bounds.upper_h = 110
+        orangeType.hsv_bounds.upper_s = 255
+        orangeType.hsv_bounds.upper_v = 255
+        self.buoy_types.append(orangeType)
+
+        greenType = BuoyTypeInfo()
+        greenType.buoy_diameter = 0.5
+        greenType.name = "green"
+        greenType.hsv_bounds.lower_h = 81
+        greenType.hsv_bounds.lower_s = 49
+        greenType.hsv_bounds.lower_v = 120
+        greenType.hsv_bounds.upper_h = 140
+        greenType.hsv_bounds.upper_s = 255
+        greenType.hsv_bounds.upper_v = 255
+        self.buoy_types.append(greenType)
+
+        whiteType = BuoyTypeInfo()
+        whiteType.buoy_diameter = 0.5
+        whiteType.name = "white"
+        whiteType.hsv_bounds.lower_h = 0
+        whiteType.hsv_bounds.lower_s = 0
+        whiteType.hsv_bounds.lower_v = 245
+        whiteType.hsv_bounds.upper_h = 255
+        whiteType.hsv_bounds.upper_s = 255
+        whiteType.hsv_bounds.upper_v = 255
+        self.buoy_types.append(whiteType)
 
         self.set_parameters()
         self.get_parameters()
@@ -212,7 +247,7 @@ class BuoyDetection(Node):
             10)
         
         self.mask_publisher = self.create_publisher(
-            Image,
+            AnnotatedImage,
             'cv_mask',
             10
         )
@@ -221,29 +256,30 @@ class BuoyDetection(Node):
             'buoy_position',
             10
         )
+        self.initial_cv_parameters_publisher = self.create_publisher(
+            CVParameters,
+            'initial_cv_parameters',
+            10
+        )
+        initial_parameters = CVParameters()
+        initial_parameters.buoy_types.extend(self.buoy_types)
+        initial_parameters.circularity_threshold = self.buoy_circularity_threshold
+        sleep_rate = self.create_rate(1)
+        while self.initial_cv_parameters_publisher.get_subscription_count() < 1:
+            self.get_logger().info("waiting for cv parameters subscriber...")
+            time.sleep(1)
+        self.get_logger().info(f"Publishing initial cv parameters after finding {self.initial_cv_parameters_publisher.get_subscription_count()} subscribers")
+        self.initial_cv_parameters_publisher.publish(initial_parameters)
+
         self.bridge = CvBridge()
     
         self.get_logger().info("Setup done")
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.cv.lower_h', 5)
-        self.declare_parameter('sailbot.cv.lower_s', 49)
-        self.declare_parameter('sailbot.cv.lower_v', 120)
-        self.declare_parameter('sailbot.cv.upper_h', 110)
-        self.declare_parameter('sailbot.cv.upper_s', 255)
-        self.declare_parameter('sailbot.cv.upper_v', 255)
         self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
-        self.declare_parameter('sailbot.cv.buoy_diameter_meters', 0.5)
 
     def get_parameters(self) -> None:
-        self.lower_h = self.get_parameter('sailbot.cv.lower_h').get_parameter_value().integer_value
-        self.lower_s = self.get_parameter('sailbot.cv.lower_s').get_parameter_value().integer_value
-        self.lower_v = self.get_parameter('sailbot.cv.lower_v').get_parameter_value().integer_value
-        self.upper_h = self.get_parameter('sailbot.cv.upper_h').get_parameter_value().integer_value
-        self.upper_s = self.get_parameter('sailbot.cv.upper_s').get_parameter_value().integer_value
-        self.upper_v = self.get_parameter('sailbot.cv.upper_v').get_parameter_value().integer_value
         self.buoy_circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
-        self.buoy_diameter_meters = self.get_parameter('sailbot.cv.buoy_diameter_meters').get_parameter_value().double_value
 
     def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude
@@ -253,14 +289,8 @@ class BuoyDetection(Node):
         self.heading = msg.data
     
     def cv_parameters_callback(self, msg: CVParameters) -> None:
-        self.lower_h = int(msg.lh*255)
-        self.lower_s = int(msg.ls*255)
-        self.lower_v = int(msg.lv*255)
-        self.upper_h = int(msg.uh*255)
-        self.upper_s = int(msg.us*255)
-        self.upper_v = int(msg.uv*255)
+        self.buoy_types = msg.buoy_types
         self.buoy_circularity_threshold = msg.circularity_threshold
-        self.buoy_diameter_meters = msg.buoy_diameter_meters
 
     def publish_tracks(self) -> None:
         #self.get_logger().info(f"Num tracks: {len(self.tracks)}")
@@ -359,8 +389,11 @@ class BuoyDetection(Node):
         
         image = cv2.undistort(current_frame, camera_matrix, distortion_coefficients)
 
-        contours = self.detect_orange_objects(image)
-        detections = [self.calculate_object_center(contour) for contour in contours]
+        detections = []
+        for buoy_type in self.buoy_types:
+            contours = self.detect_colored_objects(image, buoy_type)
+            detections.extend([self.calculate_object_center(contour, buoy_type.buoy_diameter) for contour in contours])
+        
         #self.get_logger().info(f"detections: {detections}")
 
         detections_latlon = []
@@ -422,20 +455,20 @@ class BuoyDetection(Node):
         
         return 255-filled_image
 
-    def detect_orange_objects(self, image):
+    def detect_colored_objects(self, image, type_info: BuoyTypeInfo):
         """
-        Detects orange objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,
-        converts it to HSV color space, applies a color mask to isolate orange regions, and identifies contours that meet
+        Detects colored objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,
+        converts it to HSV color space, applies a color mask to isolate color regions, and identifies contours that meet
         specific area and circularity criteria.
 
         :param image: An image array in BGR format, typically received from an image capturing device or simulation environment.
 
-        :return: A list of contours that represent detected orange objects which meet the area and circularity thresholds.
+        :return: A list of contours that represent detected colored objects which meet the area and circularity thresholds.
                 These objects are presumed to be circular in shape, fitting the typical characteristics of buoys.
 
         Function behavior includes:
         - Converting the image to HSV color space for better color segmentation.
-        - Applying a mask to filter out colors that are not within a specified orange range.
+        - Applying a mask to filter out colors that are not within a specified color range.
         - Refining the mask using morphological operations to reduce noise and improve object isolation.
         - Detecting contours in the masked image and filtering these based on their area to remove too small or large objects.
         - Further analyzing the filtered contours for circularity to confirm if they match the expected shape of buoys.
@@ -449,9 +482,10 @@ class BuoyDetection(Node):
 
         # Define range for orange color and create a mask
         #lower_orange = np.array([3, 205, 74])
-        lower_orange = np.array([self.lower_h, self.lower_s, self.lower_v])
-        upper_orange = np.array([self.upper_h, self.upper_s, self.upper_v])
-        mask = cv2.inRange(hsv, lower_orange, upper_orange)
+        bounds = type_info.hsv_bounds
+        lower_range = np.array([bounds.lower_h, bounds.lower_s, bounds.lower_v])
+        upper_range = np.array([bounds.upper_h, bounds.upper_s, bounds.upper_v])
+        mask = cv2.inRange(hsv, lower_range, upper_range)
         mask = self.fill_holes(mask)
         #mask = cv2.GaussianBlur(mask, (5, 5), 2)
         kernel = np.ones((2, 2), np.uint8)
@@ -486,20 +520,21 @@ class BuoyDetection(Node):
                 cv2.circle(mask_rgb, center, radius, (0, 255, 0), 2)
 
         img_msg = self.bridge.cv2_to_imgmsg(mask_rgb, encoding="rgb8")
-        self.mask_publisher.publish(img_msg)
+        img_ann = AnnotatedImage(image=img_msg, source=type_info.name)
+        self.mask_publisher.publish(img_ann)
         #cv2.imwrite('/home/sailbot/test_image.jpg', mask_rgb)
         return contours_cirles
 
-    def calculate_depth(self, contour):
+    def calculate_depth(self, contour, diameter):
 
         (x, y), radius = cv2.minEnclosingCircle(contour)
         #self.get_logger().info("radius: "+str(radius))
 
         #depth = (KNOWN_DIAMETER*PIXEL_SIZE*current_x_scaling_factor/2 * FOCAL_LENGTH*current_x_scaling_factor) / radius
-        depth = (self.buoy_diameter_meters*FX)/(radius*2/self.current_x_scaling_factor)
+        depth = (diameter*FX)/(radius*2/self.current_x_scaling_factor)
         return depth
 
-    def calculate_object_center(self, contour):
+    def calculate_object_center(self, contour, diameter):
         # Calculate the center of the contour
         M = cv2.moments(contour)
         if M["m00"] != 0:
@@ -508,7 +543,7 @@ class BuoyDetection(Node):
         else:
             cX, cY = 0, 0
         
-        cZ = self.calculate_depth(contour)
+        cZ = self.calculate_depth(contour, diameter)
         return cX, cY, cZ
 
     def pixel_to_world(self, x_pixel, y_pixel, depth, f_x, f_y, c_x, c_y):

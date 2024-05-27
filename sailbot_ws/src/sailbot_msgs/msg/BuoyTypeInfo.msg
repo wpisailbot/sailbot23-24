@@ -1,0 +1,3 @@
+string name
+HSVBounds hsv_bounds
+float32 buoy_diameter

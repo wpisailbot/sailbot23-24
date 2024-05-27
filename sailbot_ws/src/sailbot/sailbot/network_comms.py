@@ -18,7 +18,20 @@ from sensor_msgs.msg import NavSatFix, Image
 from geographic_msgs.msg import GeoPoint
 from nav_msgs.msg import OccupancyGrid
 from ament_index_python.packages import get_package_share_directory
-from sailbot_msgs.msg import Wind, GeoPath, AutonomousMode, TrimState, Waypoint, WaypointPath, GeoPathSegment, BuoyDetectionStamped, CVParameters
+from sailbot_msgs.msg import (
+    Wind,
+    GeoPath,
+    AutonomousMode,
+    TrimState,
+    Waypoint,
+    WaypointPath,
+    GeoPathSegment,
+    BuoyDetectionStamped,
+    CVParameters,
+    HSVBounds,
+    BuoyTypeInfo,
+    AnnotatedImage
+)
 import grpc
 from concurrent import futures
 import json
@@ -132,7 +145,7 @@ class NetworkComms(LifecycleNode):
 
     :ivar current_map: An 'OccupancyGrid' object representing the current map used for navigation.
     :ivar current_boat_state: A protobuf message holding the current state of the boat.
-    :ivar current_video_source: An integer representing the current requested video source
+    :ivar current_video_source: A string representing the current requested video source
 
     **Subscriptions**:
 
@@ -169,8 +182,9 @@ class NetworkComms(LifecycleNode):
     last_camera_frame_shape = None
     last_camera_frame_time = time.time()
     do_video_encode = False
-    current_video_source = 0
+    current_video_source = ""
     current_buoy_positions = {}
+    available_video_sources = set()
 
     def __init__(self):
         super().__init__('network_comms')
@@ -216,24 +230,10 @@ class NetworkComms(LifecycleNode):
         self.map_image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.cv.lower_h', 5)
-        self.declare_parameter('sailbot.cv.lower_s', 49)
-        self.declare_parameter('sailbot.cv.lower_v', 120)
-        self.declare_parameter('sailbot.cv.upper_h', 110)
-        self.declare_parameter('sailbot.cv.upper_s', 255)
-        self.declare_parameter('sailbot.cv.upper_v', 255)
         self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
-        self.declare_parameter('sailbot.cv.buoy_diameter_meters', 0.5)
 
     def get_parameters(self) -> None:
-        self.current_cv_parameters.lower_h = self.get_parameter('sailbot.cv.lower_h').get_parameter_value().integer_value/255
-        self.current_cv_parameters.lower_s = self.get_parameter('sailbot.cv.lower_s').get_parameter_value().integer_value/255
-        self.current_cv_parameters.lower_v = self.get_parameter('sailbot.cv.lower_v').get_parameter_value().integer_value/255
-        self.current_cv_parameters.upper_h = self.get_parameter('sailbot.cv.upper_h').get_parameter_value().integer_value/255
-        self.current_cv_parameters.upper_s = self.get_parameter('sailbot.cv.upper_s').get_parameter_value().integer_value/255
-        self.current_cv_parameters.upper_v  = self.get_parameter('sailbot.cv.upper_v').get_parameter_value().integer_value/255
         self.current_cv_parameters.circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
-        self.current_cv_parameters.buoy_diameter  = self.get_parameter('sailbot.cv.buoy_diameter_meters').get_parameter_value().double_value
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -350,7 +350,7 @@ class NetworkComms(LifecycleNode):
             self.camera_depth_image_callback,
             10)
         self.camera_mask_image_subscriber = self.create_subscription(
-            Image,
+            AnnotatedImage,
             'cv_mask',
             self.camera_mask_image_callback,
             10)
@@ -371,18 +371,22 @@ class NetworkComms(LifecycleNode):
             self.path_segment_debug_callback,
             10
         )
-
         self.target_heading_debug_subscriber = self.create_subscription(
             Float64,
             'target_heading',
             self.target_heading_debug_callback,
             10
         )
-
         self.target_track_debug_subscriber = self.create_subscription(
             Float64,
             'target_track',
             self.target_track_debug_callback,
+            10
+        )
+        self.initial_cv_parameters_subscriber = self.create_subscription(
+            CVParameters,
+            'initial_cv_parameters',
+            self.initial_cv_parameters_callback,
             10
         )
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
@@ -669,24 +673,38 @@ class NetworkComms(LifecycleNode):
             self.last_camera_frame = encode_frame(frame)
             self.last_camera_frame_time = current_time
 
+    def update_video_sources(self):
+        self.current_boat_state.ClearField('available_video_sources')
+        for source in self.available_video_sources:
+            self.current_boat_state.available_video_sources.append(source)
+        
     def camera_color_image_callback(self, msg: Image):
         # if(self.do_video_encode == False):
         #     return
-        if(self.current_video_source != 0):
+        if('COLOR' not in self.available_video_sources):
+            self.available_video_sources.add('COLOR')
+            self.update_video_sources()
+        if(self.current_video_source != 'COLOR'):
             return
         self.set_current_image(msg)
 
-    def camera_mask_image_callback(self, msg: Image):
+    def camera_mask_image_callback(self, msg: AnnotatedImage):
         # if(self.do_video_encode == False):
         #     return
-        if(self.current_video_source != 1):
+        if(msg.source not in self.available_video_sources):
+            self.available_video_sources.add(msg.source)
+            self.update_video_sources()
+        if(self.current_video_source != msg.source):
             return
-        self.set_current_image(msg)
+        self.set_current_image(msg.image)
 
     def camera_depth_image_callback(self, msg: Image):
         # if(self.do_video_encode == False):
         #     return
-        if(self.current_video_source != 2):
+        if('DEPTH' not in self.available_video_sources):
+            self.available_video_sources.add('DEPTH')
+            self.update_video_sources()
+        if(self.current_video_source != 'DEPTH'):
             return
         self.set_current_image(msg)
 
@@ -718,6 +736,19 @@ class NetworkComms(LifecycleNode):
         self.current_boat_state.has_target_track = True
         self.current_boat_state.target_track = msg.data
         #self.get_logger().info("Got target track")
+    
+    def initial_cv_parameters_callback(self, msg: CVParameters):
+        self.current_cv_parameters.ClearField("buoy_types")
+        buoy_type: BuoyTypeInfo
+        for buoy_type in msg.buoy_types:
+            type_bounds: HSVBounds = buoy_type.hsv_bounds
+            this_bounds = boat_state_pb2.HSVBounds(lower_h=type_bounds.lower_h/255, lower_s=type_bounds.lower_s/255, lower_v=type_bounds.lower_v/255, upper_h=type_bounds.upper_h/255, upper_s=type_bounds.upper_s/255, upper_v=type_bounds.upper_v/255)
+            this_type = boat_state_pb2.BuoyTypeInfo(hsv_bounds=this_bounds, buoy_diameter=buoy_type.buoy_diameter, name=buoy_type.name)
+            self.current_cv_parameters.buoy_types.append(this_type)
+        
+        self.current_cv_parameters.circularity_threshold = msg.circularity_threshold
+
+        self.get_logger().info(f"Got initial CV values: {self.current_cv_parameters}")
 
     #new server code
     def create_grpc_server(self): 
@@ -749,12 +780,7 @@ class NetworkComms(LifecycleNode):
     def StreamVideo(self, command: video_pb2.VideoRequest, context):
         #self.do_video_encode = True
         rate = self.create_rate(10)
-        if(command.videoSource == 'COLOR'):
-            self.current_video_source = 0
-        elif(command.videoSource == 'MASK'):
-            self.current_video_source = 1
-        elif(command.videoSource == 'DEPTH'):
-            self.current_video_source = 2
+        self.current_video_source = command.videoSource
 
         try:
             while context.is_active():
@@ -914,24 +940,23 @@ class NetworkComms(LifecycleNode):
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def ExecuteSetCVParametersCommand(self, command: control_pb2.SetCVParametersCommand, context):        
-        self.current_cv_parameters.lower_h = command.parameters.lower_h
-        self.current_cv_parameters.lower_s = command.parameters.lower_s
-        self.current_cv_parameters.lower_v = command.parameters.lower_v
-        self.current_cv_parameters.upper_h = command.parameters.upper_h
-        self.current_cv_parameters.upper_s = command.parameters.upper_s
-        self.current_cv_parameters.upper_v = command.parameters.upper_v
-        self.current_cv_parameters.circularity_threshold = command.parameters.circularity_threshold
-        self.current_cv_parameters.buoy_diameter = command.parameters.buoy_diameter
-
+        self.current_cv_parameters = command.parameters
 
         newParams = CVParameters()
-        newParams.lh = command.parameters.lower_h
-        newParams.ls = command.parameters.lower_s
-        newParams.lv = command.parameters.lower_v
-        newParams.uh = command.parameters.upper_h
-        newParams.us = command.parameters.upper_s
-        newParams.uv = command.parameters.upper_v
-        newParams.buoy_diameter_meters = command.parameters.buoy_diameter
+        for buoy_type in command.parameters.buoy_types:
+            this_type = BuoyTypeInfo()
+            this_type.hsv_bounds.lower_h = buoy_type.hsv_bounds.lower_h*255
+            this_type.hsv_bounds.lower_s = buoy_type.hsv_bounds.lower_s*255
+            this_type.hsv_bounds.lower_v = buoy_type.hsv_bounds.lower_v*255
+            this_type.hsv_bounds.upper_h = buoy_type.hsv_bounds.upper_h*255
+            this_type.hsv_bounds.upper_s = buoy_type.hsv_bounds.upper_s*255
+            this_type.hsv_bounds.upper_v = buoy_type.hsv_bounds.upper_v*255
+
+            this_type.name = buoy_type.name
+            this_type.buoy_diameter = buoy_type.buoy_diameter
+
+            newParams.buoy_types.append(this_type)
+
         newParams.circularity_threshold = command.parameters.circularity_threshold
         self.cv_parameters_publisher.publish(newParams)
         
