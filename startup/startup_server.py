@@ -19,6 +19,23 @@ import psutil
 import signal
 import logging
 from io import StringIO
+import traceback
+
+def get_launch_file_names(package_name):
+    try:
+        package_share_directory = get_package_share_directory(package_name)
+        launch_directory = os.path.join(package_share_directory, 'launch')
+        
+        if not os.path.exists(launch_directory):
+            print(f"No launch directory found for package '{package_name}'.")
+            return []
+        
+        launch_files = [f for f in os.listdir(launch_directory) if f.endswith('.py') or f.endswith('.xml')]
+        return launch_files
+    except Exception as e:
+        trace = traceback.format_exc()
+        print(f'Caught exception: {e}\n{trace}')
+
 
 class ROS2ControlServicer(ros2_control_pb2_grpc.ROS2ControlServicer):
     def __init__(self):
@@ -47,7 +64,8 @@ class ROS2ControlServicer(ros2_control_pb2_grpc.ROS2ControlServicer):
         print("Launching nodes...")
         self.launch_service = LaunchService()
         self.logs.write(f"Starting launch file: {request.launch_file} with arguments: {request.arguments}\n")
-        package_name, launch_file_name = request.launch_file.split()
+        package_name = request.package
+        launch_file_name = request.launch_file
         package_share_directory = get_package_share_directory(package_name)
         launch_file_path = os.path.join(package_share_directory, 'launch', launch_file_name)
 
@@ -108,6 +126,12 @@ class ROS2ControlServicer(ros2_control_pb2_grpc.ROS2ControlServicer):
             # Process new logs line-by-line
             for line in new_logs.splitlines():
                 yield ros2_control_pb2.LogMessage(log=line)
+
+    async def GetLaunchFileNames(self, request, context):
+        response = ros2_control_pb2.FileNameList()
+        names = get_launch_file_names("sailbot")
+        response.names.extend(names)
+        return response
 
 async def serve():
     server = grpc.aio.server(

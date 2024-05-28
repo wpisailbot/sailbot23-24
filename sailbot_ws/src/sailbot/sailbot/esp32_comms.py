@@ -443,7 +443,7 @@ class ESPComms(LifecycleNode):
         self.request_tack_override = True
         if self.request_tack_timer is not None:
             self.request_tack_timer.cancel()
-        self.request_tack_override = self.create_timer(self.request_tack_timer_duration, self.request_tack_timer_callback)
+        self.request_tack_timer = self.create_timer(self.request_tack_timer_duration, self.request_tack_timer_callback)
 
     def ballast_timer_callback(self) -> None:
         """
