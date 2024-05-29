@@ -169,7 +169,7 @@ class BuoyDetection(Node):
     - **listener_callback**: Processes each incoming image, detects buoys, and manages tracks.
     - **fill_holes**: Fills holes within binary images to create solid objects, improving reliability of object detection.
     - **detect_colored_objects**: Detects colored objects in the image by applying a color threshold and shape analysis.
-    - **calculate_depth**: Estimates the depth of detected objects based on their size in the image.
+    - **calculate_depth**: Finds the depth of the object by sampling the depth texture from the ZED camera.
     - **calculate_object_center**: Calculates the center of detected objects in pixel coordinates.
     - **pixel_to_world**: Converts pixel coordinates to world coordinates using intrinsic camera parameters.
 
@@ -565,22 +565,45 @@ class BuoyDetection(Node):
         depth = (diameter*FX)/(radius*2/self.current_x_scaling_factor)
         return depth
     
-    def calculate_depth(self, cX, cY, contour, diameter):
+    def calculate_depth(self, contour, diameter):
+        """
+        Finds the depth of a contour by sampling the depth image from the ZED camera.
+        Validates the object and depth by checking the sampled depth vs. the depth this buoy should be at
+        based on its contour diameter.
+
+        :param cX: X center of the contour in the image
+        :param cY: Y center of the contour in the image
+        :param contour: The contour we are checking
+        :param diameter: The diameter of the contour
+
+
+        :return: Depth of the object if valid, None if not.
+
+        Function behavior includes:
+        - Checking for availability of the depth texture
+        - Sampling the depth texture
+        - Checking for invalid values in the depth texture
+        - Calculating the minimum enclosing circle and expected depth of the contour
+        - Checking if the sampled depth and estimated depth agree with each other
+
+        """
         # Ensure the depth image is available
         if self.depth_image is None:
             self.get_logger().warn("Depth texture is None.")
             return None# self.estimate_depth(contour, diameter)
 
+        # Calculate the radius of the contour
+        (y, x), radius = cv2.minEnclosingCircle(contour)
+        x = int(x)
+        y = int(y)
+
         # Sample the depth value from the depth image at the contour center
-        depth = self.depth_image[cY, cX]
+        depth = self.depth_image[x, y]
 
         # Handle invalid depth values
         if np.isnan(depth) or depth <= 0 or not np.isfinite(depth):
             self.get_logger().warn("Encountered NaN, infinite, or negative value in depth texture.")
             return None#self.estimate_depth(contour, diameter)
-
-        # Calculate the radius of the contour
-        (x, y), radius = cv2.minEnclosingCircle(contour)
 
         # Calculate the expected depth based on the known diameter and contour radius
         expected_depth = (diameter * FX) / (2 * radius / self.current_x_scaling_factor)
@@ -602,7 +625,7 @@ class BuoyDetection(Node):
         else:
             cX, cY = 0, 0
         
-        cZ = self.calculate_depth(cX, cY, contour, diameter)
+        cZ = self.calculate_depth(contour, diameter)
         
         if(cZ is None):
             return None
