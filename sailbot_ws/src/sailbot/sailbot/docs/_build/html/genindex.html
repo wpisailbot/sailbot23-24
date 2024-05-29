@@ -53,6 +53,7 @@
  | <a href="#U"><strong>U</strong></a>
  | <a href="#V"><strong>V</strong></a>
  | <a href="#W"><strong>W</strong></a>
+ | <a href="#Z"><strong>Z</strong></a>
  
 </div>
 <h2 id="A">A</h2>
@@ -78,8 +79,6 @@
         <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.airmar_heading_callback">(buoy_detection.BuoyDetection method)</a>
 </li>
         <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.airmar_heading_callback">(heading_controller_vf.HeadingController method)</a>
-</li>
-        <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.airmar_heading_callback">(path_follower_vf.PathFollower method)</a>
 </li>
       </ul></li>
       <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.airmar_position_callback">airmar_position_callback() (buoy_detection.BuoyDetection method)</a>
@@ -135,6 +134,8 @@
         <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.autonomous_mode_callback">(heading_controller_vf.HeadingController method)</a>
 </li>
       </ul></li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.available_video_sources">available_video_sources (network_comms.NetworkComms attribute)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -156,10 +157,10 @@
 </li>
       <li><a href="ballast_control.html#ballast_control.BallastControl">BallastControl (class in ballast_control)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="ballast_control.html#ballast_control.bound">bound() (in module ballast_control)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     buoy_detection
 
@@ -174,6 +175,8 @@
 </li>
       </ul></li>
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.buoy_rounding_distance_meters">buoy_rounding_distance_meters (path_follower_vf.PathFollower attribute)</a>
+</li>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.buoy_types">buoy_types (buoy_detection.BuoyDetection attribute)</a>
 </li>
       <li><a href="buoy_detection.html#buoy_detection.BuoyDetection">BuoyDetection (class in buoy_detection)</a>
 </li>
@@ -195,8 +198,12 @@
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.camera_color_image_callback">camera_color_image_callback() (network_comms.NetworkComms method)</a>
 </li>
-      <li><a href="network_comms.html#network_comms.NetworkComms.camera_depth_image_callback">camera_depth_image_callback() (network_comms.NetworkComms method)</a>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.camera_depth_image_callback">camera_depth_image_callback() (buoy_detection.BuoyDetection method)</a>
+
+      <ul>
+        <li><a href="network_comms.html#network_comms.NetworkComms.camera_depth_image_callback">(network_comms.NetworkComms method)</a>
 </li>
+      </ul></li>
       <li><a href="network_comms.html#network_comms.NetworkComms.camera_mask_image_callback">camera_mask_image_callback() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="state_manager.html#state_manager.StateManager.change_node_state">change_node_state() (state_manager.StateManager method)</a>
@@ -208,6 +215,8 @@
       <li><a href="state_manager.html#state_manager.StateManager.client_state_getters">client_state_getters (state_manager.StateManager attribute)</a>
 </li>
       <li><a href="state_manager.html#state_manager.StateManager.client_state_setters">client_state_setters (state_manager.StateManager attribute)</a>
+</li>
+      <li><a href="heading_controller_vf.html#heading_controller_vf.closest_edge_heading">closest_edge_heading() (in module heading_controller_vf)</a>
 </li>
       <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.compute_rudder_angle">compute_rudder_angle() (heading_controller_vf.HeadingController method)</a>
 </li>
@@ -227,8 +236,14 @@
 </li>
       <li><a href="esp32_comms.html#esp32_comms.ESPComms.could_be_tacking">could_be_tacking (esp32_comms.ESPComms attribute)</a>
 </li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.create_and_bind_error_callback">create_and_bind_error_callback() (network_comms.NetworkComms method)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="network_comms.html#network_comms.NetworkComms.create_and_bind_lifecycle_callback">create_and_bind_lifecycle_callback() (network_comms.NetworkComms method)</a>
+</li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.create_error_callback">create_error_callback() (network_comms.NetworkComms method)</a>
+</li>
       <li><a href="network_comms.html#network_comms.NetworkComms.create_grpc_server">create_grpc_server() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="buoy_detection.html#buoy_detection.create_kalman_filter">create_kalman_filter() (in module buoy_detection)</a>
@@ -247,6 +262,8 @@
         <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.current_buoy_positions">(path_follower_vf.PathFollower attribute)</a>
 </li>
       </ul></li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.current_cv_parameters">current_cv_parameters (network_comms.NetworkComms attribute)</a>
+</li>
       <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.current_grid_cell">current_grid_cell (heading_controller_vf.HeadingController attribute)</a>
 
       <ul>
@@ -279,16 +296,22 @@
 </li>
       <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.current_y_scaling_factor">current_y_scaling_factor (buoy_detection.BuoyDetection attribute)</a>
 </li>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.cv_parameters_callback">cv_parameters_callback() (buoy_detection.BuoyDetection method)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.detect_orange_objects">detect_orange_objects() (buoy_detection.BuoyDetection method)</a>
+      <li><a href="network_comms.html#network_comms.NetworkComms.decode_image">decode_image() (network_comms.NetworkComms method)</a>
+</li>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.depth_image">depth_image (buoy_detection.BuoyDetection attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.detect_colored_objects">detect_colored_objects() (buoy_detection.BuoyDetection method)</a>
+</li>
       <li><a href="path_follower_vf.html#path_follower_vf.distance">distance() (in module path_follower_vf)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.do_video_encode">do_video_encode (network_comms.NetworkComms attribute)</a>
@@ -302,7 +325,11 @@
       <li><a href="state_manager.html#state_manager.StateManager.early_node_names">early_node_names (state_manager.StateManager attribute)</a>
 </li>
       <li><a href="network_comms.html#network_comms.encode_frame">encode_frame() (in module network_comms)</a>
+
+      <ul>
+        <li><a href="network_comms.html#network_comms.NetworkComms.encode_frame">(network_comms.NetworkComms method)</a>
 </li>
+      </ul></li>
       <li><a href="buoy_detection.html#buoy_detection.enu_to_geodetic">enu_to_geodetic() (in module buoy_detection)</a>
 </li>
       <li><a href="ballast_control.html#ballast_control.BallastControl.ERROR_MIN_MAGNITUDE">ERROR_MIN_MAGNITUDE (ballast_control.BallastControl attribute)</a>
@@ -316,21 +343,29 @@
       </ul></li>
       <li><a href="esp32_comms.html#esp32_comms.ESPComms">ESPComms (class in esp32_comms)</a>
 </li>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.estimate_depth">estimate_depth() (buoy_detection.BuoyDetection method)</a>
+</li>
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.exact_points">exact_points (path_follower_vf.PathFollower attribute)</a>
+</li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteAddWaypointCommand">ExecuteAddWaypointCommand() (network_comms.NetworkComms method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteAddWaypointCommand">ExecuteAddWaypointCommand() (network_comms.NetworkComms method)</a>
-</li>
       <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteAutonomousModeCommand">ExecuteAutonomousModeCommand() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteBallastCommand">ExecuteBallastCommand() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteMarkBuoyCommand">ExecuteMarkBuoyCommand() (network_comms.NetworkComms method)</a>
 </li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteRequestTackCommand">ExecuteRequestTackCommand() (network_comms.NetworkComms method)</a>
+</li>
       <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteRudderCommand">ExecuteRudderCommand() (network_comms.NetworkComms method)</a>
 </li>
-      <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteSetRudderKPCommand">ExecuteSetRudderKPCommand() (network_comms.NetworkComms method)</a>
+      <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteSetCVParametersCommand">ExecuteSetCVParametersCommand() (network_comms.NetworkComms method)</a>
+</li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteSetRudderAdjustmentScaleCommand">ExecuteSetRudderAdjustmentScaleCommand() (network_comms.NetworkComms method)</a>
+</li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteSetRudderOvershootBiasCommand">ExecuteSetRudderOvershootBiasCommand() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.ExecuteSetVFForwardMagnitudeCommand">ExecuteSetVFForwardMagnitudeCommand() (network_comms.NetworkComms method)</a>
 </li>
@@ -383,6 +418,8 @@
 </li>
         <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.get_parameters">(heading_controller_vf.HeadingController method)</a>
 </li>
+        <li><a href="network_comms.html#network_comms.NetworkComms.get_parameters">(network_comms.NetworkComms method)</a>
+</li>
         <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.get_parameters">(path_follower_vf.PathFollower method)</a>
 </li>
         <li><a href="wind_smoother.html#wind_smoother.WindSmoother.get_parameters">(wind_smoother.WindSmoother method)</a>
@@ -401,6 +438,8 @@
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.get_square_corners">get_square_corners() (path_follower_vf.PathFollower method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.get_state">get_state() (in module network_comms)</a>
+</li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.GetCVParameters">GetCVParameters() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.GetMap">GetMap() (network_comms.NetworkComms method)</a>
 </li>
@@ -425,7 +464,11 @@
 </li>
       </ul></li>
       <li><a href="network_comms.html#network_comms.NetworkComms.heading_callback">heading_callback() (network_comms.NetworkComms method)</a>
+
+      <ul>
+        <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.heading_callback">(path_follower_vf.PathFollower method)</a>
 </li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li>
@@ -435,8 +478,6 @@
         <li><a href="heading_controller_vf.html#module-heading_controller_vf">module</a>
 </li>
       </ul></li>
-      <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.heading_kp">heading_kp (heading_controller_vf.HeadingController attribute)</a>
-</li>
       <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController">HeadingController (class in heading_controller_vf)</a>
 </li>
   </ul></td>
@@ -449,11 +490,15 @@
 </li>
       <li><a href="ballast_control.html#ballast_control.BallastControl.in_ramp_up">in_ramp_up (ballast_control.BallastControl attribute)</a>
 </li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.initial_cv_parameters_callback">initial_cv_parameters_callback() (network_comms.NetworkComms method)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.insert_intermediate_points">insert_intermediate_points() (path_follower_vf.PathFollower method)</a>
 </li>
       <li><a href="path_follower_vf.html#path_follower_vf.interpolate_point">interpolate_point() (in module path_follower_vf)</a>
+</li>
+      <li><a href="heading_controller_vf.html#heading_controller_vf.is_in_nogo">is_in_nogo() (in module heading_controller_vf)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -487,12 +532,14 @@
 </li>
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.last_recalculation_time">last_recalculation_time (path_follower_vf.PathFollower attribute)</a>
 </li>
-      <li><a href="wind_smoother.html#wind_smoother.WindSmoother.last_true_winds">last_true_winds (wind_smoother.WindSmoother attribute)</a>
+      <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.last_rudder_time">last_rudder_time (heading_controller_vf.HeadingController attribute)</a>
 </li>
-      <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.last_waypoint_was_rounding_type">last_waypoint_was_rounding_type (path_follower_vf.PathFollower attribute)</a>
+      <li><a href="wind_smoother.html#wind_smoother.WindSmoother.last_true_winds">last_true_winds (wind_smoother.WindSmoother attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.last_waypoint_was_rounding_type">last_waypoint_was_rounding_type (path_follower_vf.PathFollower attribute)</a>
+</li>
       <li><a href="esp32_comms.html#esp32_comms.ESPComms.last_winds">last_winds (esp32_comms.ESPComms attribute)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.lat_long_callback">lat_long_callback() (network_comms.NetworkComms method)</a>
@@ -507,8 +554,6 @@
 </li>
       <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.leeway_angle">leeway_angle (heading_controller_vf.HeadingController attribute)</a>
 </li>
-      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.listener_callback">listener_callback() (buoy_detection.BuoyDetection method)</a>
-</li>
       <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.longitude">longitude (buoy_detection.BuoyDetection attribute)</a>
 
       <ul>
@@ -521,6 +566,8 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.magnetic_field_callback">magnetic_field_callback() (heading_controller_vf.HeadingController method)</a>
+</li>
       <li><a href="airmar_reader.html#airmar_reader.main">main() (in module airmar_reader)</a>
 
       <ul>
@@ -553,10 +600,10 @@
         <li><a href="wind_smoother.html#wind_smoother.WindSmoother.median">(wind_smoother.WindSmoother method)</a>
 </li>
       </ul></li>
-      <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.min_path_recalculation_interval_seconds">min_path_recalculation_interval_seconds (path_follower_vf.PathFollower attribute)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.min_path_recalculation_interval_seconds">min_path_recalculation_interval_seconds (path_follower_vf.PathFollower attribute)</a>
+</li>
       <li>
     module
 
@@ -740,18 +787,30 @@
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.pitch_callback">pitch_callback() (network_comms.NetworkComms method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.pixel_to_world">pixel_to_world() (buoy_detection.BuoyDetection method)</a>
 </li>
       <li><a href="buoy_detection.html#buoy_detection.Track.predict">predict() (buoy_detection.Track method)</a>
 </li>
       <li><a href="ballast_control.html#ballast_control.BallastControl.previous_error">previous_error (ballast_control.BallastControl attribute)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.previous_look_ahead_index">previous_look_ahead_index (path_follower_vf.PathFollower attribute)</a>
 </li>
       <li><a href="ballast_control.html#ballast_control.BallastControl.previous_time">previous_time (ballast_control.BallastControl attribute)</a>
 </li>
+      <li><a href="airmar_reader.html#airmar_reader.AirmarReader.publish_error">publish_error() (airmar_reader.AirmarReader method)</a>
+
+      <ul>
+        <li><a href="ballast_control.html#ballast_control.BallastControl.publish_error">(ballast_control.BallastControl method)</a>
+</li>
+        <li><a href="esp32_comms.html#esp32_comms.ESPComms.publish_error">(esp32_comms.ESPComms method)</a>
+</li>
+        <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.publish_error">(heading_controller_vf.HeadingController method)</a>
+</li>
+        <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.publish_error">(path_follower_vf.PathFollower method)</a>
+</li>
+      </ul></li>
       <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.publish_tracks">publish_tracks() (buoy_detection.BuoyDetection method)</a>
 </li>
       <li><a href="airmar_reader.html#airmar_reader.AirmarReader.publishIfValid">publishIfValid() (airmar_reader.AirmarReader method)</a>
@@ -774,8 +833,24 @@
 </li>
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.remove_last_points_if_necessary">remove_last_points_if_necessary() (path_follower_vf.PathFollower method)</a>
 </li>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.remove_stale_tracks">remove_stale_tracks() (buoy_detection.BuoyDetection method)</a>
+</li>
+      <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.request_replan_callback">request_replan_callback() (path_follower_vf.PathFollower method)</a>
+</li>
+      <li><a href="esp32_comms.html#esp32_comms.ESPComms.request_tack_callback">request_tack_callback() (esp32_comms.ESPComms method)</a>
+</li>
+      <li><a href="esp32_comms.html#esp32_comms.ESPComms.request_tack_override">request_tack_override (esp32_comms.ESPComms attribute)</a>
+</li>
+      <li><a href="esp32_comms.html#esp32_comms.ESPComms.request_tack_timer">request_tack_timer (esp32_comms.ESPComms attribute)</a>
+</li>
+      <li><a href="esp32_comms.html#esp32_comms.ESPComms.request_tack_timer_callback">request_tack_timer_callback() (esp32_comms.ESPComms method)</a>
+</li>
+      <li><a href="esp32_comms.html#esp32_comms.ESPComms.request_tack_timer_duration">request_tack_timer_duration (esp32_comms.ESPComms attribute)</a>
+</li>
       <li><a href="state_manager.html#state_manager.StateManager.restart_lifecycle_node_callback">restart_lifecycle_node_callback() (state_manager.StateManager method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="state_manager.html#state_manager.StateManager.restart_node">restart_node() (state_manager.StateManager method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.RestartNode">RestartNode() (network_comms.NetworkComms method)</a>
@@ -786,13 +861,15 @@
         <li><a href="network_comms.html#network_comms.NetworkComms.roll_callback">(network_comms.NetworkComms method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="ballast_control.html#ballast_control.BallastControl.roll_correction_callback">roll_correction_callback() (ballast_control.BallastControl method)</a>
 </li>
       <li><a href="ballast_control.html#ballast_control.BallastControl.roll_errors">roll_errors (ballast_control.BallastControl attribute)</a>
 </li>
       <li><a href="ballast_control.html#ballast_control.BallastControl.roll_kp">roll_kp (ballast_control.BallastControl attribute)</a>
+</li>
+      <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.rudder_adjustment_scale">rudder_adjustment_scale (heading_controller_vf.HeadingController attribute)</a>
+</li>
+      <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.rudder_adjustment_scale_callback">rudder_adjustment_scale_callback() (heading_controller_vf.HeadingController method)</a>
 </li>
       <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.rudder_angle">rudder_angle (heading_controller_vf.HeadingController attribute)</a>
 </li>
@@ -804,7 +881,7 @@
       </ul></li>
       <li><a href="esp32_comms.html#esp32_comms.ESPComms.rudder_angle_limit_deg">rudder_angle_limit_deg (esp32_comms.ESPComms attribute)</a>
 </li>
-      <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.rudder_kp_callback">rudder_kp_callback() (heading_controller_vf.HeadingController method)</a>
+      <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.rudder_overshoot_bias_callback">rudder_overshoot_bias_callback() (heading_controller_vf.HeadingController method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -825,15 +902,19 @@
 </li>
         <li><a href="heading_controller_vf.html#heading_controller_vf.HeadingController.set_parameters">(heading_controller_vf.HeadingController method)</a>
 </li>
+        <li><a href="network_comms.html#network_comms.NetworkComms.set_parameters">(network_comms.NetworkComms method)</a>
+</li>
         <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.set_parameters">(path_follower_vf.PathFollower method)</a>
 </li>
         <li><a href="wind_smoother.html#wind_smoother.WindSmoother.set_parameters">(wind_smoother.WindSmoother method)</a>
 </li>
       </ul></li>
-      <li><a href="network_comms.html#network_comms.NetworkComms.setup_node_subscription">setup_node_subscription() (network_comms.NetworkComms method)</a>
+      <li><a href="network_comms.html#network_comms.NetworkComms.setup_node_subscriptions">setup_node_subscriptions() (network_comms.NetworkComms method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="network_comms.html#network_comms.NetworkComms.shutdown_handler">shutdown_handler() (network_comms.NetworkComms method)</a>
+</li>
       <li><a href="path_follower_vf.html#path_follower_vf.PathFollower.single_waypoint_callback">single_waypoint_callback() (path_follower_vf.PathFollower method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.speed_kmh_callback">speed_kmh_callback() (network_comms.NetworkComms method)</a>
@@ -889,6 +970,8 @@
 </li>
       <li><a href="state_manager.html#state_manager.StateManager.transitionNodes">transitionNodes() (state_manager.StateManager method)</a>
 </li>
+      <li><a href="path_follower_vf.html#path_follower_vf.trigger_error_transition">trigger_error_transition() (in module path_follower_vf)</a>
+</li>
       <li><a href="network_comms.html#network_comms.NetworkComms.trim_state_callback">trim_state_callback() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="network_comms.html#network_comms.NetworkComms.trim_tab_comms_heartbeat">trim_tab_comms_heartbeat() (network_comms.NetworkComms method)</a>
@@ -920,6 +1003,8 @@
       <li><a href="network_comms.html#network_comms.NetworkComms.update_node_status_timer_callback">update_node_status_timer_callback() (network_comms.NetworkComms method)</a>
 </li>
       <li><a href="wind_smoother.html#wind_smoother.WindSmoother.update_true_winds">update_true_winds() (wind_smoother.WindSmoother method)</a>
+</li>
+      <li><a href="network_comms.html#network_comms.NetworkComms.update_video_sources">update_video_sources() (network_comms.NetworkComms method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -959,6 +1044,14 @@
 </li>
       </ul></li>
       <li><a href="wind_smoother.html#wind_smoother.WindSmoother">WindSmoother (class in wind_smoother)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="Z">Z</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="buoy_detection.html#buoy_detection.BuoyDetection.zed_image_callback">zed_image_callback() (buoy_detection.BuoyDetection method)</a>
 </li>
   </ul></td>
 </tr></table>

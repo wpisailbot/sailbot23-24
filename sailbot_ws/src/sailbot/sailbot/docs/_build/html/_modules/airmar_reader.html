@@ -109,6 +109,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">roll_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">pitch_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
 
     <span class="c1">#lifecycle node callbacks</span>
 <div class="viewcode-block" id="AirmarReader.on_configure"><a class="viewcode-back" href="../airmar_reader.html#airmar_reader.AirmarReader.on_configure">[docs]</a>    <span class="k">def</span> <span class="nf">on_configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">LifecycleState</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionCallbackReturn</span><span class="p">:</span>
@@ -137,6 +138,9 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">apparent_wind_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Wind</span><span class="p">,</span> <span class="s1">&#39;airmar_data/apparent_wind&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">roll_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Float64</span><span class="p">,</span> <span class="s1">&#39;airmar_data/roll&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">pitch_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Float64</span><span class="p">,</span> <span class="s1">&#39;airmar_data/pitch&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">String</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s1">/error&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">timer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_timer</span><span class="p">(</span><span class="mf">0.01</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">timer_callback</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">TransitionCallbackReturn</span><span class="o">.</span><span class="n">SUCCESS</span></div>
@@ -369,7 +373,12 @@
                 <span class="c1">#raise ValueError(&quot;Unknown NEMA code: &quot; + type_code)</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
-            <span class="k">return</span><span class="p">({})</span></div></div>
+            <span class="k">return</span><span class="p">({})</span></div>
+    
+<div class="viewcode-block" id="AirmarReader.publish_error"><a class="viewcode-back" href="../airmar_reader.html#airmar_reader.AirmarReader.publish_error">[docs]</a>    <span class="k">def</span> <span class="nf">publish_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">string</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">error_msg</span> <span class="o">=</span> <span class="n">String</span><span class="p">()</span>
+        <span class="n">error_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">string</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span></div></div>
 
 
 <div class="viewcode-block" id="main"><a class="viewcode-back" href="../airmar_reader.html#airmar_reader.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -393,7 +402,9 @@
         <span class="k">pass</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">trace</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
-        <span class="n">airmar_reader</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">error_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="n">airmar_reader</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="n">error_string</span><span class="p">)</span>
+        <span class="n">airmar_reader</span><span class="o">.</span><span class="n">publish_error</span><span class="p">(</span><span class="n">error_string</span><span class="p">)</span>
     <span class="k">finally</span><span class="p">:</span>
         <span class="c1"># Shutdown and cleanup the node</span>
         <span class="n">airmar_reader</span><span class="o">.</span><span class="n">ser</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>

@@ -65,7 +65,7 @@ adjusting the ballast’s position to counteract roll induced by wind or other e
 <li><p><strong>current_ballast_position</strong> – (int) Last known ADC value of the ballast position.</p></li>
 <li><p><strong>move</strong> – (bool) Flag to determine if the ballast needs to be moved.</p></li>
 <li><p><strong>current_wind_dir</strong> – (float) Current wind direction in degrees.</p></li>
-<li><p><strong>autonomous_mode</strong> – (int) Current autonomous mode of the vessel.</p></li>
+<li><p><strong>autonomous_mode</strong> – (int) Current autonomous mode of the boat.</p></li>
 </ul>
 </dd>
 </dl>
@@ -100,22 +100,22 @@ preventing sudden movements that could damage the ballast belt or drive shaft.</
 </ul>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_FULL_PORT">
-<span class="sig-name descname"><span class="pre">ADC_FULL_PORT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2300</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_FULL_PORT" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ADC_FULL_PORT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2847</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_FULL_PORT" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_FULL_STARBOARD">
-<span class="sig-name descname"><span class="pre">ADC_FULL_STARBOARD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">700</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_FULL_STARBOARD" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ADC_FULL_STARBOARD</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1247</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_FULL_STARBOARD" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_MAX">
-<span class="sig-name descname"><span class="pre">ADC_MAX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2300</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_MAX" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ADC_MAX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2847</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_MAX" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.ADC_MIN">
-<span class="sig-name descname"><span class="pre">ADC_MIN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">700</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_MIN" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ADC_MIN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1247</span></em><a class="headerlink" href="#ballast_control.BallastControl.ADC_MIN" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -259,7 +259,7 @@ The loop also incorporates a ramp-up mechanism to smoothly reach the desired pos
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.current_ballast_position">
-<span class="sig-name descname"><span class="pre">current_ballast_position</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1500.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.current_ballast_position" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">current_ballast_position</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2047.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.current_ballast_position" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -269,7 +269,7 @@ The loop also incorporates a ramp-up mechanism to smoothly reach the desired pos
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.current_target">
-<span class="sig-name descname"><span class="pre">current_target</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1500.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.current_target" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">current_target</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2047.0</span></em><a class="headerlink" href="#ballast_control.BallastControl.current_target" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -376,7 +376,12 @@ super().on_shutdown() in derived classes.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="ballast_control.BallastControl.previous_time">
-<span class="sig-name descname"><span class="pre">previous_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715623677.1293256</span></em><a class="headerlink" href="#ballast_control.BallastControl.previous_time" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">previous_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1716956578.8228672</span></em><a class="headerlink" href="#ballast_control.BallastControl.previous_time" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ballast_control.BallastControl.publish_error">
+<span class="sig-name descname"><span class="pre">publish_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ballast_control.html#BallastControl.publish_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ballast_control.BallastControl.publish_error" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">

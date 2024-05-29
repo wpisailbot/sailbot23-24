@@ -31,7 +31,7 @@
   <h1>Source code for path_follower_vf</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="kn">import</span> <span class="nn">rclpy</span>
-<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">String</span><span class="p">,</span> <span class="n">Float64</span><span class="p">,</span> <span class="n">Int16</span><span class="p">,</span> <span class="n">Header</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">String</span><span class="p">,</span> <span class="n">Float64</span><span class="p">,</span> <span class="n">Int16</span><span class="p">,</span> <span class="n">Header</span><span class="p">,</span> <span class="n">Empty</span>
 <span class="kn">from</span> <span class="nn">sensor_msgs.msg</span> <span class="kn">import</span> <span class="n">NavSatFix</span>
 <span class="kn">from</span> <span class="nn">nav_msgs.msg</span> <span class="kn">import</span> <span class="n">OccupancyGrid</span>
 <span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Point</span><span class="p">,</span> <span class="n">Pose</span><span class="p">,</span> <span class="n">PoseStamped</span><span class="p">,</span> <span class="n">Quaternion</span>
@@ -43,6 +43,8 @@
 <span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">Publisher</span>
 <span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">State</span>
 <span class="kn">from</span> <span class="nn">rclpy.lifecycle</span> <span class="kn">import</span> <span class="n">TransitionCallbackReturn</span>
+<span class="kn">from</span> <span class="nn">lifecycle_msgs.srv</span> <span class="kn">import</span> <span class="n">ChangeState</span>
+<span class="kn">from</span> <span class="nn">lifecycle_msgs.msg</span> <span class="kn">import</span> <span class="n">Transition</span>
 <span class="kn">from</span> <span class="nn">rclpy.timer</span> <span class="kn">import</span> <span class="n">Timer</span>
 <span class="kn">from</span> <span class="nn">rclpy.subscription</span> <span class="kn">import</span> <span class="n">Subscription</span>
 <span class="kn">from</span> <span class="nn">rclpy.node</span> <span class="kn">import</span> <span class="n">ParameterType</span>
@@ -137,6 +139,11 @@
 <span class="sd">    - &#39;airmar_heading_subscription&#39;: Subscribes to heading updates from the boat&#39;s sensors.</span>
 <span class="sd">    - &#39;airmar_position_subscription&#39;: Subscribes to position updates, updating boat&#39;s geographic location.</span>
 <span class="sd">    - &#39;airmar_speed_knots_subscription&#39;: Subscribes to speed updates in knots.</span>
+<span class="sd">    - &#39;waypoints_subscription&#39;: Subscribes to lists of waypoints. Currently only used for clearing all waypoints.</span>
+<span class="sd">    - &#39;single_waypoint_subscription&#39;: Subscribes to single waypoints. Used to add waypoints.</span>
+<span class="sd">    - &#39;true_wind_subscription&#39;: Subscribes to smoothed true wind data.</span>
+<span class="sd">    - &#39;buoy_position_subscription&#39;: Subscribes to buoy positions, used for snapping waypoints.</span>
+<span class="sd">    - &#39;request_recalculation_subscription&#39;: Allows other nodes to request path recalculation.</span>
 
 <span class="sd">    **Publishers**:</span>
 
@@ -210,6 +217,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">target_position_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">current_path_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_publisher</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Publisher</span><span class="p">]</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">airmar_position_subscription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Subscription</span><span class="p">]</span>
@@ -301,10 +310,12 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">current_path_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">GeoPath</span><span class="p">,</span> <span class="s1">&#39;current_path&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">Point</span><span class="p">,</span> <span class="s1">&#39;current_grid_cell&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
 
+            <span class="bp">self</span><span class="o">.</span><span class="n">error_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_lifecycle_publisher</span><span class="p">(</span><span class="n">String</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s1">/error&#39;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
             <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
                 <span class="n">Float64</span><span class="p">,</span>
-                <span class="s1">&#39;/airmar_data/heading&#39;</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_callback</span><span class="p">,</span>
+                <span class="s1">&#39;heading&#39;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">heading_callback</span><span class="p">,</span>
                 <span class="mi">10</span><span class="p">,</span>
                 <span class="n">callback_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">subscription_callback_group</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">airmar_position_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
@@ -319,30 +330,38 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">airmar_speed_knots_callback</span><span class="p">,</span>
                 <span class="mi">10</span><span class="p">,</span>
                 <span class="n">callback_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">subscription_callback_group</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">waypoints_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">waypoints_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
                 <span class="n">WaypointPath</span><span class="p">,</span> 
                 <span class="s1">&#39;waypoints&#39;</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">waypoints_callback</span><span class="p">,</span>
                 <span class="mi">10</span><span class="p">,</span> 
                 <span class="n">callback_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">subscription_callback_group</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">single_waypoint_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">single_waypoint_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
                 <span class="n">Waypoint</span><span class="p">,</span> 
                 <span class="s1">&#39;single_waypoint&#39;</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">single_waypoint_callback</span><span class="p">,</span>
                 <span class="mi">10</span><span class="p">,</span> 
                 <span class="n">callback_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">subscription_callback_group</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
                 <span class="n">Wind</span><span class="p">,</span>
                 <span class="s1">&#39;true_wind_smoothed&#39;</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">true_wind_callback</span><span class="p">,</span>
                 <span class="mi">10</span><span class="p">,</span>
                 <span class="n">callback_group</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">subscription_callback_group</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">buoy_position_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">buoy_position_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
                 <span class="n">BuoyDetectionStamped</span><span class="p">,</span>
                 <span class="s1">&#39;buoy_position&#39;</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">buoy_position_callback</span><span class="p">,</span>
                 <span class="mi">10</span><span class="p">,</span>
                 <span class="n">callback_group</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subscription_callback_group</span><span class="p">)</span>
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">request_replan_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+                <span class="n">Empty</span><span class="p">,</span>
+                <span class="s1">&#39;request_replan&#39;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">request_replan_callback</span><span class="p">,</span>
+                <span class="mi">10</span><span class="p">,</span>
+                <span class="n">callback_group</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subscription_callback_group</span><span class="p">)</span>
+            
             <span class="c1">#self.timer = self.create_timer(0.1, self.control_loop_callback)</span>
             <span class="c1">#super().on_configure(state)</span>
         
@@ -384,7 +403,7 @@
     
     <span class="c1">#end callbacks</span>
 
-<div class="viewcode-block" id="PathFollower.airmar_heading_callback"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.airmar_heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="PathFollower.heading_callback"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1">#self.get_logger().info(&quot;Got heading&quot;)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
     
@@ -393,7 +412,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">longitude</span>
         <span class="n">new_grid_cell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">latlong_to_grid_proj</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_width</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_height</span><span class="p">)</span>
         <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Got new position&quot;</span><span class="p">)</span>
+        <span class="c1">#self.get_logger().info(&quot;Got new position&quot;)</span>
 
         <span class="k">if</span> <span class="n">new_grid_cell</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_cell</span> <span class="ow">and</span> <span class="p">(</span><span class="n">current_time</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">last_recalculation_time</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_path_recalculation_interval_seconds</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Recalculating path&quot;</span><span class="p">)</span>
@@ -428,8 +447,8 @@
         <span class="n">req</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="n">end_point</span>
         <span class="n">req</span><span class="o">.</span><span class="n">pathfinding_strategy</span> <span class="o">=</span> <span class="n">GetPath</span><span class="o">.</span><span class="n">Request</span><span class="o">.</span><span class="n">PATHFINDING_STRATEGY_ASTAR</span>
         
-        <span class="c1">#Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along +y axis.</span>
-        <span class="n">wind_angle_adjusted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wind_angle_deg</span><span class="o">-</span><span class="mi">90</span>
+        <span class="c1">#Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.</span>
+        <span class="n">wind_angle_adjusted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wind_angle_deg</span><span class="o">+</span><span class="mi">90</span>
 
 
         <span class="n">req</span><span class="o">.</span><span class="n">wind_angle_deg</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">wind_angle_adjusted</span><span class="p">)</span>
@@ -573,8 +592,6 @@
 <span class="sd">        &#39;image_width&#39;, and &#39;image_height&#39; are available within the class instance and are appropriately set before calling this function.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         
-        <span class="bp">self</span><span class="o">.</span><span class="n">grid_points</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">exact_points</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">closestDistance</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span>
         <span class="n">closestBuoyKey</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_buoy_positions</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
@@ -585,11 +602,16 @@
                 <span class="n">closestBuoyKey</span> <span class="o">=</span> <span class="n">key</span>
         
         <span class="k">if</span> <span class="p">(</span><span class="n">waypoint_msg</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">Waypoint</span><span class="o">.</span><span class="n">WAYPOINT_TYPE_INTERSECT</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;before: Num grid points: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">grid_points</span><span class="p">)</span><span class="si">}</span><span class="s2">, num exact points: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">exact_points</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
             <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Intersect&quot;</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">grid_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">latlong_to_grid_proj</span><span class="p">(</span><span class="n">waypoint_msg</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="n">waypoint_msg</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_width</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_height</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">remove_last_points_if_necessary</span><span class="p">(</span><span class="n">next_point</span><span class="o">=</span><span class="p">(</span><span class="n">waypoint_msg</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="n">waypoint_msg</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span><span class="p">))</span>
+
             <span class="bp">self</span><span class="o">.</span><span class="n">last_waypoint_was_rounding_type</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">exact_points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">waypoint_msg</span><span class="o">.</span><span class="n">point</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;after: num grid points: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">grid_points</span><span class="p">)</span><span class="si">}</span><span class="s2">, num exact points: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">exact_points</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
         <span class="k">else</span><span class="p">:</span>
 
             <span class="n">previousPoint</span> <span class="o">=</span> <span class="kc">None</span>
@@ -649,7 +671,6 @@
         
         <span class="c1"># Reset look-ahead, since previous values are not relevant anymore</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">previous_look_ahead_index</span> <span class="o">=</span> <span class="mi">0</span>
-
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">grid_points</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Empty waypoints, will clear path&quot;</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">current_path</span> <span class="o">=</span> <span class="n">GeoPath</span><span class="p">()</span>
@@ -804,6 +825,16 @@
 
 <div class="viewcode-block" id="PathFollower.buoy_position_callback"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.buoy_position_callback">[docs]</a>    <span class="k">def</span> <span class="nf">buoy_position_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">BuoyDetectionStamped</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">current_buoy_positions</span><span class="p">[</span><span class="n">msg</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span></div>
+
+<div class="viewcode-block" id="PathFollower.request_replan_callback"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.request_replan_callback">[docs]</a>    <span class="k">def</span> <span class="nf">request_replan_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Empty</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="c1"># Allow this recalculation at most once per second</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">current_time</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">last_recalculation_time</span><span class="o">&lt;</span><span class="mf">1.0</span><span class="p">):</span>
+            <span class="k">return</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_recalculation_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">recalculate_path_from_exact_points</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">find_look_ahead</span><span class="p">()</span></div>
     
 <div class="viewcode-block" id="PathFollower.find_look_ahead"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.find_look_ahead">[docs]</a>    <span class="k">def</span> <span class="nf">find_look_ahead</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -834,17 +865,17 @@
             <span class="c1">#self.get_logger().info(&quot;No lookAhead point for zero-length path&quot;)</span>
             <span class="k">return</span>
         
-        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Grid path length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_grid_path</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1">#self.get_logger().info(f&quot;Grid path length: {len(self.current_grid_path)}&quot;)</span>
         <span class="n">num_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_path</span><span class="o">.</span><span class="n">points</span><span class="p">)</span> 
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">previous_look_ahead_index</span><span class="p">,</span> <span class="n">num_points</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
             <span class="n">point</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_path</span><span class="o">.</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
             <span class="n">distance</span> <span class="o">=</span> <span class="n">great_circle</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span><span class="p">),</span> <span class="p">(</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="n">point</span><span class="o">.</span><span class="n">longitude</span><span class="p">))</span><span class="o">.</span><span class="n">meters</span>
             <span class="c1"># Check if the next point is closer. If so, we probably skipped some points. Don&#39;t target them. </span>
             <span class="n">next_is_closer</span> <span class="o">=</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">i</span><span class="o">&gt;=</span><span class="n">num_points</span> <span class="k">else</span> <span class="p">(</span><span class="kc">True</span> <span class="k">if</span> <span class="n">great_circle</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">longitude</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">current_path</span><span class="o">.</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">latitude</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_path</span><span class="o">.</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">longitude</span><span class="p">))</span><span class="o">.</span><span class="n">meters</span><span class="o">&lt;</span><span class="n">distance</span> <span class="k">else</span> <span class="kc">False</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;next_is_closer: </span><span class="si">{</span><span class="n">next_is_closer</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1">#self.get_logger().info(f&quot;next_is_closer: {next_is_closer}&quot;)</span>
             <span class="k">if</span><span class="p">(</span><span class="ow">not</span> <span class="n">next_is_closer</span><span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">previous_look_ahead_index</span> <span class="o">=</span> <span class="n">i</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calulated current point: </span><span class="si">{</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">point</span><span class="o">.</span><span class="n">longitude</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="c1">#self.get_logger().info(f&quot;Calulated current point: {point.latitude}, {point.longitude}&quot;)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">target_position_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">point</span><span class="p">)</span> <span class="c1"># In this version, this is just for display in the UI. This is NOT an input to heading_controller_vf </span>
                 <span class="n">segment</span> <span class="o">=</span> <span class="n">PathSegment</span><span class="p">()</span>
                 <span class="n">segment</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_grid_path</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
@@ -858,7 +889,7 @@
                 <span class="k">return</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1">#remove exact points if we&#39;ve passed them</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Point is: </span><span class="si">{</span><span class="n">point</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="c1">#self.get_logger().info(f&quot;Point is: {point}&quot;)</span>
                 <span class="k">if</span><span class="p">(</span><span class="n">point</span><span class="o">.</span><span class="n">latitude</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">exact_points</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">latitude</span> <span class="ow">and</span> <span class="n">point</span><span class="o">.</span><span class="n">longitude</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">exact_points</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">longitude</span><span class="p">):</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Removing passed exact point&quot;</span><span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">grid_points</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
@@ -904,8 +935,8 @@
         <span class="c1">#self.get_logger().info(f&quot;lat_pct: {lat_pct}, long_pct: {long_pct}&quot;)</span>
         
         <span class="c1"># Convert percentages to pixel positions</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">long_pct</span> <span class="o">*</span> <span class="n">image_width</span><span class="p">)</span>
-        <span class="n">y</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">lat_pct</span> <span class="o">*</span> <span class="n">image_height</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">long_pct</span> <span class="o">*</span> <span class="n">image_width</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="p">(</span><span class="n">lat_pct</span> <span class="o">*</span> <span class="n">image_height</span><span class="p">)</span>
         
         <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span></div>
 
@@ -981,15 +1012,35 @@
                     <span class="n">new_point</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">new_y</span>
                     <span class="n">appended</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_point</span><span class="p">)</span>
         <span class="n">appended</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-        <span class="k">return</span> <span class="n">appended</span></div></div>
+        <span class="k">return</span> <span class="n">appended</span></div>
+    
+<div class="viewcode-block" id="PathFollower.publish_error"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.PathFollower.publish_error">[docs]</a>    <span class="k">def</span> <span class="nf">publish_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">string</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">error_msg</span> <span class="o">=</span> <span class="n">String</span><span class="p">()</span>
+        <span class="n">error_msg</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">string</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span></div></div>
 
+<div class="viewcode-block" id="trigger_error_transition"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.trigger_error_transition">[docs]</a><span class="k">def</span> <span class="nf">trigger_error_transition</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">LifecycleNode</span><span class="p">):</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">create_client</span><span class="p">(</span><span class="n">ChangeState</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s1">/change_state&#39;</span><span class="p">)</span>
+    <span class="k">while</span> <span class="ow">not</span> <span class="n">client</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="n">timeout_sec</span><span class="o">=</span><span class="mf">1.0</span><span class="p">):</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Service not available, waiting again...&#39;</span><span class="p">)</span>
+
+    <span class="n">request</span> <span class="o">=</span> <span class="n">ChangeState</span><span class="o">.</span><span class="n">Request</span><span class="p">()</span>
+    <span class="n">request</span><span class="o">.</span><span class="n">transition</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">Transition</span><span class="o">.</span><span class="n">TRANSITION_DEACTIVATE</span> <span class="c1"># Transition to inactive state</span>
+
+    <span class="n">future</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">call_async</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+    <span class="n">rclpy</span><span class="o">.</span><span class="n">spin_until_future_complete</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">future</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Transition to error state successful&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Failed to transition to error state&#39;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="main"><a class="viewcode-back" href="../path_follower_vf.html#path_follower_vf.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="n">rclpy</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
     <span class="n">path_follower</span> <span class="o">=</span> <span class="n">PathFollower</span><span class="p">()</span>
 
-    <span class="c1"># Use the SingleThreadedExecutor to spin the node.</span>
+    <span class="c1"># Use the MultiThreadedExecutor to spin the node.</span>
     <span class="n">executor</span> <span class="o">=</span> <span class="n">rclpy</span><span class="o">.</span><span class="n">executors</span><span class="o">.</span><span class="n">MultiThreadedExecutor</span><span class="p">()</span>
     <span class="n">executor</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">path_follower</span><span class="p">)</span>
 
@@ -1000,12 +1051,15 @@
         <span class="k">pass</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">trace</span> <span class="o">=</span> <span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span>
-        <span class="n">path_follower</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">error_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;Unhandled exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">trace</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="n">path_follower</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">fatal</span><span class="p">(</span><span class="n">error_string</span><span class="p">)</span>
+        <span class="n">path_follower</span><span class="o">.</span><span class="n">publish_error</span><span class="p">(</span><span class="n">error_string</span><span class="p">)</span>
     <span class="k">finally</span><span class="p">:</span>
         <span class="c1"># Shutdown and cleanup the node</span>
         <span class="n">executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
         <span class="n">path_follower</span><span class="o">.</span><span class="n">destroy_node</span><span class="p">()</span>
         <span class="n">rclpy</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span></div>
+
 <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
     <span class="n">main</span><span class="p">()</span>
 </pre></div>

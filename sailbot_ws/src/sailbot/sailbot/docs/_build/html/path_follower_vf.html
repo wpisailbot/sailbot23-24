@@ -67,6 +67,11 @@ manages threats, and integrates sensor data to navigate efficiently.</p>
 <li><p>‘airmar_heading_subscription’: Subscribes to heading updates from the boat’s sensors.</p></li>
 <li><p>‘airmar_position_subscription’: Subscribes to position updates, updating boat’s geographic location.</p></li>
 <li><p>‘airmar_speed_knots_subscription’: Subscribes to speed updates in knots.</p></li>
+<li><p>‘waypoints_subscription’: Subscribes to lists of waypoints. Currently only used for clearing all waypoints.</p></li>
+<li><p>‘single_waypoint_subscription’: Subscribes to single waypoints. Used to add waypoints.</p></li>
+<li><p>‘true_wind_subscription’: Subscribes to smoothed true wind data.</p></li>
+<li><p>‘buoy_position_subscription’: Subscribes to buoy positions, used for snapping waypoints.</p></li>
+<li><p>‘request_recalculation_subscription’: Allows other nodes to request path recalculation.</p></li>
 </ul>
 <p><strong>Publishers</strong>:</p>
 <ul class="simple">
@@ -123,11 +128,6 @@ back to the waypoint for subsequent adjustments.</p>
 <p>This function assumes that ‘buoy_threat_size_map_units’, ‘buoy_threat_gaussian_intensity’,
 ‘bbox’, ‘image_width’, ‘image_height’, and ‘set_threat_cli’ (a ROS2 service client) are properly configured and available.</p>
 </dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="path_follower_vf.PathFollower.airmar_heading_callback">
-<span class="sig-name descname"><span class="pre">airmar_heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.airmar_heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.airmar_heading_callback" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="path_follower_vf.PathFollower.airmar_position_callback">
@@ -324,6 +324,11 @@ The order of corners depends on the specified direction.</p>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.heading_callback">
+<span class="sig-name descname"><span class="pre">heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.heading_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="path_follower_vf.PathFollower.insert_intermediate_points">
 <span class="sig-name descname"><span class="pre">insert_intermediate_points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_per_unit_distance</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">PoseStamped</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.insert_intermediate_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.insert_intermediate_points" title="Permalink to this definition">¶</a></dt>
 <dd><p>Inserts intermediate points into a given path segment to simplify more granular path following.
@@ -350,7 +355,7 @@ between each pair of consecutive waypoints in the path.</p></li>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="path_follower_vf.PathFollower.last_recalculation_time">
-<span class="sig-name descname"><span class="pre">last_recalculation_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715623681.1592271</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.last_recalculation_time" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">last_recalculation_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1716956584.0435443</span></em><a class="headerlink" href="#path_follower_vf.PathFollower.last_recalculation_time" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -473,6 +478,11 @@ super().on_shutdown() in derived classes.</p>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.publish_error">
+<span class="sig-name descname"><span class="pre">publish_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.publish_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.publish_error" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="path_follower_vf.PathFollower.recalculate_path_from_exact_points">
 <span class="sig-name descname"><span class="pre">recalculate_path_from_exact_points</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.recalculate_path_from_exact_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.recalculate_path_from_exact_points" title="Permalink to this definition">¶</a></dt>
 <dd><p>Recalculates the current path based on exact geographic points and grid coordinates determined by previous processing.
@@ -517,6 +527,11 @@ are no longer relevant after analyzing the new point’s proximity to the previo
 have looped back and are curther away than earlier points, requiring a path correction</p>
 <p>This function is intended to ensure buoy rounding paths are sensible.</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="path_follower_vf.PathFollower.request_replan_callback">
+<span class="sig-name descname"><span class="pre">request_replan_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Empty</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/path_follower_vf.html#PathFollower.request_replan_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.PathFollower.request_replan_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="path_follower_vf.PathFollower.segment_endpoint_indices">
@@ -662,6 +677,11 @@ recalculating the navigation path, and updating the look-ahead mechanism.</p>
 <span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.main" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="path_follower_vf.trigger_error_transition">
+<span class="sig-prename descclassname"><span class="pre">path_follower_vf.</span></span><span class="sig-name descname"><span class="pre">trigger_error_transition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">LifecycleNode</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/path_follower_vf.html#trigger_error_transition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#path_follower_vf.trigger_error_transition" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </section>
 
 
@@ -696,6 +716,7 @@ recalculating the navigation path, and updating the look-ahead mechanism.</p>
 <li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.get_maps_dir"><code class="docutils literal notranslate"><span class="pre">get_maps_dir()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.interpolate_point"><code class="docutils literal notranslate"><span class="pre">interpolate_point()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#path_follower_vf.trigger_error_transition"><code class="docutils literal notranslate"><span class="pre">trigger_error_transition()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="state_manager.html">State Manager Node</a></li>

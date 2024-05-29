@@ -39,7 +39,9 @@
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">LifecycleNode</span></code></p>
 <p>A ROS2 Lifecycle node for controlling the heading of a robotic sailboat based on navigational data and environmental conditions.
 This node integrates fuzzy logic for rudder angle control and uses an adaptive vector field for path following,
-dynamically adjusting the rudder based on computed heading errors and external factors like wind direction.</p>
+dynamically adjusting the rudder based on computed heading errors and external factors like wind direction.
+It also triggers path replanning if cross-track error and VF settings make the boat unable to converge with the path
+without going upwind.</p>
 <p>The node subscribes to various topics to receive updates on the boat’s heading, wind conditions, and navigation path, and publishes
 commands for rudder angle adjustments. It is capable of handling different autonomous modes, specifically focusing on full autonomous navigation.</p>
 <dl class="field-list simple">
@@ -50,7 +52,7 @@ commands for rudder angle adjustments. It is capable of handling different auton
 <li><p><strong>path_segment</strong> – (Optional[PathSegment]) Current path segment for navigation.</p></li>
 <li><p><strong>wind_direction_deg</strong> – (Optional[float]) Current wind direction in degrees.</p></li>
 <li><p><strong>autonomous_mode</strong> – (int) Current autonomous mode of operation.</p></li>
-<li><p><strong>heading_kp</strong> – (float) Proportional gain for heading control.</p></li>
+<li><p><strong>rudder_adjustment_scale</strong> – (float) Proportional gain for heading control.</p></li>
 <li><p><strong>rudder_angle</strong> – (float) Current angle of the rudder.</p></li>
 </ul>
 </dd>
@@ -140,13 +142,15 @@ the line, and the propulsive force increases, aiding in smoother convergence and
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.compute_rudder_angle">
 <span class="sig-name descname"><span class="pre">compute_rudder_angle</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.compute_rudder_angle"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.compute_rudder_angle" title="Permalink to this definition">¶</a></dt>
 <dd><p>Computes and publishes the rudder angle based on the current heading, target segment, and other navigational parameters.
-The function adjusts the rudder angle to align the vessel’s heading with the target heading derived from the current path segment.
+The function adjusts the rudder angle to align the boat’s heading with the target heading derived from the current path segment.
 The rudder adjustment also considers the rate of change in heading error and conditions such as the need to tack against the wind.</p>
 <p>This function performs several checks and computations:
-- Ensures that the vessel is in full autonomous mode before making any adjustments.
+- Ensures that the boat is in full autonomous mode before making any adjustments.
 - Publishes a zero rudder angle if there is no target path segment.
 - Logs and exits if the current grid cell is not available.
-- Computes a target heading from the current path segment using a vector field.
+- Computes a target track from the current path segment using a vector field.
+- Checks if track would bring the boat upwind. Reuqests path replanning if that happens, and sets the boat to sail
+along the edge of the no-sail zone
 - Applies an offset to correct for calculated leeway angle (heading vs. track)
 - Calculates heading error and its rate of change.
 - Uses a fuzzy logic controller to compute the required rudder adjustment.
@@ -154,15 +158,15 @@ The rudder adjustment also considers the rate of change in heading error and con
 - Publishes the computed rudder angle.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>None. This function directly affects the vessel’s steering by publishing rudder angle adjustments to a designated ROS topic.</p>
+<dd class="field-odd"><p>None. This function directly affects the boat’s steering by publishing rudder angle adjustments to a designated ROS topic.</p>
 </dd>
 </dl>
 <p>The function relies on the following attributes:
 - ‘autonomous_mode’: The current mode of operation, checked against predefined autonomous modes.
 - ‘path_segment’: The current navigation path segment from which the target heading is derived.
-- ‘current_grid_cell’: The vessel’s current position in grid coordinates, necessary for vector field calculations.
+- ‘current_grid_cell’: The boat’s current position in grid coordinates, necessary for vector field calculations.
 - ‘rudder_simulator’: A fuzzy logic controller for computing the rudder angle based on heading error and rate of change.
-- ‘heading_kp’: A proportional gain used to scale the rudder adjustment.
+- ‘rudder_adjustment_scale’: A proportional gain used to scale the rudder adjustment.
 - ‘wind_direction_deg’: The current wind direction, used to determine if tacking maneuvers are necessary.</p>
 <p>This method logs significant states and decisions to assist with debugging and operational monitoring.</p>
 </dd></dl>
@@ -222,18 +226,23 @@ uninitialized.</p>
 <dd></dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.heading_kp">
-<span class="sig-name descname"><span class="pre">heading_kp</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.heading_kp" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.last_heading_error">
 <span class="sig-name descname"><span class="pre">last_heading_error</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.last_heading_error" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.last_rudder_time">
+<span class="sig-name descname"><span class="pre">last_rudder_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1716956582.0864933</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.last_rudder_time" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.leeway_angle">
 <span class="sig-name descname"><span class="pre">leeway_angle</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.leeway_angle" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.magnetic_field_callback">
+<span class="sig-name descname"><span class="pre">magnetic_field_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.magnetic_field_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.magnetic_field_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -346,14 +355,29 @@ super().on_shutdown() in derived classes.</p>
 <span class="sig-name descname"><span class="pre">path_segment_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">PathSegment</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.path_segment_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.path_segment_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.publish_error">
+<span class="sig-name descname"><span class="pre">publish_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.publish_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.publish_error" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.rudder_adjustment_scale">
+<span class="sig-name descname"><span class="pre">rudder_adjustment_scale</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.rudder_adjustment_scale" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.rudder_adjustment_scale_callback">
+<span class="sig-name descname"><span class="pre">rudder_adjustment_scale_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.rudder_adjustment_scale_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.rudder_adjustment_scale_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <dl class="py attribute">
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.rudder_angle">
 <span class="sig-name descname"><span class="pre">rudder_angle</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.rudder_angle" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.rudder_kp_callback">
-<span class="sig-name descname"><span class="pre">rudder_kp_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.rudder_kp_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.rudder_kp_callback" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="heading_controller_vf.HeadingController.rudder_overshoot_bias_callback">
+<span class="sig-name descname"><span class="pre">rudder_overshoot_bias_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/heading_controller_vf.html#HeadingController.rudder_overshoot_bias_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.HeadingController.rudder_overshoot_bias_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -420,10 +444,33 @@ and at least one parameter in the list hadn’t been declared beforehand.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="heading_controller_vf.HeadingController.wind_direction_deg">
-<span class="sig-name descname"><span class="pre">wind_direction_deg</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.wind_direction_deg" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">wind_direction_deg</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">270</span></em><a class="headerlink" href="#heading_controller_vf.HeadingController.wind_direction_deg" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="heading_controller_vf.closest_edge_heading">
+<span class="sig-prename descclassname"><span class="pre">heading_controller_vf.</span></span><span class="sig-name descname"><span class="pre">closest_edge_heading</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target_track_rad</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wind_angle_rad</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nogo_angle_rad</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#closest_edge_heading"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.closest_edge_heading" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the closest edge heading to sail along the no-sail zone.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target_track</strong> – Desired track angle in radians</p></li>
+<li><p><strong>wind_direction_deg</strong> – Wind direction in degrees</p></li>
+<li><p><strong>wind_restriction_replan_cutoff_degrees</strong> – Wind restriction cutoff angle in degrees</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Heading along the closest edge of the no-sail zone in radians</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="heading_controller_vf.is_in_nogo">
+<span class="sig-prename descclassname"><span class="pre">heading_controller_vf.</span></span><span class="sig-name descname"><span class="pre">is_in_nogo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bearing_rad</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wind_angle_rad</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nogo_angle_rad</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/heading_controller_vf.html#is_in_nogo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#heading_controller_vf.is_in_nogo" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="heading_controller_vf.main">
@@ -462,6 +509,8 @@ and at least one parameter in the list hadn’t been declared beforehand.</p>
 <li class="toctree-l1"><a class="reference internal" href="esp32_comms.html">ESP32 Comms Node</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Heading Controller Node</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.HeadingController"><code class="docutils literal notranslate"><span class="pre">HeadingController</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.closest_edge_heading"><code class="docutils literal notranslate"><span class="pre">closest_edge_heading()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.is_in_nogo"><code class="docutils literal notranslate"><span class="pre">is_in_nogo()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#heading_controller_vf.normalRelativeAngle"><code class="docutils literal notranslate"><span class="pre">normalRelativeAngle()</span></code></a></li>
 </ul>

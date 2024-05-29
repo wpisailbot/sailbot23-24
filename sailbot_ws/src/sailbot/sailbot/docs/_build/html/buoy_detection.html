@@ -57,8 +57,8 @@ processes the images to detect objects based on color and shape criteria, and pu
 <li><p><strong>associate_detections_to_tracks</strong>: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.</p></li>
 <li><p><strong>listener_callback</strong>: Processes each incoming image, detects buoys, and manages tracks.</p></li>
 <li><p><strong>fill_holes</strong>: Fills holes within binary images to create solid objects, improving reliability of object detection.</p></li>
-<li><p><strong>detect_orange_objects</strong>: Detects orange objects in the image by applying a color threshold and shape analysis.</p></li>
-<li><p><strong>calculate_depth</strong>: Estimates the depth of detected objects based on their size in the image.</p></li>
+<li><p><strong>detect_colored_objects</strong>: Detects colored objects in the image by applying a color threshold and shape analysis.</p></li>
+<li><p><strong>calculate_depth</strong>: Finds the depth of the object by sampling the depth texture from the ZED camera.</p></li>
 <li><p><strong>calculate_object_center</strong>: Calculates the center of detected objects in pixel coordinates.</p></li>
 <li><p><strong>pixel_to_world</strong>: Converts pixel coordinates to world coordinates using intrinsic camera parameters.</p></li>
 </ul>
@@ -107,14 +107,46 @@ The function handles cases where there are no tracks or detections and returns m
 - Determining which detections and tracks remain unmatched after the matching process.</p>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.calculate_depth">
-<span class="sig-name descname"><span class="pre">calculate_depth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">contour</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.calculate_depth"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.calculate_depth" title="Permalink to this definition">¶</a></dt>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.buoy_types">
+<span class="sig-name descname"><span class="pre">buoy_types</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">BuoyTypeInfo</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#buoy_detection.BuoyDetection.buoy_types" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.calculate_depth">
+<span class="sig-name descname"><span class="pre">calculate_depth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">contour</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diameter</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.calculate_depth"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.calculate_depth" title="Permalink to this definition">¶</a></dt>
+<dd><p>Finds the depth of a contour by sampling the depth image from the ZED camera.
+Validates the object and depth by checking the sampled depth vs. the depth this buoy should be at
+based on its contour diameter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cX</strong> – X center of the contour in the image</p></li>
+<li><p><strong>cY</strong> – Y center of the contour in the image</p></li>
+<li><p><strong>contour</strong> – The contour we are checking</p></li>
+<li><p><strong>diameter</strong> – The diameter of the contour</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Depth of the object if valid, None if not.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Checking for availability of the depth texture
+- Sampling the depth texture
+- Checking for invalid values in the depth texture
+- Calculating the minimum enclosing circle and expected depth of the contour
+- Checking if the sampled depth and estimated depth agree with each other</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="buoy_detection.BuoyDetection.calculate_object_center">
-<span class="sig-name descname"><span class="pre">calculate_object_center</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">contour</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.calculate_object_center"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.calculate_object_center" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">calculate_object_center</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">contour</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diameter</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.calculate_object_center"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.calculate_object_center" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.camera_depth_image_callback">
+<span class="sig-name descname"><span class="pre">camera_depth_image_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.camera_depth_image_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.camera_depth_image_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -128,23 +160,33 @@ The function handles cases where there are no tracks or detections and returns m
 <dd></dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.detect_orange_objects">
-<span class="sig-name descname"><span class="pre">detect_orange_objects</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.detect_orange_objects"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.detect_orange_objects" title="Permalink to this definition">¶</a></dt>
-<dd><p>Detects orange objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,
-converts it to HSV color space, applies a color mask to isolate orange regions, and identifies contours that meet
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.cv_parameters_callback">
+<span class="sig-name descname"><span class="pre">cv_parameters_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">CVParameters</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.cv_parameters_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.cv_parameters_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.depth_image">
+<span class="sig-name descname"><span class="pre">depth_image</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#buoy_detection.BuoyDetection.depth_image" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.detect_colored_objects">
+<span class="sig-name descname"><span class="pre">detect_colored_objects</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BuoyTypeInfo</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.detect_colored_objects"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.detect_colored_objects" title="Permalink to this definition">¶</a></dt>
+<dd><p>Detects colored objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,
+converts it to HSV color space, applies a color mask to isolate color regions, and identifies contours that meet
 specific area and circularity criteria.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>image</strong> – An image array in BGR format, typically received from an image capturing device or simulation environment.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list of contours that represent detected orange objects which meet the area and circularity thresholds.
+<dd class="field-even"><p>A list of contours that represent detected colored objects which meet the area and circularity thresholds.
 These objects are presumed to be circular in shape, fitting the typical characteristics of buoys.</p>
 </dd>
 </dl>
 <p>Function behavior includes:
 - Converting the image to HSV color space for better color segmentation.
-- Applying a mask to filter out colors that are not within a specified orange range.
+- Applying a mask to filter out colors that are not within a specified color range.
 - Refining the mask using morphological operations to reduce noise and improve object isolation.
 - Detecting contours in the masked image and filtering these based on their area to remove too small or large objects.
 - Further analyzing the filtered contours for circularity to confirm if they match the expected shape of buoys.
@@ -152,6 +194,11 @@ These objects are presumed to be circular in shape, fitting the typical characte
 - Publishing the result image with detected objects highlighted to a ROS topic for further use or debugging.
 - Optionally saving the processed image to disk for analysis (commented out).</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.estimate_depth">
+<span class="sig-name descname"><span class="pre">estimate_depth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">contour</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diameter</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.estimate_depth"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.estimate_depth" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="buoy_detection.BuoyDetection.fill_holes">
@@ -210,35 +257,6 @@ uninitialized.</p>
 <span class="sig-name descname"><span class="pre">latitude</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">42.0396766107111</span></em><a class="headerlink" href="#buoy_detection.BuoyDetection.latitude" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.listener_callback">
-<span class="sig-name descname"><span class="pre">listener_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.listener_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.listener_callback" title="Permalink to this definition">¶</a></dt>
-<dd><p>Callback function for handling image data received from a ROS subscriber. This function processes each image frame to detect,
-identify, and track orange objects, likely buoys, based on their color and shape. It converts ROS image messages to OpenCV
-format, undistorts the image using camera intrinsics, and utilizes various helper functions to compute the objects’
-geographical and relative positions.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>data</strong> – A ROS Image message that contains the image data captured by a camera.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>None. This function directly updates the system’s state by modifying the tracking information and publishing the results.</p>
-</dd>
-</dl>
-<p>Function behavior includes:
-- Converting the ROS image message to an OpenCV image format.
-- Calculating scaling factors based on the camera’s resolution.
-- Undistorting the image using pre-defined camera matrix and distortion coefficients.
-- Detecting orange objects in the image by analyzing their contours.
-- Calculating the center of each detected object.
-- Converting the pixel coordinates of these centers to world coordinates, then to latitude and longitude.
-- Transforming geodetic coordinates to East-North-Up (ENU) coordinates.
-- Associating detected objects with existing tracks or creating new tracks for unmatched detections.
-- Updating the track information and publishing the updated tracks for further processing or visualization.</p>
-<p>This function relies on a set of predefined variables and configurations such as camera calibration parameters (‘camera_matrix’,
-‘distortion_coefficients’), and scaling factors (‘FX’, ‘FY’, ‘CX’, ‘CY’).</p>
-</dd></dl>
-
 <dl class="py attribute">
 <dt class="sig sig-object py" id="buoy_detection.BuoyDetection.longitude">
 <span class="sig-name descname"><span class="pre">longitude</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-71.84585650616927</span></em><a class="headerlink" href="#buoy_detection.BuoyDetection.longitude" title="Permalink to this definition">¶</a></dt>
@@ -272,6 +290,11 @@ into a 3D point in space relative to the camera. The conversion accounts for cam
 <dl class="py method">
 <dt class="sig sig-object py" id="buoy_detection.BuoyDetection.publish_tracks">
 <span class="sig-name descname"><span class="pre">publish_tracks</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.publish_tracks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.publish_tracks" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.remove_stale_tracks">
+<span class="sig-name descname"><span class="pre">remove_stale_tracks</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.remove_stale_tracks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.remove_stale_tracks" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -311,8 +334,37 @@ and at least one parameter in the list hadn’t been declared beforehand.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="buoy_detection.BuoyDetection.tracks">
-<span class="sig-name descname"><span class="pre">tracks</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#buoy_detection.BuoyDetection.tracks" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">tracks</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#buoy_detection.Track" title="buoy_detection.Track"><span class="pre">Track</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#buoy_detection.BuoyDetection.tracks" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="buoy_detection.BuoyDetection.zed_image_callback">
+<span class="sig-name descname"><span class="pre">zed_image_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/buoy_detection.html#BuoyDetection.zed_image_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#buoy_detection.BuoyDetection.zed_image_callback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Callback function for handling image data received from a ROS subscriber. This function processes each image frame to detect,
+identify, and track orange objects, likely buoys, based on their color and shape. It converts ROS image messages to OpenCV
+format, undistorts the image using camera intrinsics, and utilizes various helper functions to compute the objects’
+geographical and relative positions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> – A ROS Image message that contains the image data captured by a camera.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None. This function directly updates the system’s state by modifying the tracking information and publishing the results.</p>
+</dd>
+</dl>
+<p>Function behavior includes:
+- Converting the ROS image message to an OpenCV image format.
+- Calculating scaling factors based on the camera’s resolution.
+- Undistorting the image using pre-defined camera matrix and distortion coefficients.
+- Detecting orange objects in the image by analyzing their contours.
+- Calculating the center of each detected object.
+- Converting the pixel coordinates of these centers to world coordinates, then to latitude and longitude.
+- Transforming geodetic coordinates to East-North-Up (ENU) coordinates.
+- Associating detected objects with existing tracks or creating new tracks for unmatched detections.
+- Updating the track information and publishing the updated tracks for further processing or visualization.</p>
+<p>This function relies on a set of predefined variables and configurations such as camera calibration parameters (‘camera_matrix’,
+‘distortion_coefficients’), and scaling factors (‘FX’, ‘FY’, ‘CX’, ‘CY’).</p>
+</dd></dl>
 
 </dd></dl>
 

@@ -36,7 +36,7 @@
 <span class="kn">from</span> <span class="nn">geographic_msgs.msg</span> <span class="kn">import</span> <span class="n">GeoPoint</span>
 <span class="kn">from</span> <span class="nn">cv_bridge</span> <span class="kn">import</span> <span class="n">CvBridge</span>
 
-<span class="kn">from</span> <span class="nn">sailbot_msgs.msg</span> <span class="kn">import</span> <span class="n">BuoyDetectionStamped</span>
+<span class="kn">from</span> <span class="nn">sailbot_msgs.msg</span> <span class="kn">import</span> <span class="n">BuoyDetectionStamped</span><span class="p">,</span> <span class="n">CVParameters</span><span class="p">,</span> <span class="n">BuoyTypeInfo</span><span class="p">,</span> <span class="n">AnnotatedImage</span>
 
 <span class="kn">import</span> <span class="nn">cv2</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
@@ -45,7 +45,8 @@
 <span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">linear_sum_assignment</span>
 <span class="kn">import</span> <span class="nn">pyproj</span>
 <span class="kn">from</span> <span class="nn">pyproj</span> <span class="kn">import</span> <span class="n">Transformer</span>
-
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">from</span> <span class="nn">geopy.distance</span> <span class="kn">import</span> <span class="n">geodesic</span>
 
 <span class="n">PIXEL_SIZE</span> <span class="o">=</span> <span class="mf">0.002</span> <span class="c1"># In mm</span>
@@ -127,6 +128,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">kf</span> <span class="o">=</span> <span class="n">create_kalman_filter</span><span class="p">(</span><span class="n">initial_e</span><span class="p">,</span> <span class="n">initial_n</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">time_since_update</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">history</span> <span class="o">=</span> <span class="p">[(</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">])]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_update_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> 
 
 <div class="viewcode-block" id="Track.predict"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.Track.predict">[docs]</a>    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">predict</span><span class="p">()</span>
@@ -136,7 +138,8 @@
 <div class="viewcode-block" id="Track.update"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.Track.update">[docs]</a>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">detection_enu</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">detection_enu</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">time_since_update</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">history</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_update_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span></div>
     
 <div class="viewcode-block" id="Track.get_position"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.Track.get_position">[docs]</a>    <span class="k">def</span> <span class="nf">get_position</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">kf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span></div></div>
@@ -196,8 +199,8 @@
 <span class="sd">    - **associate_detections_to_tracks**: Associates new detections with existing tracks using a cost matrix based on Euclidean distance.</span>
 <span class="sd">    - **listener_callback**: Processes each incoming image, detects buoys, and manages tracks.</span>
 <span class="sd">    - **fill_holes**: Fills holes within binary images to create solid objects, improving reliability of object detection.</span>
-<span class="sd">    - **detect_orange_objects**: Detects orange objects in the image by applying a color threshold and shape analysis.</span>
-<span class="sd">    - **calculate_depth**: Estimates the depth of detected objects based on their size in the image.</span>
+<span class="sd">    - **detect_colored_objects**: Detects colored objects in the image by applying a color threshold and shape analysis.</span>
+<span class="sd">    - **calculate_depth**: Finds the depth of the object by sampling the depth texture from the ZED camera.</span>
 <span class="sd">    - **calculate_object_center**: Calculates the center of detected objects in pixel coordinates.</span>
 <span class="sd">    - **pixel_to_world**: Converts pixel coordinates to world coordinates using intrinsic camera parameters.</span>
 
@@ -214,9 +217,45 @@
     <span class="n">current_y_scaling_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
     <span class="n">latitude</span><span class="p">,</span> <span class="n">longitude</span> <span class="o">=</span> <span class="mf">42.0396766107111</span><span class="p">,</span> <span class="o">-</span><span class="mf">71.84585650616927</span>
     <span class="n">heading</span> <span class="o">=</span> <span class="mi">0</span>
-    <span class="n">tracks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">tracks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Track</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">buoy_types</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">BuoyTypeInfo</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">depth_image</span> <span class="o">=</span> <span class="kc">None</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;object_detection_node&#39;</span><span class="p">)</span>
+
+        <span class="n">orangeType</span> <span class="o">=</span> <span class="n">BuoyTypeInfo</span><span class="p">()</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">buoy_diameter</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;orange&quot;</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_h</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_s</span> <span class="o">=</span> <span class="mi">98</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_v</span> <span class="o">=</span> <span class="mi">52</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_h</span> <span class="o">=</span> <span class="mi">17</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_s</span> <span class="o">=</span> <span class="mi">255</span>
+        <span class="n">orangeType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_v</span> <span class="o">=</span> <span class="mi">255</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">orangeType</span><span class="p">)</span>
+
+        <span class="n">greenType</span> <span class="o">=</span> <span class="n">BuoyTypeInfo</span><span class="p">()</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">buoy_diameter</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;green&quot;</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_h</span> <span class="o">=</span> <span class="mi">81</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_s</span> <span class="o">=</span> <span class="mi">49</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_v</span> <span class="o">=</span> <span class="mi">120</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_h</span> <span class="o">=</span> <span class="mi">140</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_s</span> <span class="o">=</span> <span class="mi">255</span>
+        <span class="n">greenType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_v</span> <span class="o">=</span> <span class="mi">255</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">greenType</span><span class="p">)</span>
+
+        <span class="n">whiteType</span> <span class="o">=</span> <span class="n">BuoyTypeInfo</span><span class="p">()</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">buoy_diameter</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;white&quot;</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_h</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_s</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">lower_v</span> <span class="o">=</span> <span class="mi">245</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_h</span> <span class="o">=</span> <span class="mi">255</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_s</span> <span class="o">=</span> <span class="mi">255</span>
+        <span class="n">whiteType</span><span class="o">.</span><span class="n">hsv_bounds</span><span class="o">.</span><span class="n">upper_v</span> <span class="o">=</span> <span class="mi">255</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">whiteType</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">set_parameters</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">get_parameters</span><span class="p">()</span>
@@ -224,7 +263,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
             <span class="n">Image</span><span class="p">,</span>
             <span class="s1">&#39;/zed/zed_node/rgb/image_rect_color&#39;</span><span class="p">,</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">listener_callback</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">zed_image_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera_depth_image_subscriber</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">Image</span><span class="p">,</span>
+            <span class="s1">&#39;/zed/zed_node/depth/depth_registered&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">camera_depth_image_callback</span><span class="p">,</span>
             <span class="mi">10</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">airmar_position_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
                 <span class="n">NavSatFix</span><span class="p">,</span>
@@ -233,12 +277,17 @@
                 <span class="mi">10</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
             <span class="n">Float64</span><span class="p">,</span>
-            <span class="s1">&#39;/airmar_data/heading&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;heading&#39;</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">airmar_heading_callback</span><span class="p">,</span>
             <span class="mi">10</span><span class="p">)</span>
-
+        <span class="bp">self</span><span class="o">.</span><span class="n">cv_parameters_subscription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_subscription</span><span class="p">(</span>
+            <span class="n">CVParameters</span><span class="p">,</span>
+            <span class="s1">&#39;cv_parameters&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cv_parameters_callback</span><span class="p">,</span>
+            <span class="mi">10</span><span class="p">)</span>
+        
         <span class="bp">self</span><span class="o">.</span><span class="n">mask_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_publisher</span><span class="p">(</span>
-            <span class="n">Image</span><span class="p">,</span>
+            <span class="n">AnnotatedImage</span><span class="p">,</span>
             <span class="s1">&#39;cv_mask&#39;</span><span class="p">,</span>
             <span class="mi">10</span>
         <span class="p">)</span>
@@ -247,36 +296,36 @@
             <span class="s1">&#39;buoy_position&#39;</span><span class="p">,</span>
             <span class="mi">10</span>
         <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initial_cv_parameters_publisher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_publisher</span><span class="p">(</span>
+            <span class="n">CVParameters</span><span class="p">,</span>
+            <span class="s1">&#39;initial_cv_parameters&#39;</span><span class="p">,</span>
+            <span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="n">initial_parameters</span> <span class="o">=</span> <span class="n">CVParameters</span><span class="p">()</span>
+        <span class="n">initial_parameters</span><span class="o">.</span><span class="n">buoy_types</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">buoy_types</span><span class="p">)</span>
+        <span class="n">initial_parameters</span><span class="o">.</span><span class="n">circularity_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buoy_circularity_threshold</span>
+        <span class="n">sleep_rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_rate</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_cv_parameters_publisher</span><span class="o">.</span><span class="n">get_subscription_count</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;waiting for cv parameters subscriber...&quot;</span><span class="p">)</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Publishing initial cv parameters after finding </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">initial_cv_parameters_publisher</span><span class="o">.</span><span class="n">get_subscription_count</span><span class="p">()</span><span class="si">}</span><span class="s2"> subscribers&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initial_cv_parameters_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">initial_parameters</span><span class="p">)</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">bridge</span> <span class="o">=</span> <span class="n">CvBridge</span><span class="p">()</span>
     
         <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Setup done&quot;</span><span class="p">)</span>
 
 <div class="viewcode-block" id="BuoyDetection.set_parameters"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.set_parameters">[docs]</a>    <span class="k">def</span> <span class="nf">set_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_h&#39;</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_s&#39;</span><span class="p">,</span> <span class="mi">49</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_v&#39;</span><span class="p">,</span> <span class="mi">120</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_h&#39;</span><span class="p">,</span> <span class="mi">110</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_s&#39;</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_v&#39;</span><span class="p">,</span> <span class="mi">255</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_circularity_threshold&#39;</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_diameter_meters&#39;</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span></div>
-
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.depth_error_threshold_meters&#39;</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">declare_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_detection_lifetime_seconds&#39;</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="BuoyDetection.get_parameters"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.get_parameters">[docs]</a>    <span class="k">def</span> <span class="nf">get_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">lower_h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_h&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">lower_s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_s&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">lower_v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.lower_v&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">upper_h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_h&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">upper_s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_s&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">upper_v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.upper_v&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">integer_value</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">buoy_circularity_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_circularity_threshold&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_diameter_meters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_diameter_meters&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span></div>
-
-
-
-
+        <span class="bp">self</span><span class="o">.</span><span class="n">depth_error_threshold_meters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.depth_error_threshold_meters&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_detection_lifetime_seconds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parameter</span><span class="p">(</span><span class="s1">&#39;sailbot.cv.buoy_detection_lifetime_seconds&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">get_parameter_value</span><span class="p">()</span><span class="o">.</span><span class="n">double_value</span></div>
 
 
 
@@ -286,6 +335,15 @@
     
 <div class="viewcode-block" id="BuoyDetection.airmar_heading_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.airmar_heading_callback">[docs]</a>    <span class="k">def</span> <span class="nf">airmar_heading_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Float64</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">heading</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">data</span></div>
+    
+<div class="viewcode-block" id="BuoyDetection.cv_parameters_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.cv_parameters_callback">[docs]</a>    <span class="k">def</span> <span class="nf">cv_parameters_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">CVParameters</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Got new CV parameters: </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_types</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">buoy_types</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buoy_circularity_threshold</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">circularity_threshold</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.remove_stale_tracks"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.remove_stale_tracks">[docs]</a>    <span class="k">def</span> <span class="nf">remove_stale_tracks</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tracks</span> <span class="o">=</span> <span class="p">[</span><span class="n">track</span> <span class="k">for</span> <span class="n">track</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tracks</span> <span class="k">if</span> <span class="n">current_time</span> <span class="o">-</span> <span class="n">track</span><span class="o">.</span><span class="n">last_update_time</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buoy_detection_lifetime_seconds</span><span class="p">]</span></div>
 
 <div class="viewcode-block" id="BuoyDetection.publish_tracks"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.publish_tracks">[docs]</a>    <span class="k">def</span> <span class="nf">publish_tracks</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1">#self.get_logger().info(f&quot;Num tracks: {len(self.tracks)}&quot;)</span>
@@ -349,7 +407,7 @@
 
         <span class="k">return</span> <span class="n">matches</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">unmatched_detections</span><span class="p">)</span><span class="c1">#, list(unmatched_tracks)</span></div>
 
-<div class="viewcode-block" id="BuoyDetection.listener_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.listener_callback">[docs]</a>    <span class="k">def</span> <span class="nf">listener_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="BuoyDetection.zed_image_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.zed_image_callback">[docs]</a>    <span class="k">def</span> <span class="nf">zed_image_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Callback function for handling image data received from a ROS subscriber. This function processes each image frame to detect,</span>
 <span class="sd">        identify, and track orange objects, likely buoys, based on their color and shape. It converts ROS image messages to OpenCV</span>
@@ -384,8 +442,15 @@
         
         <span class="n">image</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">undistort</span><span class="p">(</span><span class="n">current_frame</span><span class="p">,</span> <span class="n">camera_matrix</span><span class="p">,</span> <span class="n">distortion_coefficients</span><span class="p">)</span>
 
-        <span class="n">contours</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detect_orange_objects</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
-        <span class="n">detections</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">calculate_object_center</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span> <span class="k">for</span> <span class="n">contour</span> <span class="ow">in</span> <span class="n">contours</span><span class="p">]</span>
+        <span class="n">detections</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">buoy_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">buoy_types</span><span class="p">:</span>
+            <span class="n">contours</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">detect_colored_objects</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">buoy_type</span><span class="p">)</span>
+            <span class="n">detections</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">center</span> <span class="k">for</span> <span class="n">contour</span> <span class="ow">in</span> <span class="n">contours</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">center</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_object_center</span><span class="p">(</span><span class="n">contour</span><span class="p">,</span> <span class="n">buoy_type</span><span class="o">.</span><span class="n">buoy_diameter</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="p">]</span>
+            <span class="p">)</span>        
         <span class="c1">#self.get_logger().info(f&quot;detections: {detections}&quot;)</span>
 
         <span class="n">detections_latlon</span> <span class="o">=</span> <span class="p">[]</span>
@@ -407,7 +472,12 @@
             <span class="n">enu</span> <span class="o">=</span> <span class="n">detections_enu</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">tracks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Track</span><span class="p">(</span><span class="n">enu</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">enu</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">publish_tracks</span><span class="p">()</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">publish_tracks</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remove_stale_tracks</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="BuoyDetection.camera_depth_image_callback"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.camera_depth_image_callback">[docs]</a>    <span class="k">def</span> <span class="nf">camera_depth_image_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="n">depth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridge</span><span class="o">.</span><span class="n">imgmsg_to_cv2</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">desired_encoding</span><span class="o">=</span><span class="s2">&quot;32FC1&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">depth_image</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">undistort</span><span class="p">(</span><span class="n">depth</span><span class="p">,</span> <span class="n">camera_matrix</span><span class="p">,</span> <span class="n">distortion_coefficients</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="BuoyDetection.fill_holes"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.fill_holes">[docs]</a>    <span class="k">def</span> <span class="nf">fill_holes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">):</span>
@@ -447,20 +517,20 @@
         
         <span class="k">return</span> <span class="mi">255</span><span class="o">-</span><span class="n">filled_image</span></div>
 
-<div class="viewcode-block" id="BuoyDetection.detect_orange_objects"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.detect_orange_objects">[docs]</a>    <span class="k">def</span> <span class="nf">detect_orange_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">):</span>
+<div class="viewcode-block" id="BuoyDetection.detect_colored_objects"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.detect_colored_objects">[docs]</a>    <span class="k">def</span> <span class="nf">detect_colored_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">,</span> <span class="n">type_info</span><span class="p">:</span> <span class="n">BuoyTypeInfo</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Detects orange objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,</span>
-<span class="sd">        converts it to HSV color space, applies a color mask to isolate orange regions, and identifies contours that meet</span>
+<span class="sd">        Detects colored objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,</span>
+<span class="sd">        converts it to HSV color space, applies a color mask to isolate color regions, and identifies contours that meet</span>
 <span class="sd">        specific area and circularity criteria.</span>
 
 <span class="sd">        :param image: An image array in BGR format, typically received from an image capturing device or simulation environment.</span>
 
-<span class="sd">        :return: A list of contours that represent detected orange objects which meet the area and circularity thresholds.</span>
+<span class="sd">        :return: A list of contours that represent detected colored objects which meet the area and circularity thresholds.</span>
 <span class="sd">                These objects are presumed to be circular in shape, fitting the typical characteristics of buoys.</span>
 
 <span class="sd">        Function behavior includes:</span>
 <span class="sd">        - Converting the image to HSV color space for better color segmentation.</span>
-<span class="sd">        - Applying a mask to filter out colors that are not within a specified orange range.</span>
+<span class="sd">        - Applying a mask to filter out colors that are not within a specified color range.</span>
 <span class="sd">        - Refining the mask using morphological operations to reduce noise and improve object isolation.</span>
 <span class="sd">        - Detecting contours in the masked image and filtering these based on their area to remove too small or large objects.</span>
 <span class="sd">        - Further analyzing the filtered contours for circularity to confirm if they match the expected shape of buoys.</span>
@@ -474,9 +544,10 @@
 
         <span class="c1"># Define range for orange color and create a mask</span>
         <span class="c1">#lower_orange = np.array([3, 205, 74])</span>
-        <span class="n">lower_orange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">3</span><span class="p">,</span> <span class="mi">120</span><span class="p">,</span> <span class="mi">74</span><span class="p">])</span>
-        <span class="n">upper_orange</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">15</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">255</span><span class="p">])</span>
-        <span class="n">mask</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">inRange</span><span class="p">(</span><span class="n">hsv</span><span class="p">,</span> <span class="n">lower_orange</span><span class="p">,</span> <span class="n">upper_orange</span><span class="p">)</span>
+        <span class="n">bounds</span> <span class="o">=</span> <span class="n">type_info</span><span class="o">.</span><span class="n">hsv_bounds</span>
+        <span class="n">lower_range</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">bounds</span><span class="o">.</span><span class="n">lower_h</span><span class="p">,</span> <span class="n">bounds</span><span class="o">.</span><span class="n">lower_s</span><span class="p">,</span> <span class="n">bounds</span><span class="o">.</span><span class="n">lower_v</span><span class="p">])</span>
+        <span class="n">upper_range</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">bounds</span><span class="o">.</span><span class="n">upper_h</span><span class="p">,</span> <span class="n">bounds</span><span class="o">.</span><span class="n">upper_s</span><span class="p">,</span> <span class="n">bounds</span><span class="o">.</span><span class="n">upper_v</span><span class="p">])</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">inRange</span><span class="p">(</span><span class="n">hsv</span><span class="p">,</span> <span class="n">lower_range</span><span class="p">,</span> <span class="n">upper_range</span><span class="p">)</span>
         <span class="n">mask</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_holes</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span>
         <span class="c1">#mask = cv2.GaussianBlur(mask, (5, 5), 2)</span>
         <span class="n">kernel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
@@ -511,20 +582,72 @@
                 <span class="n">cv2</span><span class="o">.</span><span class="n">circle</span><span class="p">(</span><span class="n">mask_rgb</span><span class="p">,</span> <span class="n">center</span><span class="p">,</span> <span class="n">radius</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
 
         <span class="n">img_msg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bridge</span><span class="o">.</span><span class="n">cv2_to_imgmsg</span><span class="p">(</span><span class="n">mask_rgb</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;rgb8&quot;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">mask_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">img_msg</span><span class="p">)</span>
+        <span class="n">img_ann</span> <span class="o">=</span> <span class="n">AnnotatedImage</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="n">img_msg</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">type_info</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mask_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">img_ann</span><span class="p">)</span>
         <span class="c1">#cv2.imwrite(&#39;/home/sailbot/test_image.jpg&#39;, mask_rgb)</span>
         <span class="k">return</span> <span class="n">contours_cirles</span></div>
 
-<div class="viewcode-block" id="BuoyDetection.calculate_depth"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.calculate_depth">[docs]</a>    <span class="k">def</span> <span class="nf">calculate_depth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contour</span><span class="p">):</span>
+<div class="viewcode-block" id="BuoyDetection.estimate_depth"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.estimate_depth">[docs]</a>    <span class="k">def</span> <span class="nf">estimate_depth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contour</span><span class="p">,</span> <span class="n">diameter</span><span class="p">):</span>
 
         <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">radius</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">minEnclosingCircle</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span>
         <span class="c1">#self.get_logger().info(&quot;radius: &quot;+str(radius))</span>
 
         <span class="c1">#depth = (KNOWN_DIAMETER*PIXEL_SIZE*current_x_scaling_factor/2 * FOCAL_LENGTH*current_x_scaling_factor) / radius</span>
-        <span class="n">depth</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">buoy_diameter_meters</span><span class="o">*</span><span class="n">FX</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">radius</span><span class="o">*</span><span class="mi">2</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">current_x_scaling_factor</span><span class="p">)</span>
+        <span class="n">depth</span> <span class="o">=</span> <span class="p">(</span><span class="n">diameter</span><span class="o">*</span><span class="n">FX</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">radius</span><span class="o">*</span><span class="mi">2</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">current_x_scaling_factor</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">depth</span></div>
+    
+<div class="viewcode-block" id="BuoyDetection.calculate_depth"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.calculate_depth">[docs]</a>    <span class="k">def</span> <span class="nf">calculate_depth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contour</span><span class="p">,</span> <span class="n">diameter</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Finds the depth of a contour by sampling the depth image from the ZED camera.</span>
+<span class="sd">        Validates the object and depth by checking the sampled depth vs. the depth this buoy should be at</span>
+<span class="sd">        based on its contour diameter.</span>
+
+<span class="sd">        :param cX: X center of the contour in the image</span>
+<span class="sd">        :param cY: Y center of the contour in the image</span>
+<span class="sd">        :param contour: The contour we are checking</span>
+<span class="sd">        :param diameter: The diameter of the contour</span>
+
+
+<span class="sd">        :return: Depth of the object if valid, None if not.</span>
+
+<span class="sd">        Function behavior includes:</span>
+<span class="sd">        - Checking for availability of the depth texture</span>
+<span class="sd">        - Sampling the depth texture</span>
+<span class="sd">        - Checking for invalid values in the depth texture</span>
+<span class="sd">        - Calculating the minimum enclosing circle and expected depth of the contour</span>
+<span class="sd">        - Checking if the sampled depth and estimated depth agree with each other</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Ensure the depth image is available</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth_image</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Depth texture is None.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="c1"># self.estimate_depth(contour, diameter)</span>
+
+        <span class="c1"># Calculate the radius of the contour</span>
+        <span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span> <span class="n">radius</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">minEnclosingCircle</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+        <span class="c1"># Sample the depth value from the depth image at the contour center</span>
+        <span class="n">depth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth_image</span><span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">]</span>
+
+        <span class="c1"># Handle invalid depth values</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">depth</span><span class="p">)</span> <span class="ow">or</span> <span class="n">depth</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">depth</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Encountered NaN, infinite, or negative value in depth texture.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="c1">#self.estimate_depth(contour, diameter)</span>
+
+        <span class="c1"># Calculate the expected depth based on the known diameter and contour radius</span>
+        <span class="n">expected_depth</span> <span class="o">=</span> <span class="p">(</span><span class="n">diameter</span> <span class="o">*</span> <span class="n">FX</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">radius</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_x_scaling_factor</span><span class="p">)</span>
+
+        <span class="c1"># Validate the depth from texture against the expected depth</span>
+        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">depth</span> <span class="o">-</span> <span class="n">expected_depth</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth_error_threshold_meters</span><span class="p">:</span>
+            <span class="c1"># Depth values are not consistent</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Depth inconsistency: texture=</span><span class="si">{</span><span class="n">depth</span><span class="si">}</span><span class="s2">, expected=</span><span class="si">{</span><span class="n">expected_depth</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        
         <span class="k">return</span> <span class="n">depth</span></div>
 
-<div class="viewcode-block" id="BuoyDetection.calculate_object_center"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.calculate_object_center">[docs]</a>    <span class="k">def</span> <span class="nf">calculate_object_center</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contour</span><span class="p">):</span>
+<div class="viewcode-block" id="BuoyDetection.calculate_object_center"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.calculate_object_center">[docs]</a>    <span class="k">def</span> <span class="nf">calculate_object_center</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contour</span><span class="p">,</span> <span class="n">diameter</span><span class="p">):</span>
         <span class="c1"># Calculate the center of the contour</span>
         <span class="n">M</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">moments</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">M</span><span class="p">[</span><span class="s2">&quot;m00&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
@@ -533,7 +656,11 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">cX</span><span class="p">,</span> <span class="n">cY</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
         
-        <span class="n">cZ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_depth</span><span class="p">(</span><span class="n">contour</span><span class="p">)</span>
+        <span class="n">cZ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_depth</span><span class="p">(</span><span class="n">contour</span><span class="p">,</span> <span class="n">diameter</span><span class="p">)</span>
+        
+        <span class="k">if</span><span class="p">(</span><span class="n">cZ</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        
         <span class="k">return</span> <span class="n">cX</span><span class="p">,</span> <span class="n">cY</span><span class="p">,</span> <span class="n">cZ</span></div>
 
 <div class="viewcode-block" id="BuoyDetection.pixel_to_world"><a class="viewcode-back" href="../buoy_detection.html#buoy_detection.BuoyDetection.pixel_to_world">[docs]</a>    <span class="k">def</span> <span class="nf">pixel_to_world</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x_pixel</span><span class="p">,</span> <span class="n">y_pixel</span><span class="p">,</span> <span class="n">depth</span><span class="p">,</span> <span class="n">f_x</span><span class="p">,</span> <span class="n">f_y</span><span class="p">,</span> <span class="n">c_x</span><span class="p">,</span> <span class="n">c_y</span><span class="p">):</span>

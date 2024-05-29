@@ -44,7 +44,7 @@ for the boat. It handles command executions and telemetry data streaming over gR
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>current_map</strong> – An ‘OccupancyGrid’ object representing the current map used for navigation.</p></li>
 <li><p><strong>current_boat_state</strong> – A protobuf message holding the current state of the boat.</p></li>
-<li><p><strong>current_video_source</strong> – An integer representing the current requested video source</p></li>
+<li><p><strong>current_video_source</strong> – A string representing the current requested video source</p></li>
 </ul>
 </dd>
 </dl>
@@ -95,13 +95,28 @@ for the boat. It handles command executions and telemetry data streaming over gR
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteRequestTackCommand">
+<span class="sig-name descname"><span class="pre">ExecuteRequestTackCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">RequestTackCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteRequestTackCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteRequestTackCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteRudderCommand">
 <span class="sig-name descname"><span class="pre">ExecuteRudderCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">RudderCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteRudderCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteRudderCommand" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteSetRudderKPCommand">
-<span class="sig-name descname"><span class="pre">ExecuteSetRudderKPCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SetRudderKPCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteSetRudderKPCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteSetRudderKPCommand" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteSetCVParametersCommand">
+<span class="sig-name descname"><span class="pre">ExecuteSetCVParametersCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SetCVParametersCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteSetCVParametersCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteSetCVParametersCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteSetRudderAdjustmentScaleCommand">
+<span class="sig-name descname"><span class="pre">ExecuteSetRudderAdjustmentScaleCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SetRudderAdjustmentScaleCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteSetRudderAdjustmentScaleCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteSetRudderAdjustmentScaleCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteSetRudderOvershootBiasCommand">
+<span class="sig-name descname"><span class="pre">ExecuteSetRudderOvershootBiasCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SetRudderOvershootBiasCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteSetRudderOvershootBiasCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteSetRudderOvershootBiasCommand" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -117,6 +132,11 @@ for the boat. It handles command executions and telemetry data streaming over gR
 <dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.ExecuteTrimTabCommand">
 <span class="sig-name descname"><span class="pre">ExecuteTrimTabCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TrimTabCommand</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.ExecuteTrimTabCommand"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.ExecuteTrimTabCommand" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.GetCVParameters">
+<span class="sig-name descname"><span class="pre">GetCVParameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GetCVParametersRequest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.GetCVParameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.GetCVParameters" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -149,6 +169,11 @@ for the boat. It handles command executions and telemetry data streaming over gR
 <span class="sig-name descname"><span class="pre">apparent_wind_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Wind</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.apparent_wind_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.apparent_wind_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
+<dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.available_video_sources">
+<span class="sig-name descname"><span class="pre">available_video_sources</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#network_comms.NetworkComms.available_video_sources" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.buoy_position_callback">
 <span class="sig-name descname"><span class="pre">buoy_position_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BuoyDetectionStamped</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.buoy_position_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.buoy_position_callback" title="Permalink to this definition">¶</a></dt>
@@ -166,12 +191,27 @@ for the boat. It handles command executions and telemetry data streaming over gR
 
 <dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.camera_mask_image_callback">
-<span class="sig-name descname"><span class="pre">camera_mask_image_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.camera_mask_image_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.camera_mask_image_callback" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">camera_mask_image_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">AnnotatedImage</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.camera_mask_image_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.camera_mask_image_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.control_system_heartbeat">
 <span class="sig-name descname"><span class="pre">control_system_heartbeat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.control_system_heartbeat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.control_system_heartbeat" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.create_and_bind_error_callback">
+<span class="sig-name descname"><span class="pre">create_and_bind_error_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.create_and_bind_error_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.create_and_bind_error_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.create_and_bind_lifecycle_callback">
+<span class="sig-name descname"><span class="pre">create_and_bind_lifecycle_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.create_and_bind_lifecycle_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.create_and_bind_lifecycle_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.create_error_callback">
+<span class="sig-name descname"><span class="pre">create_error_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">String</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.create_error_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.create_error_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -195,6 +235,11 @@ for the boat. It handles command executions and telemetry data streaming over gR
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.current_cv_parameters">
+<span class="sig-name descname"><span class="pre">current_cv_parameters</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#network_comms.NetworkComms.current_cv_parameters" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.current_map">
 <span class="sig-name descname"><span class="pre">current_map</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">OccupancyGrid</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#network_comms.NetworkComms.current_map" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -206,7 +251,12 @@ for the boat. It handles command executions and telemetry data streaming over gR
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.current_video_source">
-<span class="sig-name descname"><span class="pre">current_video_source</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#network_comms.NetworkComms.current_video_source" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">current_video_source</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">''</span></em><a class="headerlink" href="#network_comms.NetworkComms.current_video_source" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.decode_image">
+<span class="sig-name descname"><span class="pre">decode_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.decode_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.decode_image" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -215,8 +265,42 @@ for the boat. It handles command executions and telemetry data streaming over gR
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.encode_frame">
+<span class="sig-name descname"><span class="pre">encode_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.encode_frame"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.encode_frame" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.get_parameters">
+<span class="sig-name descname"><span class="pre">get_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.get_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.get_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a list of parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>names</strong> – Fully-qualified names of the parameters to get, including their namespaces.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The values for the given parameter names.
+A default Parameter will be returned for undeclared parameters if
+undeclared parameters are allowed.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ParameterNotDeclaredException if undeclared parameters are not allowed,
+and at least one parameter hadn’t been declared beforehand.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p>ParameterUninitializedException if at least one parameter is statically typed and
+uninitialized.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.heading_callback">
 <span class="sig-name descname"><span class="pre">heading_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Float64</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.heading_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.heading_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.initial_cv_parameters_callback">
+<span class="sig-name descname"><span class="pre">initial_cv_parameters_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">CVParameters</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.initial_cv_parameters_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.initial_cv_parameters_callback" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -231,7 +315,7 @@ for the boat. It handles command executions and telemetry data streaming over gR
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.last_camera_frame_time">
-<span class="sig-name descname"><span class="pre">last_camera_frame_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1715623680.4883015</span></em><a class="headerlink" href="#network_comms.NetworkComms.last_camera_frame_time" title="Permalink to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">last_camera_frame_time</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1716956582.7147317</span></em><a class="headerlink" href="#network_comms.NetworkComms.last_camera_frame_time" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -347,8 +431,48 @@ super().on_shutdown() in derived classes.</p>
 <dd></dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="network_comms.NetworkComms.setup_node_subscription">
-<span class="sig-name descname"><span class="pre">setup_node_subscription</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.setup_node_subscription"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.setup_node_subscription" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="network_comms.NetworkComms.set_parameters">
+<span class="sig-name descname"><span class="pre">set_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.set_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.set_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set parameters for the node, and return the result for the set action.</p>
+<p>If any parameter in the list was not declared beforehand and undeclared parameters are not
+allowed for the node, this method will raise a ParameterNotDeclaredException exception.</p>
+<p>Parameters are set in the order they are declared in the list.
+If setting a parameter fails due to not being declared, then the
+parameters which have already been set will stay set, and no attempt will
+be made to set the parameters which come after.</p>
+<p>If undeclared parameters are allowed, then all the parameters will be implicitly
+declared before being set even if they were not declared beforehand.
+Parameter overrides are ignored by this method.</p>
+<p>If a callback was registered previously with <code class="xref py py-func docutils literal notranslate"><span class="pre">add_on_set_parameters_callback()</span></code>, it
+will be called prior to setting the parameters for the node, once for each parameter.
+If the callback prevents a parameter from being set, then it will be reflected in the
+returned result; no exceptions will be raised in this case.
+For each successfully set parameter, a <code class="xref py py-class docutils literal notranslate"><span class="pre">ParameterEvent</span></code> message is
+published.</p>
+<p>If the value type of the parameter is NOT_SET, and the existing parameter type is
+something else, then the parameter will be implicitly undeclared.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameter_list</strong> – The list of parameters to set.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The result for each set action as a list.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ParameterNotDeclaredException if undeclared parameters are not allowed,
+and at least one parameter in the list hadn’t been declared beforehand.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.setup_node_subscriptions">
+<span class="sig-name descname"><span class="pre">setup_node_subscriptions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.setup_node_subscriptions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.setup_node_subscriptions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.shutdown_handler">
+<span class="sig-name descname"><span class="pre">shutdown_handler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signum</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.shutdown_handler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.shutdown_handler" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -404,6 +528,11 @@ super().on_shutdown() in derived classes.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="network_comms.NetworkComms.update_node_status_timer_callback">
 <span class="sig-name descname"><span class="pre">update_node_status_timer_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.update_node_status_timer_callback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.update_node_status_timer_callback" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="network_comms.NetworkComms.update_video_sources">
+<span class="sig-name descname"><span class="pre">update_video_sources</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/network_comms.html#NetworkComms.update_video_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#network_comms.NetworkComms.update_video_sources" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
