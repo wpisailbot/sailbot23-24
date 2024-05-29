@@ -46,6 +46,7 @@ import time
 import os
 import numpy as np
 import cv2
+from cv_bridge import CvBridge
 import re
 import numpy as np
 import traceback
@@ -234,6 +235,7 @@ class NetworkComms(LifecycleNode):
         self.get_logger().info(f'Map name: {self.map_name}')
         self.get_logger().info("Getting map image")
         self.map_image, self.bbox = find_and_load_image(get_resource_dir(), self.map_name)
+        self.bridge = CvBridge()
 
     def set_parameters(self) -> None:
         self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
@@ -488,6 +490,7 @@ class NetworkComms(LifecycleNode):
             'heartbeat/trim_tab_comms',
             self.trim_tab_comms_heartbeat,
             1)
+            
         #super().on_configure()
         return TransitionCallbackReturn.SUCCESS
 
@@ -672,12 +675,48 @@ class NetworkComms(LifecycleNode):
     def pitch_callback(self, msg: Float64):
         self.current_boat_state.pitch = msg.data
     
+    def decode_image(self, msg: Image):
+        if msg.encoding == 'mono8':
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='mono8')
+        elif msg.encoding == 'mono16':
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='mono16')
+        elif msg.encoding == 'rgb8':
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='rgb8')
+        elif msg.encoding == 'bgr8':
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        elif msg.encoding == 'bgra8':
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgra8')
+        elif msg.encoding == 'rgba8':
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='rgba8')
+        elif msg.encoding == '32FC1':
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='32FC1')
+            
+            # Depth image has Inf and NaN in it, which breaks normalization
+            valid_mask = np.isfinite(cv_image)
+            if np.any(valid_mask):
+                max_val = np.max(cv_image[valid_mask])
+            else:
+                max_val = 0.0
+                self.get_logger().warn('No valid values found in the image.')
+
+            cv_image = np.nan_to_num(cv_image, nan=max_val, posinf=max_val)
+
+            frame = cv2.normalize(cv_image, None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
+
+        else:
+            raise ValueError(f"Unsupported encoding: {msg.encoding}")
+        return frame
+
+    def encode_frame(self, frame):
+        encoded_frame = cv2.imencode('.jpg', frame)[1].tobytes()
+        return encoded_frame
+
     def set_current_image(self, msg: Image):
         current_time = time.time()
-        if(current_time>self.last_camera_frame_time+0.1):
-            frame = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+        if current_time > self.last_camera_frame_time + 0.1:
+            frame = self.decode_image(msg)
             self.last_camera_frame_shape = frame.shape
-            self.last_camera_frame = encode_frame(frame)
+            self.last_camera_frame = self.encode_frame(frame)
             self.last_camera_frame_time = current_time
 
     def update_video_sources(self):
