@@ -46,6 +46,8 @@ buoy_detection:
     sailbot:
       cv:
         buoy_circularity_threshold: 0.6
+        depth_error_threshold_meters: 1.0
+        buoy_detection_lifetime_seconds: 3.0
 
 network_comms:
   ros__parameters:

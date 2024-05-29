@@ -1,3 +1,3 @@
 geographic_msgs/GeoPoint position
-uint8 id
+uint32 id
 std_msgs/Header header

@@ -97,6 +97,7 @@ class Track:
         self.kf = create_kalman_filter(initial_e, initial_n)
         self.time_since_update = 0
         self.history = [(self.kf.x[0], self.kf.x[2])]
+        self.last_update_time = time.time() 
 
     def predict(self):
         self.kf.predict()
@@ -107,6 +108,7 @@ class Track:
         self.kf.update(detection_enu)
         self.time_since_update = 0
         self.history.append((self.kf.x[0], self.kf.x[2]))
+        self.last_update_time = time.time()
     
     def get_position(self):
         return (self.kf.x[0], self.kf.x[2])
@@ -186,16 +188,18 @@ class BuoyDetection(Node):
     heading = 0
     tracks: List[Track] = []
     buoy_types: List[BuoyTypeInfo] = []
+    depth_image = None
+
     def __init__(self):
         super().__init__('object_detection_node')
 
         orangeType = BuoyTypeInfo()
         orangeType.buoy_diameter = 0.5
         orangeType.name = "orange"
-        orangeType.hsv_bounds.lower_h = 5
-        orangeType.hsv_bounds.lower_s = 49
-        orangeType.hsv_bounds.lower_v = 120
-        orangeType.hsv_bounds.upper_h = 110
+        orangeType.hsv_bounds.lower_h = 0
+        orangeType.hsv_bounds.lower_s = 98
+        orangeType.hsv_bounds.lower_v = 52
+        orangeType.hsv_bounds.upper_h = 17
         orangeType.hsv_bounds.upper_s = 255
         orangeType.hsv_bounds.upper_v = 255
         self.buoy_types.append(orangeType)
@@ -228,7 +232,12 @@ class BuoyDetection(Node):
         self.subscription = self.create_subscription(
             Image,
             '/zed/zed_node/rgb/image_rect_color',
-            self.listener_callback,
+            self.zed_image_callback,
+            10)
+        self.camera_depth_image_subscriber = self.create_subscription(
+            Image,
+            '/zed/zed_node/depth/depth_registered',
+            self.camera_depth_image_callback,
             10)
         self.airmar_position_subscription = self.create_subscription(
                 NavSatFix,
@@ -277,9 +286,17 @@ class BuoyDetection(Node):
 
     def set_parameters(self) -> None:
         self.declare_parameter('sailbot.cv.buoy_circularity_threshold', 0.6)
+        self.declare_parameter('sailbot.cv.depth_error_threshold_meters', 3.0)
+        self.declare_parameter('sailbot.cv.buoy_detection_lifetime_seconds', 3.0)
+
+
 
     def get_parameters(self) -> None:
         self.buoy_circularity_threshold = self.get_parameter('sailbot.cv.buoy_circularity_threshold').get_parameter_value().double_value
+        self.depth_error_threshold_meters = self.get_parameter('sailbot.cv.depth_error_threshold_meters').get_parameter_value().double_value
+        self.buoy_detection_lifetime_seconds = self.get_parameter('sailbot.cv.buoy_detection_lifetime_seconds').get_parameter_value().double_value
+
+
 
     def airmar_position_callback(self, msg: NavSatFix) -> None:
         self.latitude = msg.latitude
@@ -292,6 +309,10 @@ class BuoyDetection(Node):
         self.get_logger().info(f"Got new CV parameters: {msg}")
         self.buoy_types = msg.buoy_types
         self.buoy_circularity_threshold = msg.circularity_threshold
+
+    def remove_stale_tracks(self):
+        current_time = time.time()
+        self.tracks = [track for track in self.tracks if current_time - track.last_update_time <= self.buoy_detection_lifetime_seconds]
 
     def publish_tracks(self) -> None:
         #self.get_logger().info(f"Num tracks: {len(self.tracks)}")
@@ -355,7 +376,7 @@ class BuoyDetection(Node):
 
         return matches, list(unmatched_detections)#, list(unmatched_tracks)
 
-    def listener_callback(self, data) -> None:
+    def zed_image_callback(self, data) -> None:
         """
         Callback function for handling image data received from a ROS subscriber. This function processes each image frame to detect,
         identify, and track orange objects, likely buoys, based on their color and shape. It converts ROS image messages to OpenCV
@@ -393,8 +414,12 @@ class BuoyDetection(Node):
         detections = []
         for buoy_type in self.buoy_types:
             contours = self.detect_colored_objects(image, buoy_type)
-            detections.extend([self.calculate_object_center(contour, buoy_type.buoy_diameter) for contour in contours])
-        
+            detections.extend(
+                [
+                    center for contour in contours
+                    if (center := self.calculate_object_center(contour, buoy_type.buoy_diameter)) is not None
+                ]
+            )        
         #self.get_logger().info(f"detections: {detections}")
 
         detections_latlon = []
@@ -417,6 +442,11 @@ class BuoyDetection(Node):
             self.tracks.append(Track(enu[0], enu[1]))
 
         self.publish_tracks()
+        self.remove_stale_tracks()
+
+    def camera_depth_image_callback(self, msg):
+        depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="32FC1")
+        self.depth_image = cv2.undistort(depth, camera_matrix, distortion_coefficients)
 
 
     def fill_holes(self, image):
@@ -526,13 +556,41 @@ class BuoyDetection(Node):
         #cv2.imwrite('/home/sailbot/test_image.jpg', mask_rgb)
         return contours_cirles
 
-    def calculate_depth(self, contour, diameter):
+    def estimate_depth(self, contour, diameter):
 
         (x, y), radius = cv2.minEnclosingCircle(contour)
         #self.get_logger().info("radius: "+str(radius))
 
         #depth = (KNOWN_DIAMETER*PIXEL_SIZE*current_x_scaling_factor/2 * FOCAL_LENGTH*current_x_scaling_factor) / radius
         depth = (diameter*FX)/(radius*2/self.current_x_scaling_factor)
+        return depth
+    
+    def calculate_depth(self, cX, cY, contour, diameter):
+        # Ensure the depth image is available
+        if self.depth_image is None:
+            self.get_logger().warn("Depth texture is None.")
+            return None# self.estimate_depth(contour, diameter)
+
+        # Sample the depth value from the depth image at the contour center
+        depth = self.depth_image[cY, cX]
+
+        # Handle invalid depth values
+        if np.isnan(depth) or depth <= 0 or not np.isfinite(depth):
+            self.get_logger().warn("Encountered NaN, infinite, or negative value in depth texture.")
+            return None#self.estimate_depth(contour, diameter)
+
+        # Calculate the radius of the contour
+        (x, y), radius = cv2.minEnclosingCircle(contour)
+
+        # Calculate the expected depth based on the known diameter and contour radius
+        expected_depth = (diameter * FX) / (2 * radius / self.current_x_scaling_factor)
+
+        # Validate the depth from texture against the expected depth
+        if abs(depth - expected_depth) > self.depth_error_threshold_meters:
+            # Depth values are not consistent
+            self.get_logger().warn(f"Depth inconsistency: texture={depth}, expected={expected_depth}")
+            return None
+        
         return depth
 
     def calculate_object_center(self, contour, diameter):
@@ -544,7 +602,11 @@ class BuoyDetection(Node):
         else:
             cX, cY = 0, 0
         
-        cZ = self.calculate_depth(contour, diameter)
+        cZ = self.calculate_depth(cX, cY, contour, diameter)
+        
+        if(cZ is None):
+            return None
+        
         return cX, cY, cZ
 
     def pixel_to_world(self, x_pixel, y_pixel, depth, f_x, f_y, c_x, c_y):
