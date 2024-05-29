@@ -306,7 +306,7 @@ class BuoyDetection(Node):
         self.heading = msg.data
     
     def cv_parameters_callback(self, msg: CVParameters) -> None:
-        self.get_logger().info(f"Got new CV parameters: {msg}")
+        #self.get_logger().info(f"Got new CV parameters: {msg}")
         self.buoy_types = msg.buoy_types
         self.buoy_circularity_threshold = msg.circularity_threshold
 
@@ -571,8 +571,6 @@ class BuoyDetection(Node):
         Validates the object and depth by checking the sampled depth vs. the depth this buoy should be at
         based on its contour diameter.
 
-        :param cX: X center of the contour in the image
-        :param cY: Y center of the contour in the image
         :param contour: The contour we are checking
         :param diameter: The diameter of the contour
 
@@ -602,7 +600,7 @@ class BuoyDetection(Node):
 
         # Handle invalid depth values
         if np.isnan(depth) or depth <= 0 or not np.isfinite(depth):
-            self.get_logger().warn("Encountered NaN, infinite, or negative value in depth texture.")
+            #self.get_logger().warn("Encountered NaN, infinite, or negative value in depth texture.")
             return None#self.estimate_depth(contour, diameter)
 
         # Calculate the expected depth based on the known diameter and contour radius
@@ -611,7 +609,7 @@ class BuoyDetection(Node):
         # Validate the depth from texture against the expected depth
         if abs(depth - expected_depth) > self.depth_error_threshold_meters:
             # Depth values are not consistent
-            self.get_logger().warn(f"Depth inconsistency: texture={depth}, expected={expected_depth}")
+            #self.get_logger().warn(f"Depth inconsistency: texture={depth}, expected={expected_depth}")
             return None
         
         return depth

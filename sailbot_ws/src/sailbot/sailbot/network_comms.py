@@ -191,6 +191,7 @@ class NetworkComms(LifecycleNode):
     do_video_encode = False
     current_video_source = ""
     current_buoy_positions = {}
+    current_buoy_times = {}
     available_video_sources = set()
 
     def __init__(self):
@@ -490,9 +491,10 @@ class NetworkComms(LifecycleNode):
             'heartbeat/trim_tab_comms',
             self.trim_tab_comms_heartbeat,
             1)
-            
-        #super().on_configure()
-        return TransitionCallbackReturn.SUCCESS
+        
+        self.buoy_cleanup_timer = self.create_timer(1.0, self.remove_old_buoys)
+
+        return super().on_configure(state)
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")
@@ -754,14 +756,27 @@ class NetworkComms(LifecycleNode):
             return
         self.set_current_image(msg)
 
-    def buoy_position_callback(self, msg: BuoyDetectionStamped):
-        self.current_buoy_positions[msg.id] = msg
+    def update_buoy_state(self):
         self.current_boat_state.ClearField("buoy_positions")# = command.new_path
         #self.get_logger().info("Cleared old path")
         for key in self.current_buoy_positions.keys():
             point = self.current_buoy_positions[key].position
             point_msg = boat_state_pb2.Point(latitude=point.latitude, longitude = point.longitude)
             self.current_boat_state.buoy_positions.append(point_msg)
+
+    def buoy_position_callback(self, msg: BuoyDetectionStamped):
+        self.current_buoy_positions[msg.id] = msg
+        self.current_buoy_times[msg.id] = time.time()
+        self.update_buoy_state()
+    
+    def remove_old_buoys(self):
+        current_time = time.time()
+        keys_to_delete = [key for key, (timestamp) in self.current_buoy_times.items() if current_time - timestamp > 3]
+        for key in keys_to_delete:
+            del self.current_buoy_positions[key]
+            del self.current_buoy_times[key]
+
+        self.update_buoy_state()
 
     def rudder_angle_callback(self, msg: Int16):
         self.current_boat_state.rudder_position = msg.data
@@ -1012,7 +1027,6 @@ class NetworkComms(LifecycleNode):
                 newParams.buoy_types.append(this_type)
 
             newParams.circularity_threshold = command.parameters.circularity_threshold
-            self.get_logger().info(f"Got new CV parameters: {newParams}")
             self.cv_parameters_publisher.publish(newParams)
         except Exception as e:
             trace = traceback.format_exc()

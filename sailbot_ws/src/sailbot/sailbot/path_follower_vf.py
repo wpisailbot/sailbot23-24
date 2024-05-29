@@ -171,6 +171,7 @@ class PathFollower(LifecycleNode):
     last_recalculation_time = time.time()
 
     current_buoy_positions = {}
+    current_buoy_times = {}
     last_waypoint_was_rounding_type = False
 
     waypoint_threat_id_map = {}
@@ -331,8 +332,7 @@ class PathFollower(LifecycleNode):
                 10,
                 callback_group = self.subscription_callback_group)
             
-            #self.timer = self.create_timer(0.1, self.control_loop_callback)
-            #super().on_configure(state)
+            self.buoy_cleanup_timer = self.create_timer(1.0, self.remove_old_buoys)
         
         except Exception as e:
             self.get_logger().info("Error in configure")
@@ -340,7 +340,7 @@ class PathFollower(LifecycleNode):
         
         self.get_logger().info("Path following node configured")
         
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_configure(state)
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Activating...")
@@ -715,6 +715,7 @@ class PathFollower(LifecycleNode):
             #synchronous service call because ROS2 async doesn't work in callbacks
             result = self.set_threat_cli.call(req)
             self.get_logger().info("Threat removed")
+        self.waypoint_threat_id_map.clear()
 
 
     def add_threat(self, waypoint: Waypoint, id=-1) -> None:
@@ -794,6 +795,14 @@ class PathFollower(LifecycleNode):
 
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg
+        self.current_buoy_times[msg.id] = time.time()
+
+    def remove_old_buoys(self):
+        current_time = time.time()
+        keys_to_delete = [key for key, (timestamp) in self.current_buoy_times.items() if current_time - timestamp > 3]
+        for key in keys_to_delete:
+            del self.current_buoy_positions[key]
+            del self.current_buoy_times[key]
 
     def request_replan_callback(self, msg: Empty) -> None:
         current_time = time.time()
