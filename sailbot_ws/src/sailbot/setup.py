@@ -1,5 +1,14 @@
 from setuptools import find_packages, setup
+import os
 from glob import glob
+
+def glob_exclude(directory, exclude_patterns=[]):
+    """ Glob files in directory, excluding those matching any pattern in exclude_patterns """
+    files = glob(os.path.join(directory, '*'))
+    for pattern in exclude_patterns:
+        excluded_files = glob(os.path.join(directory, pattern))
+        files = [f for f in files if f not in excluded_files]
+    return files
 
 package_name = 'sailbot'
 
@@ -14,8 +23,8 @@ setup(
         ('share/' + package_name + '/launch/', glob('launch/*.py')),
         ('share/' + package_name + '/config/', glob('config/*.yaml')),
         ('share/' + package_name +'/maps/', glob('maps/*.png')),
-        ('lib/'+package_name+'/telemetry_messages/python/', glob('sailbot/telemetry_messages/python/*')),
-        ('lib/'+package_name+'/trim_tab_messages/python/', glob('sailbot/trim_tab_messages/python/*')),
+        ('lib/'+package_name+'/telemetry_messages/python/', glob_exclude('sailbot/telemetry_messages/python/*',  ['__pycache__'])),
+        ('lib/'+package_name+'/trim_tab_messages/python/', glob_exclude('sailbot/trim_tab_messages/python/*',  ['__pycache__'])),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -45,6 +54,7 @@ setup(
             'buoy_detection = sailbot.buoy_detection:main',
             'fake_movement = sailbot.fake_movement:main',
             'heading_select = sailbot.heading_select:main',
+            'search_rescue_vf = sailbot.search_rescue_vf:main',
         ],
     },
 )

@@ -55,11 +55,26 @@ public:
             RCLCPP_WARN(this->get_logger(), "GetPath called, but no map has been set!");
         }
         RCLCPP_INFO(this->get_logger(), "Calculating solution");
-        uint x1 = request->start.x + pMap->half_width_diff;
-        uint y1 = request->start.y + pMap->half_height_diff;
-        uint x2 = request->end.x + pMap->half_width_diff;
-        uint y2 = request->end.y + pMap->half_height_diff;
+        float x1f = request->start.x + pMap->half_width_diff;
+        float y1f = request->start.y + pMap->half_height_diff;
+        float x2f = request->end.x + pMap->half_width_diff;
+        float y2f = request->end.y + pMap->half_height_diff;
+        if(x1f<0.0 || x2f<0.0 || y1f<0.0 || y2f>0.0){
+            RCLCPP_WARN(this->get_logger(), "Cells out of map bounds!");
+            return;
+        }
+
+        uint x1 = uint(x1f);
+        uint y1 = uint(y1f);
+        uint x2 = uint(x2f);
+        uint y2 = uint(y2f);
         RCLCPP_INFO(this->get_logger(), "Adjusted cells: (%d, %d), (%d, %d)", x1, y1, x2, y2);
+        RCLCPP_INFO(this->get_logger(), "Map dims: (%d, %d)", pMap->height, pMap->height);
+
+        if(x1>=pMap->width || x2>=pMap->width || y1>=pMap->height || y2>=pMap->height){
+            RCLCPP_WARN(this->get_logger(), "Cells out of map bounds!");
+            return;
+        }
         auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getMapNode(x1, y1), pMap->getMapNode(x2, y2), request->pathfinding_strategy);
         RCLCPP_INFO(this->get_logger(), "Solution complete");
         for (auto p : path)
