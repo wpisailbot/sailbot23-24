@@ -887,7 +887,7 @@ class PathFollower(LifecycleNode):
         bearing = (90 - math.degrees(theta)) % 360
         return bearing
 
-    def latlong_to_grid_proj(self, latitude: float, longitude: float, bbox: dict, image_width: int, image_height: int, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
+    def latlong_to_grid_proj(self, latitude: float, longitude: float, bbox: dict, image_width: int, image_height: int, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[float, float]:
         """
         Convert latitude and longitude coordinates to grid cell coordinates using pyproj for projection handling.
 

@@ -626,7 +626,7 @@ class PathFollower(LifecycleNode):
                     self.exact_points.pop(0)
 
 
-    def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
+    def latlong_to_grid_proj(self, latitude, longitude, bbox, image_width, image_height, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[float, float]:
         """
         Convert lat/long coordinates to grid cell using pyproj for projection handling.
         

@@ -438,7 +438,7 @@ class PathFollower(LifecycleNode):
         - Updates the 'exact_points' and 'grid_points' with the waypoints for the lawnmower pattern.
         """
 
-        track_spacing=5 # Meters
+        track_spacing=10 # Meters
 
         # Calculate number of tracks needed
         num_tracks = int(2 * radius_meters / track_spacing)
@@ -469,16 +469,25 @@ class PathFollower(LifecycleNode):
 
 
             # Calculate the start and end points of the chord perpendicular to the wind direction
-            start_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), perpendicular_bearing)
-            end_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), (perpendicular_bearing + 180) % 360)
+            if i%2==0:
+                start_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), perpendicular_bearing)
+                end_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), (perpendicular_bearing + 180) % 360)
+            else:
+                end_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), perpendicular_bearing)
+                start_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), (perpendicular_bearing + 180) % 360)
             self.get_logger().info(f"start point: {start_point}")
             self.get_logger().info(f"end point: {end_point}")
 
 
             self.exact_points.append(GeoPoint(latitude=start_point.latitude, longitude=start_point.longitude))
             self.exact_points.append(GeoPoint(latitude=end_point.latitude, longitude=end_point.longitude))
+        
+        # Remove first point, duplicate from artifact of circle calculations
+        self.exact_points.pop(0)
 
-            self.grid_points = [self.latlong_to_grid_proj(p.latitude, p.longitude, self.bbox, self.image_width, self.image_height) for p in self.exact_points]
+        self.grid_points = [self.latlong_to_grid_proj(p.latitude, p.longitude, self.bbox, self.image_width, self.image_height) for p in self.exact_points]
+
+        self.get_logger().info(f"grid points: {self.grid_points}")
 
 
     def recalculate_path_from_exact_points(self) -> None:
@@ -601,7 +610,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Got single waypoint")
         self.waypoint = msg
         
-        self.generate_lawnmower_pattern(msg.point.latitude, msg.point.longitude, 20, self.wind_angle_deg)
+        self.generate_lawnmower_pattern(msg.point.latitude, msg.point.longitude, 50, self.wind_angle_deg)
 
         self.recalculate_path_from_exact_points()
         self.find_look_ahead()
@@ -698,7 +707,7 @@ class PathFollower(LifecycleNode):
         bearing = (90 - math.degrees(theta)) % 360
         return bearing
 
-    def latlong_to_grid_proj(self, latitude: float, longitude: float, bbox: dict, image_width: int, image_height: int, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[int, int]:
+    def latlong_to_grid_proj(self, latitude: float, longitude: float, bbox: dict, image_width: int, image_height: int, src_proj='EPSG:4326', dest_proj='EPSG:3857') -> Tuple[float, float]:
         """
         Convert latitude and longitude coordinates to grid cell coordinates using pyproj for projection handling.
 

@@ -552,7 +552,7 @@ class HeadingController(LifecycleNode):
             self.get_logger().info("Current grid cell is none, cannot operate")
             return
         
-        self.get_logger().info(f"Current segment: {self.path_segment.start}, {self.path_segment.end}")
+        #self.get_logger().info(f"Current segment: {self.path_segment.start}, {self.path_segment.end}")
         
         grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=self.k_base, lambda_base=self.lambda_base)
         #self.get_logger().info(f"Direction vector: {grid_direction_vector}")
@@ -577,7 +577,7 @@ class HeadingController(LifecycleNode):
         target_heading_msg.data = target_heading
         self.target_heading_debug_publisher.publish(target_heading_msg)
         
-        self.get_logger().info(f"Target heading: {target_heading}")
+        #self.get_logger().info(f"Target heading: {target_heading}")
         heading_error = math.degrees(normalRelativeAngle(math.radians(self.heading-target_heading)))
 
         current_time = time.time()
@@ -589,6 +589,9 @@ class HeadingController(LifecycleNode):
         self.rudder_simulator.input['rate_of_change'] = heading_rate_of_change * self.rudder_overshoot_bias
         self.rudder_simulator.compute()
         rudder_value = self.rudder_simulator.output['rudder_adjustment']
+
+        last_rudder_angle = self.rudder_angle
+
         self.rudder_angle += rudder_value*self.rudder_adjustment_scale # Scale
 
         if(self.rudder_angle>30):
@@ -607,8 +610,14 @@ class HeadingController(LifecycleNode):
 
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()
-        msg.data = int(self.rudder_angle)
-        self.get_logger().info(f"Rudder angle: {self.rudder_angle}")
+        try:
+            msg.data = int(self.rudder_angle)
+        except Exception as e:
+            self.get_logger().error(f"Invalid rudder value: {self.rudder_angle} rudder change this iteration: {rudder_value}, grid vector: {grid_direction_vector}, path points: {(self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y)}")
+            self.rudder_angle = last_rudder_angle
+            msg.data = int(self.rudder_angle)
+
+        #self.get_logger().info(f"Rudder angle: {self.rudder_angle}")
 
         self.rudder_angle_publisher.publish(msg)
 
