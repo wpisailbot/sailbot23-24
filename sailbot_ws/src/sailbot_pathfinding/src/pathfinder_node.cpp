@@ -59,7 +59,7 @@ public:
         float y1f = request->start.y + pMap->half_height_diff;
         float x2f = request->end.x + pMap->half_width_diff;
         float y2f = request->end.y + pMap->half_height_diff;
-        if(x1f<0.0 || x2f<0.0 || y1f<0.0 || y2f>0.0){
+        if(x1f<0.0 || x2f<0.0 || y1f<0.0 || y2f<0.0){
             RCLCPP_WARN(this->get_logger(), "Cells out of map bounds!");
             return;
         }
@@ -71,7 +71,7 @@ public:
         RCLCPP_INFO(this->get_logger(), "Adjusted cells: (%d, %d), (%d, %d)", x1, y1, x2, y2);
         RCLCPP_INFO(this->get_logger(), "Map dims: (%d, %d)", pMap->height, pMap->height);
 
-        if(x1>=pMap->width || x2>=pMap->width || y1>=pMap->height || y2>=pMap->height){
+        if(x1>=pMap->max_dim || x2>=pMap->max_dim || y1>=pMap->max_dim || y2>=pMap->max_dim){
             RCLCPP_WARN(this->get_logger(), "Cells out of map bounds!");
             return;
         }

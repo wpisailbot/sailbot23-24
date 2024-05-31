@@ -22,7 +22,10 @@ import os
 import cv2
 import re
 import numpy as np
-from pyproj import Transformer
+from pyproj import Proj, Transformer
+from shapely.geometry import LineString
+from shapely.geometry import Point as shapely_point 
+from shapely.affinity import rotate
 import math
 import traceback
 import time
@@ -30,7 +33,7 @@ import time
 from geopy.distance import great_circle
 from geopy.distance import geodesic
 from geopy.point import Point as geopy_point
-from math import sqrt, radians, degrees
+from math import sqrt, radians, degrees, cos, sin
 from typing import Tuple, List
 
 def get_maps_dir():
@@ -434,53 +437,48 @@ class PathFollower(LifecycleNode):
         Updates:
         - Updates the 'exact_points' and 'grid_points' with the waypoints for the lawnmower pattern.
         """
-        num_tracks = int(2 * radius_meters / 5) # Track width
-        angle_rad = np.radians(wind_direction_deg + 90)  # Perpendicular to wind
-        track_spacing = radius_meters / num_tracks
 
-        # Calculate the starting point (furthest upwind point on the circle)
-        start_angle_rad = np.radians(wind_direction_deg)
-        start_point_x = center_lon + np.cos(start_angle_rad) * (radius_meters / self.earth_radius) * (180 / np.pi)
-        start_point_y = center_lat + np.sin(start_angle_rad) * (radius_meters / self.earth_radius) * (180 / np.pi)
+        track_spacing=5 # Meters
 
-        # Initialize the exact_points and grid_points
+        # Calculate number of tracks needed
+        num_tracks = int(2 * radius_meters / track_spacing)
+
+        # Initialize the list of points
         self.exact_points = []
-        self.grid_points = []
 
-        start_geo = GeoPoint(latitude=start_point_y, longitude=start_point_x)
-        start_grid = self.latlong_to_grid_proj(start_point_y, start_point_x, self.bbox, self.image_width, self.image_height)
-        self.exact_points.append(start_geo)
-        self.grid_points.append(start_grid)
-
-        # Generate each track
         for i in range(num_tracks):
-            # Calculate the starting point of the track
-            track_start_x = center_lon + np.cos(angle_rad) * i * track_spacing / self.earth_radius * (180 / np.pi)
-            track_start_y = center_lat + np.sin(angle_rad) * i * track_spacing / self.earth_radius * (180 / np.pi)
-            
-            # Calculate the ending point of the track
-            track_end_x = center_lon - np.cos(angle_rad) * i * track_spacing / self.earth_radius * (180 / np.pi)
-            track_end_y = center_lat - np.sin(angle_rad) * i * track_spacing / self.earth_radius * (180 / np.pi)
-            
-            # Add points to exact_points and calculate corresponding grid points
-            start_geo = GeoPoint(latitude=track_start_y, longitude=track_start_x)
-            end_geo = GeoPoint(latitude=track_end_y, longitude=track_end_x)
-            
-            if i % 2 == 0:
-                self.exact_points.append(start_geo)
-                self.exact_points.append(end_geo)
-            else:
-                self.exact_points.append(end_geo)
-                self.exact_points.append(start_geo)
-            
-            # Calculate grid points from lat-long
-            start_grid = self.latlong_to_grid_proj(track_start_y, track_start_x, self.bbox, self.image_width, self.image_height)
-            end_grid = self.latlong_to_grid_proj(track_end_y, track_end_x, self.bbox, self.image_width, self.image_height)
-            self.grid_points.append(start_grid)
-            self.grid_points.append(end_grid)
+            # Calculate the radial distance from the center
+            d = i * track_spacing - radius_meters
+            if abs(d) > radius_meters:
+                continue  # Skip if the radial distance is outside the circle
 
-        # Recalculate the path with the new waypoints
-        self.recalculate_path_from_exact_points()
+            # Calculate the chord length at this radial distance
+            chord_length = 2 * sqrt(radius_meters**2 - d**2) if abs(d) <= radius_meters else 0
+            self.get_logger().info(f"Chord length: {chord_length}")
+            half_chord = chord_length / 2
+
+            # Calculate the bearing for the midpoint of the chord along the wind direction
+            radial_bearing = (wind_direction_deg+180)%360
+            perpendicular_bearing = (wind_direction_deg + 90) % 360
+            self.get_logger().info(f"perp. bearing: {perpendicular_bearing}")
+
+
+            # Find the midpoint along the wind vector
+            midpoint = geodesic(meters=d).destination((center_lat, center_lon), radial_bearing)
+            self.get_logger().info(f"midpoint: {midpoint}")
+
+
+            # Calculate the start and end points of the chord perpendicular to the wind direction
+            start_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), perpendicular_bearing)
+            end_point = geodesic(meters=half_chord).destination((midpoint.latitude, midpoint.longitude), (perpendicular_bearing + 180) % 360)
+            self.get_logger().info(f"start point: {start_point}")
+            self.get_logger().info(f"end point: {end_point}")
+
+
+            self.exact_points.append(GeoPoint(latitude=start_point.latitude, longitude=start_point.longitude))
+            self.exact_points.append(GeoPoint(latitude=end_point.latitude, longitude=end_point.longitude))
+
+            self.grid_points = [self.latlong_to_grid_proj(p.latitude, p.longitude, self.bbox, self.image_width, self.image_height) for p in self.exact_points]
 
 
     def recalculate_path_from_exact_points(self) -> None:
@@ -603,7 +601,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Got single waypoint")
         self.waypoint = msg
         
-        self.generate_lawnmower_pattern(msg.point.latitude, msg.point.longitude, 100, self.wind_angle_deg)
+        self.generate_lawnmower_pattern(msg.point.latitude, msg.point.longitude, 20, self.wind_angle_deg)
 
         self.recalculate_path_from_exact_points()
         self.find_look_ahead()
