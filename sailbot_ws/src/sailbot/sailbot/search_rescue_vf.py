@@ -530,7 +530,7 @@ class PathFollower(LifecycleNode):
         
         self.get_logger().info("Calculated all path segments")
         for segment in path_segments:
-           segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
+           segment.poses = self.insert_intermediate_points(segment.poses, 1.0)
 
         final_path = GeoPath()
         final_grid_path = []
@@ -549,7 +549,7 @@ class PathFollower(LifecycleNode):
             for j in range(1, len(segment.poses)-1):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
-                self.get_logger().info(f"point: {point}")
+                #self.get_logger().info(f"point: {point}")
                 lat, lon = self.grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
@@ -559,7 +559,7 @@ class PathFollower(LifecycleNode):
                 final_grid_path.append(point)
                 k+=1
             #append exact final position
-            self.get_logger().info(f"num exact points: {len(self.exact_points)}, i: {i}")
+            #self.get_logger().info(f"num exact points: {len(self.exact_points)}, i: {i}")
             final_path.points.append(self.exact_points[i+1])
             final_grid_path.append(segment.poses[len(segment.poses)-1].pose.position)
             segment_endpoint_indices.append(len(segment.poses)-1)
@@ -567,7 +567,7 @@ class PathFollower(LifecycleNode):
             i+=1
 
 
-        self.get_logger().info(f"New path: {final_path.points}")
+        #self.get_logger().info(f"New path: {final_path.points}")
         self.current_path_publisher.publish(final_path)
         self.current_path = final_path
         self.current_grid_path = final_grid_path
@@ -757,8 +757,8 @@ class PathFollower(LifecycleNode):
 
         lat_res =  abs(bbox['north']-bbox['south'])/image_height
         long_res = abs(bbox['east']-bbox['west'])/image_width
-        self.get_logger().info(f"Lat res: {lat_res}")
-        self.get_logger().info(f"Long res: {long_res}")
+        #self.get_logger().info(f"Lat res: {lat_res}")
+        #self.get_logger().info(f"Long res: {long_res}")
 
         # Calculate the geographical coordinates from the pixel positions
         long_pct = x / image_width
@@ -796,12 +796,12 @@ class PathFollower(LifecycleNode):
         for i in range(length):
             if i<(length-1):
                 num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i+1].pose.position.y)*num_per_unit_distance)
-                self.get_logger().info(f"Num to insert: {num}")
+                #self.get_logger().info(f"Num to insert: {num}")
                 appended.append(path[i])
                 x_step = (path[i+1].pose.position.x-path[i].pose.position.x)/(num+1)
-                self.get_logger().info(f"X step: {x_step}")
+                #self.get_logger().info(f"X step: {x_step}")
                 y_step = (path[i+1].pose.position.y-path[i].pose.position.y)/(num+1)
-                self.get_logger().info(f"y step: {y_step}")
+                #self.get_logger().info(f"y step: {y_step}")
                 for j in range(1, num+1):
                     new_x = path[i].pose.position.x+x_step*j
                     new_y = path[i].pose.position.y+y_step*j

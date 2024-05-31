@@ -97,7 +97,7 @@ class PathFollower(LifecycleNode):
     :ivar buoy_rounding_distance_meters: Distance for rounding buoys during navigation.
     :ivar min_path_recalculation_interval_seconds: Minimum interval between path recalculations to avoid excessive updates.
     :ivar threat_ids: List of internal IDs returned from pathfinder node for identified buoy threats.
-    :ivar previous_look_ahead_index: Last path point the boat was at, tracked to avoid issues with self-intersecting paths.
+    :ivar previous_position_index: Last path point the boat was at, tracked to avoid issues with self-intersecting paths.
     :ivar grid_points: The intermediate step between waypoints and the full grid path, passed to the pathfinder node.
     :ivar exact_points: The intermediate step between waypoints and the full geographical path.
     :ivar current_buoy_positions: Dictionary containing a mapping between buoy IDs and their current positions.
@@ -131,7 +131,7 @@ class PathFollower(LifecycleNode):
     - 'set_parameters', 'get_parameters': Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.
     - 'calculate_exact_points_from_waypoint': Processes waypoints to calculate exact navigation points.
     - 'recalculate_path_from_exact_points': Recalculates the navigation path based on new or updated exact navigation points.
-    - 'find_look_ahead': Determines the boat's progress along the path.
+    - 'find_current_segment': Determines the boat's progress along the path.
     - 'remove_last_points_if_necessary': Trims unnecessary navigation points if the last waypoint was a rounding type.
     - 'get_square_corners': Calculates and orders the four corners of a square about a target position, facing a starting position.
 
@@ -163,7 +163,7 @@ class PathFollower(LifecycleNode):
 
     threat_ids = []
 
-    previous_look_ahead_index = 0
+    previous_position_index = 0
 
     grid_points = []
     exact_points = []
@@ -388,7 +388,7 @@ class PathFollower(LifecycleNode):
             self.recalculate_path_from_exact_points()
             self.last_recalculation_time = time.time()
             
-        self.find_look_ahead()
+        self.find_current_segment()
         self.current_grid_cell = new_grid_cell
         grid_cell_msg = Point()
         grid_cell_msg.x = float(new_grid_cell[0])
@@ -398,7 +398,7 @@ class PathFollower(LifecycleNode):
 
     def airmar_speed_knots_callback(self, msg: Float64) -> None:
         self.speed_knots = msg.data
-        self.find_look_ahead()
+        self.find_current_segment()
 
     def get_path(self, start, goal) -> GetPath.Response:
         self.get_logger().info(f"get_path with {start}, {goal}")
@@ -414,7 +414,7 @@ class PathFollower(LifecycleNode):
         end_point.y = float(goal[1])
         req.start = start_point
         req.end = end_point
-        req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_ASTAR
+        req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_PRMSTAR
         
         #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.
         wind_angle_adjusted = self.wind_angle_deg+90
@@ -639,7 +639,7 @@ class PathFollower(LifecycleNode):
             return
         
         # Reset look-ahead, since previous values are not relevant anymore
-        self.previous_look_ahead_index = 0
+        self.previous_position_index = 0
         if len(self.grid_points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
             self.current_path = GeoPath()
@@ -652,7 +652,7 @@ class PathFollower(LifecycleNode):
         
         self.get_logger().info("Calculated all path segments")
         for segment in path_segments:
-           segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
+           segment.poses = self.insert_intermediate_points(segment.poses, 1.0)
 
         final_path = GeoPath()
         final_grid_path = []
@@ -671,7 +671,7 @@ class PathFollower(LifecycleNode):
             for j in range(1, len(segment.poses)-1):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
-                self.get_logger().info(f"point: {point}")
+                #self.get_logger().info(f"point: {point}")
                 lat, lon = self.grid_to_latlong_proj(point.x, point.y, self.bbox, self.image_width, self.image_height)
                 geopoint = GeoPoint()
                 geopoint.latitude = lat
@@ -681,7 +681,7 @@ class PathFollower(LifecycleNode):
                 final_grid_path.append(point)
                 k+=1
             #append exact final position
-            self.get_logger().info(f"num exact points: {len(self.exact_points)}, i: {i}")
+            #self.get_logger().info(f"num exact points: {len(self.exact_points)}, i: {i}")
             final_path.points.append(self.exact_points[i+1])
             final_grid_path.append(segment.poses[len(segment.poses)-1].pose.position)
             segment_endpoint_indices.append(len(segment.poses)-1)
@@ -689,7 +689,7 @@ class PathFollower(LifecycleNode):
             i+=1
 
 
-        self.get_logger().info(f"New path: {final_path.points}")
+        self.get_logger().info(f"Calculated new path")
         self.current_path_publisher.publish(final_path)
         self.current_path = final_path
         self.current_grid_path = final_grid_path
@@ -703,7 +703,7 @@ class PathFollower(LifecycleNode):
         self.exact_points = []
         self.grid_points = []
         self.recalculate_path_from_exact_points()
-        self.find_look_ahead()
+        self.find_current_segment()
         self.get_logger().info("Ending waypoints callback")
     
     def clear_threats(self) -> None:
@@ -786,7 +786,7 @@ class PathFollower(LifecycleNode):
             self.add_threat(msg)
         self.calculate_exact_points_from_waypoint(msg)
         self.recalculate_path_from_exact_points()
-        self.find_look_ahead()
+        self.find_current_segment()
         self.get_logger().info("Ending single waypoint callback")
 
 
@@ -812,9 +812,9 @@ class PathFollower(LifecycleNode):
         
         self.last_recalculation_time = time.time()
         self.recalculate_path_from_exact_points()
-        self.find_look_ahead()
+        self.find_current_segment()
     
-    def find_look_ahead(self) -> None:
+    def find_current_segment(self) -> None:
         """
         Determines and updates the vector field target segment based on the current navigation path. 
         This function also handles publishing various navigation-related messages to update
@@ -845,14 +845,14 @@ class PathFollower(LifecycleNode):
         
         #self.get_logger().info(f"Grid path length: {len(self.current_grid_path)}")
         num_points = len(self.current_path.points) 
-        for i in range(self.previous_look_ahead_index, num_points-1):
+        for i in range(self.previous_position_index, num_points-1):
             point = self.current_path.points[i]
             distance = great_circle((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
             # Check if the next point is closer. If so, we probably skipped some points. Don't target them. 
             next_is_closer = False if i>=num_points else (True if great_circle((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
             #self.get_logger().info(f"next_is_closer: {next_is_closer}")
             if(not next_is_closer):
-                self.previous_look_ahead_index = i
+                self.previous_position_index = i
                 #self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
                 self.target_position_publisher.publish(point) # In this version, this is just for display in the UI. This is NOT an input to heading_controller_vf 
                 segment = PathSegment()
@@ -937,8 +937,8 @@ class PathFollower(LifecycleNode):
 
         lat_res =  abs(bbox['north']-bbox['south'])/image_height
         long_res = abs(bbox['east']-bbox['west'])/image_width
-        self.get_logger().info(f"Lat res: {lat_res}")
-        self.get_logger().info(f"Long res: {long_res}")
+        #self.get_logger().info(f"Lat res: {lat_res}")
+        #self.get_logger().info(f"Long res: {long_res}")
 
         # Calculate the geographical coordinates from the pixel positions
         long_pct = x / image_width
@@ -976,12 +976,12 @@ class PathFollower(LifecycleNode):
         for i in range(length):
             if i<(length-1):
                 num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i+1].pose.position.y)*num_per_unit_distance)
-                self.get_logger().info(f"Num to insert: {num}")
+                #self.get_logger().info(f"Num to insert: {num}")
                 appended.append(path[i])
                 x_step = (path[i+1].pose.position.x-path[i].pose.position.x)/(num+1)
-                self.get_logger().info(f"X step: {x_step}")
+                #self.get_logger().info(f"X step: {x_step}")
                 y_step = (path[i+1].pose.position.y-path[i].pose.position.y)/(num+1)
-                self.get_logger().info(f"y step: {y_step}")
+                #self.get_logger().info(f"y step: {y_step}")
                 for j in range(1, num+1):
                     new_x = path[i].pose.position.x+x_step*j
                     new_y = path[i].pose.position.y+y_step*j
