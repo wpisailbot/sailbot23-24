@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import String, Float64, Int16
+from std_msgs.msg import String, Float64, Int16, Empty
 from sensor_msgs.msg import NavSatFix
 from geographic_msgs.msg import GeoPoint
 # import json
@@ -84,6 +84,8 @@ class HeadingController(LifecycleNode):
         self.rudder_angle_publisher = self.create_lifecycle_publisher(Int16, 'rudder_angle', 10)
 
         self.target_heading_debug_publisher = self.create_lifecycle_publisher(Float64, 'target_heading', 10)
+
+        self.request_tack_publisher = self.create_lifecycle_publisher(Empty, 'request_tack', 10)
 
         self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
@@ -302,6 +304,8 @@ class HeadingController(LifecycleNode):
                     self.rudder_angle = 31
                 else:
                     self.rudder_angle = -31
+                self.request_tack_publisher.publish(Empty())
+
 
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()

@@ -191,6 +191,8 @@ class HeadingController(LifecycleNode):
 
         self.request_replan_publisher = self.create_lifecycle_publisher(Empty, 'request_replan', 10)
 
+        self.request_tack_publisher = self.create_lifecycle_publisher(Empty, 'request_tack', 10)
+
         self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
         self.path_Segment_subscription = self.create_subscription(
@@ -607,6 +609,8 @@ class HeadingController(LifecycleNode):
                     self.rudder_angle = 31
                 else:
                     self.rudder_angle = -31
+                self.request_tack_publisher.publish(Empty())
+                
 
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()

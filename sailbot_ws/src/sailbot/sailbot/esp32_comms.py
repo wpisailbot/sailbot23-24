@@ -68,6 +68,7 @@ class ESPComms(LifecycleNode):
     request_tack_timer_duration = 3.0  # seconds
     request_tack_timer: Timer = None
     request_tack_override = False
+    sent_clear_winds_this_tack = False
 
     def __init__(self):
         super(ESPComms, self).__init__('esp32_comms')
@@ -271,6 +272,8 @@ class ESPComms(LifecycleNode):
             # Only tack if we're going upwind
             if (25.0 <= relative_wind < 100) or (260 <= relative_wind < 335):
                 force_tack = True
+            else:
+                self.get_logger().warn("Tack requested, but we're going downwind...")
 
         if 25.0 <= relative_wind < 100 and force_tack is False:
             # Max lift port
@@ -306,34 +309,33 @@ class ESPComms(LifecycleNode):
             self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
             self.get_logger().info("Max lift starboard")
         else:
-            #self.get_logger().info("In Min lift")
-            # In irons
-            
             # Adjust behavior to not stop during a tack
             if(self.could_be_tacking or force_tack):
                 self.get_logger().info("Tacking detected!")
-                if(self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
-                    trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
-                    self.get_logger().info("Switching from starboard to port")
-                    msg = {
-                        "clear_winds": True,
-                        "state": "max_lift_port"
-                    }
-                elif (self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
-                    self.get_logger().info("Switching from port to starboard")
-                    trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
-                    msg = {
-                        "clear_winds": True,
-                        "state": "max_lift_starboard"
-                    }
-                else:
-                    # How did we get here?
-                    self.get_logger().warn("Went into min lift in tack mode, but previous state was not max lift. Did the wind change suddenly?")
-                    msg = {
-                        "clear_winds": True,
-                        "state": "min_lift"
-                    }
-                    trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
+                if(self.switched_sides_this_tack is False):
+                    self.switched_sides_this_tack = True
+                    if(self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
+                        trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
+                        self.get_logger().info("Switching from starboard to port")
+                        msg = {
+                            "clear_winds": True,
+                            "state": "max_lift_port"
+                        }
+                    elif (self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
+                        self.get_logger().info("Switching from port to starboard")
+                        trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
+                        msg = {
+                            "clear_winds": True,
+                            "state": "max_lift_starboard"
+                        }
+                    else:
+                        # How did we get here?
+                        self.get_logger().warn("Went into min lift in tack mode, but previous state was not max lift. Did the wind change suddenly?")
+                        msg = {
+                            "clear_winds": True,
+                            "state": "min_lift"
+                        }
+                        trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
             else:
                 msg = {
                     "state": "min_lift"
@@ -349,9 +351,12 @@ class ESPComms(LifecycleNode):
             trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
             self.get_logger().info("Force neutral")
         
-        self.trim_state_debug_publisher.publish(trim_state_msg)
-        message_string = json.dumps(msg)+'\n'
-        self.ser.write(message_string.encode())
+        if(msg is not None):
+            self.trim_state_debug_publisher.publish(trim_state_msg)
+            message_string = json.dumps(msg)+'\n'
+            self.ser.write(message_string.encode())
+        else:
+            self.get_logger().info("Trim message is None, taking no action")
 
     def tt_angle_callback(self, msg: Int16) -> None:
         self.get_logger().info("Sending trimtab angle")
@@ -437,6 +442,7 @@ class ESPComms(LifecycleNode):
         # Cancel the timer to clean up
         if self.request_tack_timer is not None:
             self.request_tack_timer.cancel()
+            self.switched_sides_this_tack = False
             self.request_tack_timer = None
 
     def request_tack_callback(self, msg: Empty) -> None:

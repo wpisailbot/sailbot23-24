@@ -486,7 +486,7 @@ class PathFollower(LifecycleNode):
         
         self.get_logger().info("Calculated all path segments")
         for segment in path_segments:
-           segment.poses = self.insert_intermediate_points(segment.poses, 0.1)
+           segment.poses = self.insert_intermediate_points(segment.poses, 0.8)
 
         final_path = GeoPath()
         final_grid_path = []

@@ -649,11 +649,11 @@ class PathFollower(LifecycleNode):
         path_segments.append(self.get_path(self.current_grid_cell, self.grid_points[0]).path)
         for i in range(len(self.grid_points)-1):
             path_segments.append(self.get_path(self.grid_points[i], self.grid_points[i+1]).path)
-        self.get_logger().info(f"Last path segment: {path_segments[-1].poses}")
+        #self.get_logger().info(f"Last path segment: {path_segments[-1].poses}")
         
         #self.get_logger().info("Calculated all path segments")
         for segment in path_segments:
-           segment.poses = self.insert_intermediate_points(segment.poses, 1.0)
+           segment.poses = self.insert_intermediate_points(segment.poses, 0.8)
 
         final_path = GeoPath()
         final_grid_path = []
@@ -977,16 +977,16 @@ class PathFollower(LifecycleNode):
         for i in range(length):
             if i<(length-1):
                 num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i+1].pose.position.y)*num_per_unit_distance)
-                self.get_logger().info(f"Num to insert: {num}")
+                #self.get_logger().info(f"Num to insert: {num}")
                 appended.append(path[i])
                 x_step = (path[i+1].pose.position.x-path[i].pose.position.x)/(num+1)
-                self.get_logger().info(f"X step: {x_step}")
+                #self.get_logger().info(f"X step: {x_step}")
                 y_step = (path[i+1].pose.position.y-path[i].pose.position.y)/(num+1)
-                self.get_logger().info(f"y step: {y_step}")
+                #self.get_logger().info(f"y step: {y_step}")
                 for j in range(1, num+1):
                     new_x = path[i].pose.position.x+x_step*j
                     new_y = path[i].pose.position.y+y_step*j
-                    self.get_logger().info(f"New pos: {new_x}, {new_y}")
+                    #self.get_logger().info(f"New pos: {new_x}, {new_y}")
                     new_point = PoseStamped()
                     new_point.pose.position.x = new_x
                     new_point.pose.position.y = new_y
