@@ -780,8 +780,8 @@ class PathFollower(LifecycleNode):
         lat_pct = 1.0-(y / image_height)
         
         # Interpolate the latitude and longitude within the bounding box
-        latitude = (north_east[0] - lat_pct * (north_east[0] - south_west[0]))+(lat_res/2)
-        longitude = (south_west[1] + long_pct * (north_east[1] - south_west[1]))+(long_res/2)
+        latitude = (north_east[0] - lat_pct * (north_east[0] - south_west[0]))#+(lat_res/2)
+        longitude = (south_west[1] + long_pct * (north_east[1] - south_west[1]))#+(long_res/2)
         
         return latitude, longitude
     
@@ -811,15 +811,16 @@ class PathFollower(LifecycleNode):
         for i in range(length):
             if i<(length-1):
                 num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i+1].pose.position.y)*num_per_unit_distance)
-                #self.get_logger().info(f"Num to insert: {num}")
+                self.get_logger().info(f"Num to insert: {num}")
                 appended.append(path[i])
                 x_step = (path[i+1].pose.position.x-path[i].pose.position.x)/(num+1)
-                #self.get_logger().info(f"X step: {x_step}")
+                self.get_logger().info(f"X step: {x_step}")
                 y_step = (path[i+1].pose.position.y-path[i].pose.position.y)/(num+1)
-                #self.get_logger().info(f"y step: {y_step}")
+                self.get_logger().info(f"y step: {y_step}")
                 for j in range(1, num+1):
                     new_x = path[i].pose.position.x+x_step*j
                     new_y = path[i].pose.position.y+y_step*j
+                    self.get_logger().info(f"New pos: {new_x}, {new_y}")
                     new_point = PoseStamped()
                     new_point.pose.position.x = new_x
                     new_point.pose.position.y = new_y

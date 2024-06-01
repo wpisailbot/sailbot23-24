@@ -4,7 +4,7 @@
 #include "node.h"
 #include "map.h"
 #include <opencv2/opencv.hpp>
-#define NOGO_ANGLE_DEGREES 45
+#define NOGO_ANGLE_DEGREES 60
 
 struct Threat {
     cv::Point2f center;  // Using Point2f for subpixel precision

@@ -21,8 +21,6 @@
 #include "prm_pathfinding_strategy.h"
 #include "utilities.h"
 
-#define NOGO_ANGLE_DEGREES 45
-
 class Pathfinder : public rclcpp::Node
 {
 public:
@@ -75,7 +73,7 @@ public:
             RCLCPP_WARN(this->get_logger(), "Cells out of map bounds!");
             return;
         }
-        auto path = find_solution(*pMap, request->wind_angle_deg, pMap->getMapNode(x1, y1), pMap->getMapNode(x2, y2), request->pathfinding_strategy);
+        auto path = find_solution(*pMap, request->wind_angle_deg, std::make_pair(x1f, y1f), std::make_pair(x2f, y2f), request->pathfinding_strategy);
         RCLCPP_INFO(this->get_logger(), "Solution complete");
         for (auto p : path)
         {
@@ -173,8 +171,10 @@ public:
         pMap->apply_threat_mask(threatsMap);
     }
 
-    std::vector<std::pair<double, double>> find_solution(Map &map, double wind_angle_deg, ::MapNode *start_node, ::MapNode *goal_node, uint8_t pathfinding_strategy)
+    std::vector<std::pair<double, double>> find_solution(Map &map, double wind_angle_deg, std::pair<double, double> start, std::pair<double, double> goal, uint8_t pathfinding_strategy)
     {
+        MapNode *start_node = pMap->getMapNode(start.first, start.second);
+        MapNode *goal_node = pMap->getMapNode(goal.first, goal.second);
         cv::Mat mat = cv::Mat(map.max_dim, map.max_dim, CV_32FC1, map.data->data());
         cv::Mat scaledImage;
         mat.convertTo(scaledImage, CV_8UC1, 255.0);
@@ -188,6 +188,8 @@ public:
         cv::flip(colorImage, colorImage, 0);
         cv::imwrite("/home/sailbot/map_with_points.jpg", colorImage);
 
+
+
         double wind_angle_rad = wind_angle_deg * (M_PI / 180);
         double nogo_angle_rad = NOGO_ANGLE_DEGREES * (M_PI / 180);
         bool wind_blocked = false;
@@ -197,7 +199,10 @@ public:
             LinearRaycastPathfindingStrategy linearSolver;
             RCLCPP_INFO(this->get_logger(), "Trying linear raycast");
 
-            auto path = linearSolver.solve(map, start_node, goal_node, wind_angle_rad, nogo_angle_rad);
+            MapNode dummyStart = MapNode(start.first, start.second);
+            MapNode dummyGoal = MapNode(goal.first, goal.second);
+
+            auto path = linearSolver.solve(map, &dummyStart, &dummyGoal, wind_angle_rad, nogo_angle_rad);
             // return path;
             if (path.size() > 0)
             {
@@ -214,7 +219,10 @@ public:
         {
             RCLCPP_INFO(this->get_logger(), "Trying one tack");
             OneTackPathfindingStrategy oneTackSolver;
-            auto path = oneTackSolver.solve(map, start_node, goal_node, wind_angle_rad, nogo_angle_rad);
+            MapNode dummyStart = MapNode(start.first, start.second);
+            MapNode dummyGoal = MapNode(goal.first, goal.second);
+
+            auto path = oneTackSolver.solve(map, &dummyStart, &dummyGoal, wind_angle_rad, nogo_angle_rad);
             if (path.size() > 0)
             {
                 return path;

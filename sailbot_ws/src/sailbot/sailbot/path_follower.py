@@ -686,8 +686,8 @@ class PathFollower(LifecycleNode):
         lat_pct = 1.0-(y / image_height)
         
         # Interpolate the latitude and longitude within the bounding box
-        latitude = (north_east[0] - lat_pct * (north_east[0] - south_west[0]))+(lat_res/2)
-        longitude = (south_west[1] + long_pct * (north_east[1] - south_west[1]))+(long_res/2)
+        latitude = (north_east[0] - lat_pct * (north_east[0] - south_west[0]))#+(lat_res/2)
+        longitude = (south_west[1] + long_pct * (north_east[1] - south_west[1]))#+(long_res/2)
         
         return latitude, longitude
     

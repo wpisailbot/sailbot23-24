@@ -574,11 +574,11 @@ class PathFollower(LifecycleNode):
             self.get_logger().info(f"before: Num grid points: {len(self.grid_points)}, num exact points: {len(self.exact_points)}")
 
             self.get_logger().info(f"Intersect")
-            self.grid_points.append(self.latlong_to_grid_proj(waypoint_msg.point.latitude, waypoint_msg.point.longitude, self.bbox, self.image_width, self.image_height))
             self.remove_last_points_if_necessary(next_point=(waypoint_msg.point.latitude, waypoint_msg.point.longitude))
 
             self.last_waypoint_was_rounding_type = False
             self.exact_points.append(waypoint_msg.point)
+            self.grid_points.append(self.latlong_to_grid_proj(waypoint_msg.point.latitude, waypoint_msg.point.longitude, self.bbox, self.image_width, self.image_height))
             self.get_logger().info(f"after: num grid points: {len(self.grid_points)}, num exact points: {len(self.exact_points)}")
 
         else:
@@ -649,8 +649,9 @@ class PathFollower(LifecycleNode):
         path_segments.append(self.get_path(self.current_grid_cell, self.grid_points[0]).path)
         for i in range(len(self.grid_points)-1):
             path_segments.append(self.get_path(self.grid_points[i], self.grid_points[i+1]).path)
+        self.get_logger().info(f"Last path segment: {path_segments[-1].poses}")
         
-        self.get_logger().info("Calculated all path segments")
+        #self.get_logger().info("Calculated all path segments")
         for segment in path_segments:
            segment.poses = self.insert_intermediate_points(segment.poses, 1.0)
 
@@ -658,8 +659,8 @@ class PathFollower(LifecycleNode):
         final_grid_path = []
         i=-1
         k=0
-        final_grid_path.append(Point(x=float(self.current_grid_cell[0]), y=float(self.current_grid_cell[1])))
-        final_path.points.append(GeoPoint(latitude=self.latitude, longitude=self.longitude))
+        # final_grid_path.append(Point(x=float(self.current_grid_cell[0]), y=float(self.current_grid_cell[1])))
+        # final_path.points.append(GeoPoint(latitude=self.latitude, longitude=self.longitude))
 
         # Track the indices in the current path which correspond to endpoints of straight-line path segments
         segment_endpoint_indices = [0]
@@ -685,7 +686,6 @@ class PathFollower(LifecycleNode):
             final_path.points.append(self.exact_points[i+1])
             final_grid_path.append(segment.poses[len(segment.poses)-1].pose.position)
             segment_endpoint_indices.append(len(segment.poses)-1)
-            #self.waypoint_indices.append(k)
             i+=1
 
 
@@ -918,7 +918,7 @@ class PathFollower(LifecycleNode):
         
         return x, y
 
-    def grid_to_latlong_proj(self, x: int, y: int, bbox: dict, image_width, image_height) -> Tuple[float, float]:
+    def grid_to_latlong_proj(self, x: float, y: float, bbox: dict, image_width, image_height) -> Tuple[float, float]:
         """
         Convert grid cell coordinates in an image to latitude/longitude coordinates using specified projections.
 
@@ -945,8 +945,8 @@ class PathFollower(LifecycleNode):
         lat_pct = 1.0-(y / image_height)
         
         # Interpolate the latitude and longitude within the bounding box
-        latitude = (north_east[0] - lat_pct * (north_east[0] - south_west[0]))+(lat_res/2)
-        longitude = (south_west[1] + long_pct * (north_east[1] - south_west[1]))+(long_res/2)
+        latitude = (north_east[0] - lat_pct * (north_east[0] - south_west[0]))#+(lat_res/2)
+        longitude = (south_west[1] + long_pct * (north_east[1] - south_west[1]))#+(long_res/2)
         
         return latitude, longitude
     
@@ -968,6 +968,7 @@ class PathFollower(LifecycleNode):
         - Using linear interpolation to determine the position of each intermediate point between each consecutive waypoint pair.
         - Returning a new path list that includes both the original and the newly interpolated points.
         """
+        #self.get_logger().info(f"initial segment: {path}")
         length = len(path)
         if(length  == 0):
             self.get_logger().warn("Called insert_intermediate_points on a zero length segment!")
@@ -976,19 +977,21 @@ class PathFollower(LifecycleNode):
         for i in range(length):
             if i<(length-1):
                 num = round(distance(path[i].pose.position.x, path[i].pose.position.y, path[i+1].pose.position.x, path[i+1].pose.position.y)*num_per_unit_distance)
-                #self.get_logger().info(f"Num to insert: {num}")
+                self.get_logger().info(f"Num to insert: {num}")
                 appended.append(path[i])
                 x_step = (path[i+1].pose.position.x-path[i].pose.position.x)/(num+1)
-                #self.get_logger().info(f"X step: {x_step}")
+                self.get_logger().info(f"X step: {x_step}")
                 y_step = (path[i+1].pose.position.y-path[i].pose.position.y)/(num+1)
-                #self.get_logger().info(f"y step: {y_step}")
+                self.get_logger().info(f"y step: {y_step}")
                 for j in range(1, num+1):
                     new_x = path[i].pose.position.x+x_step*j
                     new_y = path[i].pose.position.y+y_step*j
+                    self.get_logger().info(f"New pos: {new_x}, {new_y}")
                     new_point = PoseStamped()
                     new_point.pose.position.x = new_x
                     new_point.pose.position.y = new_y
                     appended.append(new_point)
+
         appended.append(path[-1])
         return appended
     
