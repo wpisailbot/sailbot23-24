@@ -186,7 +186,7 @@ class PathFollower(LifecycleNode):
 
     waypoint_threat_id_map = {}
 
-    earth_radius = 3958.8
+    found_buoy = False
 
     def __init__(self):
         super().__init__('path_follower')
@@ -489,6 +489,13 @@ class PathFollower(LifecycleNode):
 
         self.get_logger().info(f"grid points: {self.grid_points}")
 
+    def path_to_buoy(self, buoy_pos: BuoyDetectionStamped) -> None:
+        self.exact_points.clear()
+        self.grid_points.clear()
+        self.grid_points.append(self.latlong_to_grid_proj(buoy_pos.position.latitude, buoy_pos.position.longitude, self.bbox, self.image_width, self.image_height))
+
+        self.last_waypoint_was_rounding_type = False
+        self.exact_points.append(buoy_pos.position)
 
     def recalculate_path_from_exact_points(self) -> None:
         """
@@ -623,6 +630,8 @@ class PathFollower(LifecycleNode):
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg
         self.current_buoy_times[msg.id] = time.time()
+        self.path_to_buoy(msg)
+        self.recalculate_path_from_exact_points()
 
     def request_replan_callback(self, msg: Empty) -> None:
         current_time = time.time()
