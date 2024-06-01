@@ -108,7 +108,7 @@ class PathFollower(LifecycleNode):
     :ivar buoy_rounding_distance_meters: Distance for rounding buoys during navigation.
     :ivar min_path_recalculation_interval_seconds: Minimum interval between path recalculations to avoid excessive updates.
     :ivar threat_ids: List of internal IDs returned from pathfinder node for identified buoy threats.
-    :ivar previous_look_ahead_index: Last path point the boat was at, tracked to avoid issues with self-intersecting paths.
+    :ivar previous_position_index: Last path point the boat was at, tracked to avoid issues with self-intersecting paths.
     :ivar grid_points: The intermediate step between waypoints and the full grid path, passed to the pathfinder node.
     :ivar exact_points: The intermediate step between waypoints and the full geographical path.
     :ivar current_buoy_positions: Dictionary containing a mapping between buoy IDs and their current positions.
@@ -141,7 +141,7 @@ class PathFollower(LifecycleNode):
     - 'set_parameters', 'get_parameters': Methods for declaring and retrieving ROS parameters related to navigation and pathfinding.
     - 'calculate_exact_points_from_waypoint': Processes waypoints to calculate exact navigation points.
     - 'recalculate_path_from_exact_points': Recalculates the navigation path based on new or updated exact navigation points.
-    - 'find_look_ahead': Determines the boat's progress along the path.
+    - 'find_current_segment': Determines the boat's progress along the path.
     - 'remove_last_points_if_necessary': Trims unnecessary navigation points if the last waypoint was a rounding type.
     - 'get_square_corners': Calculates and orders the four corners of a square about a target position, facing a starting position.
 
@@ -173,7 +173,7 @@ class PathFollower(LifecycleNode):
 
     threat_ids = []
 
-    previous_look_ahead_index = 0
+    previous_position_index = 0
 
     grid_points = []
     exact_points = []
@@ -378,7 +378,7 @@ class PathFollower(LifecycleNode):
             self.recalculate_path_from_exact_points()
             self.last_recalculation_time = time.time()
             
-        self.find_look_ahead()
+        self.find_current_segment()
         self.current_grid_cell = new_grid_cell
         grid_cell_msg = Point()
         grid_cell_msg.x = float(new_grid_cell[0])
@@ -517,7 +517,7 @@ class PathFollower(LifecycleNode):
             return
         
         # Reset look-ahead, since previous values are not relevant anymore
-        self.previous_look_ahead_index = 0
+        self.previous_position_index = 0
         if len(self.grid_points) == 0:
             self.get_logger().info("Empty waypoints, will clear path")
             self.current_path = GeoPath()
@@ -581,7 +581,7 @@ class PathFollower(LifecycleNode):
         self.exact_points = []
         self.grid_points = []
         self.recalculate_path_from_exact_points()
-        self.find_look_ahead()
+        self.find_current_segment()
         self.get_logger().info("Ending waypoints callback")
 
 
@@ -613,7 +613,7 @@ class PathFollower(LifecycleNode):
         self.generate_lawnmower_pattern(msg.point.latitude, msg.point.longitude, 50, self.wind_angle_deg)
 
         self.recalculate_path_from_exact_points()
-        self.find_look_ahead()
+        self.find_current_segment()
         self.get_logger().info("Ending single waypoint callback")
 
 
@@ -632,9 +632,9 @@ class PathFollower(LifecycleNode):
         
         self.last_recalculation_time = time.time()
         self.recalculate_path_from_exact_points()
-        self.find_look_ahead()
+        self.find_current_segment()
     
-    def find_look_ahead(self) -> None:
+    def find_current_segment(self) -> None:
         """
         Determines and updates the vector field target segment based on the current navigation path. 
         This function also handles publishing various navigation-related messages to update
@@ -665,14 +665,14 @@ class PathFollower(LifecycleNode):
         
         #self.get_logger().info(f"Grid path length: {len(self.current_grid_path)}")
         num_points = len(self.current_path.points) 
-        for i in range(self.previous_look_ahead_index, num_points-1):
+        for i in range(self.previous_position_index, num_points-1):
             point = self.current_path.points[i]
             distance = great_circle((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
             # Check if the next point is closer. If so, we probably skipped some points. Don't target them. 
             next_is_closer = False if i>=num_points else (True if great_circle((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
             #self.get_logger().info(f"next_is_closer: {next_is_closer}")
             if(not next_is_closer):
-                self.previous_look_ahead_index = i
+                self.previous_position_index = i
                 #self.get_logger().info(f"Calulated current point: {point.latitude}, {point.longitude}")
                 self.target_position_publisher.publish(point) # In this version, this is just for display in the UI. This is NOT an input to heading_controller_vf 
                 segment = PathSegment()
