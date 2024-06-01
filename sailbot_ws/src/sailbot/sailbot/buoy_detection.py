@@ -199,7 +199,7 @@ class BuoyDetection(Node):
         orangeType.hsv_bounds.lower_h = 0
         orangeType.hsv_bounds.lower_s = 98
         orangeType.hsv_bounds.lower_v = 52
-        orangeType.hsv_bounds.upper_h = 17
+        orangeType.hsv_bounds.upper_h = 113
         orangeType.hsv_bounds.upper_s = 255
         orangeType.hsv_bounds.upper_v = 255
         self.buoy_types.append(orangeType)

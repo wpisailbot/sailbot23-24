@@ -187,6 +187,7 @@ class PathFollower(LifecycleNode):
     waypoint_threat_id_map = {}
 
     found_buoy = False
+    last_buoy_calculation_time = time.time()
 
     def __init__(self):
         super().__init__('path_follower')
@@ -399,7 +400,7 @@ class PathFollower(LifecycleNode):
         end_point.y = float(goal[1])
         req.start = start_point
         req.end = end_point
-        req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_PRMSTAR
+        req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_ASTAR
         
         #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.
         wind_angle_adjusted = self.wind_angle_deg+90
@@ -629,9 +630,14 @@ class PathFollower(LifecycleNode):
 
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg
-        self.current_buoy_times[msg.id] = time.time()
-        self.path_to_buoy(msg)
-        self.recalculate_path_from_exact_points()
+        current_time = time.time()
+        self.current_buoy_times[msg.id] = current_time
+
+        dist = geodesic((msg.position.latitude, msg.position.longitude), (self.latitude, self.longitude))
+        if(current_time-self.last_buoy_calculation_time>2.0):
+            self.path_to_buoy(msg)
+            self.recalculate_path_from_exact_points()
+            self.last_buoy_calculation_time = current_time
 
     def request_replan_callback(self, msg: Empty) -> None:
         current_time = time.time()
@@ -676,9 +682,9 @@ class PathFollower(LifecycleNode):
         num_points = len(self.current_path.points) 
         for i in range(self.previous_position_index, num_points-1):
             point = self.current_path.points[i]
-            distance = great_circle((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
+            distance = geodesic((self.latitude, self.longitude), (point.latitude, point.longitude)).meters
             # Check if the next point is closer. If so, we probably skipped some points. Don't target them. 
-            next_is_closer = False if i>=num_points else (True if great_circle((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
+            next_is_closer = False if i>=num_points else (True if geodesic((self.latitude, self.longitude), (self.current_path.points[i+1].latitude, self.current_path.points[i+1].longitude)).meters<distance else False)
             #self.get_logger().info(f"next_is_closer: {next_is_closer}")
             if(not next_is_closer):
                 self.previous_position_index = i
