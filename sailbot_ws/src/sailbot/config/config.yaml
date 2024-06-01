@@ -2,10 +2,10 @@ heading_controller:
   ros__parameters:
     sailbot:
       heading_control:
-        rudder_adjustment_scale: 1.0
-        rudder_overshoot_bias: 10.0
+        rudder_adjustment_scale: 0.05
+        rudder_overshoot_bias: 50000.0
         vector_field_crosstrack_weight: 1.0
-        vector_field_path_dir_weight: 1.0
+        vector_field_path_dir_weight: 2.0
         leeway_correction_limit_degrees: 10.0
         wind_restriction_replan_cutoff_degrees: 30.0
 
