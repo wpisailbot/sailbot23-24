@@ -246,7 +246,9 @@ public:
                 break;
             case sailbot_msgs::srv::GetPath::Request::PATHFINDING_STRATEGY_PRMSTAR:{
                     PRMPathfindingStrategy solver;
-                    path = solver.solve(map, start_node, goal_node, wind_angle_rad, nogo_angle_rad);
+                    MapNode dummyStart = MapNode(start.first, start.second);
+                    MapNode dummyGoal = MapNode(goal.first, goal.second);
+                    path = solver.solve(map, &dummyStart, &dummyGoal, wind_angle_rad, nogo_angle_rad);
                     RCLCPP_INFO(this->get_logger(), "Got PRM-star path");
                 }
                 break;
