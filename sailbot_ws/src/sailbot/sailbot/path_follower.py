@@ -431,9 +431,9 @@ class PathFollower(LifecycleNode):
         
         if (waypoint_msg.type == Waypoint.WAYPOINT_TYPE_INTERSECT):
             self.get_logger().info(f"Intersect")
-            self.grid_points.append(self.latlong_to_grid_proj(waypoint_msg.point.latitude, waypoint_msg.point.longitude, self.bbox, self.image_width, self.image_height))
             self.remove_last_points_if_necessary(next_point=(waypoint_msg.point.latitude, waypoint_msg.point.longitude))
             self.last_waypoint_was_rounding_type = False
+            self.grid_points.append(self.latlong_to_grid_proj(waypoint_msg.point.latitude, waypoint_msg.point.longitude, self.bbox, self.image_width, self.image_height))
             self.exact_points.append(waypoint_msg.point)
         else:
 
