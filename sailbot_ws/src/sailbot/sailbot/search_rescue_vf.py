@@ -554,7 +554,7 @@ class PathFollower(LifecycleNode):
             if(len(segment.poses)==0):
                 continue 
 
-            for j in range(1, len(segment.poses)-1):
+            for j in range(1, len(segment.poses)):
                 poseStamped = segment.poses[j]
                 point = poseStamped.pose.position
                 #self.get_logger().info(f"point: {point}")
@@ -568,8 +568,8 @@ class PathFollower(LifecycleNode):
                 k+=1
             #append exact final position
             #self.get_logger().info(f"num exact points: {len(self.exact_points)}, i: {i}")
-            final_path.points.append(self.exact_points[i+1])
-            final_grid_path.append(segment.poses[len(segment.poses)-1].pose.position)
+            #final_path.points.append(self.exact_points[i+1])
+            #final_grid_path.append(segment.poses[len(segment.poses)-1].pose.position)
             segment_endpoint_indices.append(len(segment.poses)-1)
             #self.waypoint_indices.append(k)
             i+=1

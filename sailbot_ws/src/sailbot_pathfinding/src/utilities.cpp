@@ -253,7 +253,7 @@ void applyThreatToMat(cv::Mat& mat, const cv::Mat& threatMask, int offsetX, int 
             int mapX = x + offsetX;
             int mapY = y + offsetY;
             if (mapX >= 0 && mapX < mat.cols && mapY >= 0 && mapY < mat.rows) {
-                mat.at<float>(mapY, mapX) = std::max(mat.at<float>(mapY, mapX), std::max(threatMask.at<float>(y, x), 0.9f));
+                mat.at<float>(mapY, mapX) = std::max(mat.at<float>(mapY, mapX), std::min(threatMask.at<float>(y, x), 0.9f));
             }
         }
     }
