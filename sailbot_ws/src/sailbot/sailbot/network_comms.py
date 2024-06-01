@@ -17,6 +17,7 @@ from std_msgs.msg import (
     Int16,
     Empty,
     Float64,
+    Bool,
 )
 from lifecycle_msgs.msg import TransitionEvent
 from lifecycle_msgs.msg import State as StateMsg
@@ -397,6 +398,12 @@ class NetworkComms(LifecycleNode):
             CVParameters,
             'initial_cv_parameters',
             self.initial_cv_parameters_callback,
+            10
+        )
+        self.reached_buoy_subscription = self.create_subscription(
+            Bool,
+            'reached_buoy',
+            self.reached_buoy_callback,
             10
         )
         self.restart_node_client = self.create_client(RestartNode, 'state_manager/restart_node', callback_group=self.callback_group_state)
@@ -811,6 +818,9 @@ class NetworkComms(LifecycleNode):
         self.current_cv_parameters.circularity_threshold = msg.circularity_threshold
 
         self.get_logger().info(f"Got initial CV values: {self.current_cv_parameters}")
+
+    def reached_buoy_callback(self, msg: Bool):
+        self.current_boat_state.reached_buoy = msg.data
 
     #new server code
     def create_grpc_server(self): 

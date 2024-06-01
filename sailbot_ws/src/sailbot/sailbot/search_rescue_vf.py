@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import String, Float64, Int16, Header, Empty
+from std_msgs.msg import String, Float64, Int16, Header, Empty, Bool
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
@@ -200,6 +200,7 @@ class PathFollower(LifecycleNode):
         self.target_position_publisher: Optional[Publisher]
         self.current_path_publisher: Optional[Publisher]
         self.current_grid_cell_publisher: Optional[Publisher]
+        self.reached_buoy_publisher: Optional[Publisher]
 
         self.error_publisher: Optional[Publisher]
 
@@ -277,6 +278,7 @@ class PathFollower(LifecycleNode):
             self.target_position_publisher = self.create_lifecycle_publisher(GeoPoint, 'target_position', 10)
             self.current_path_publisher = self.create_lifecycle_publisher(GeoPath, 'current_path', 10)
             self.current_grid_cell_publisher = self.create_lifecycle_publisher(Point, 'current_grid_cell', 10)
+            self.reached_buoy_publisher = self.create_lifecycle_publisher(Bool, 'reached_buoy', 10)
 
             self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
@@ -634,6 +636,13 @@ class PathFollower(LifecycleNode):
         self.current_buoy_times[msg.id] = current_time
 
         dist = geodesic((msg.position.latitude, msg.position.longitude), (self.latitude, self.longitude))
+
+        if(dist<2.0):
+            self.get_logger().info("Reached buoy!!!")
+            bool_msg = Bool()
+            bool_msg.data = True
+            self.reached_buoy_publisher.publish(bool_msg)
+
         if(current_time-self.last_buoy_calculation_time>2.0):
             self.path_to_buoy(msg)
             self.recalculate_path_from_exact_points()
