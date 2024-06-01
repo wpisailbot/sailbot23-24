@@ -408,12 +408,17 @@ class BuoyDetection(Node):
         self.current_y_scaling_factor = current_frame.shape[0]/CAMERA_RESOLUTION[1]
         #self.get_logger().info("x scaling factor: "+str(self.current_x_scaling_factor))
         #self.get_logger().info("y scaling factor: "+str(self.current_y_scaling_factor))
-        
-        image = cv2.undistort(current_frame, camera_matrix, distortion_coefficients)
+
+        hsv = cv2.cvtColor(current_frame, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        v_eq = cv2.equalizeHist(v)
+        hsv_image_eq = cv2.merge([h, s, v_eq])
+
+        hsv_image_eq = cv2.undistort(hsv_image_eq, camera_matrix, distortion_coefficients)
 
         detections = []
         for buoy_type in self.buoy_types:
-            contours = self.detect_colored_objects(image, buoy_type)
+            contours = self.detect_colored_objects(hsv_image_eq, buoy_type)
             detections.extend(
                 [
                     center for contour in contours
@@ -486,13 +491,13 @@ class BuoyDetection(Node):
         
         return 255-filled_image
 
-    def detect_colored_objects(self, image, type_info: BuoyTypeInfo):
+    def detect_colored_objects(self, hsv, type_info: BuoyTypeInfo):
         """
         Detects colored objects in an image using OpenCV for color segmentation and shape analysis. The function processes an input image,
         converts it to HSV color space, applies a color mask to isolate color regions, and identifies contours that meet
         specific area and circularity criteria.
 
-        :param image: An image array in BGR format, typically received from an image capturing device or simulation environment.
+        :param hsv: An image array in BGR format, typically received from an image capturing device or simulation environment.
 
         :return: A list of contours that represent detected colored objects which meet the area and circularity thresholds.
                 These objects are presumed to be circular in shape, fitting the typical characteristics of buoys.
@@ -508,8 +513,6 @@ class BuoyDetection(Node):
         - Optionally saving the processed image to disk for analysis (commented out).
 
         """
-        # Convert to HSV color space
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
         # Define range for orange color and create a mask
         #lower_orange = np.array([3, 205, 74])
