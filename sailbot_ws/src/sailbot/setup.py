@@ -55,6 +55,7 @@ setup(
             'fake_movement = sailbot.fake_movement:main',
             'heading_select = sailbot.heading_select:main',
             'search_rescue_vf = sailbot.search_rescue_vf:main',
+            'station_keep_vf = sailbot.station_keep_vf:main',
         ],
     },
 )

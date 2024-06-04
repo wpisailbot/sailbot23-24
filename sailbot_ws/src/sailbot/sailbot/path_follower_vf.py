@@ -417,7 +417,11 @@ class PathFollower(LifecycleNode):
         req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_PRMSTAR
         
         #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.
-        wind_angle_adjusted = self.wind_angle_deg+90
+        wind_angle_adjusted = 360-(self.wind_angle_deg+90)
+        if(wind_angle_adjusted<0):
+            wind_angle_adjusted += 360
+        wind_angle_adjusted%=360
+        self.get_logger().info(f"wind adjusted: {wind_angle_adjusted}")
 
 
         req.wind_angle_deg = float(wind_angle_adjusted)
@@ -791,6 +795,7 @@ class PathFollower(LifecycleNode):
 
 
     def true_wind_callback(self, msg: Wind) -> None:
+        self.get_logger().info(f"Got wind: {msg.direction}")
         self.wind_angle_deg = msg.direction
 
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:

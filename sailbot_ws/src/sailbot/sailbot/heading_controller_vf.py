@@ -141,7 +141,12 @@ class HeadingController(LifecycleNode):
     rudder_overshoot_bias = 50000.0
     vector_field_path_dir_weight = 2.0
     
-    allow_tack = False
+    allow_tack = True
+
+    request_tack_timer_duration = 3.0  # seconds
+    request_tack_timer: Timer = None
+    this_tack_start_time = time.time()
+    request_tack_override = False
 
     def __init__(self):
         super().__init__('heading_controller')
@@ -159,6 +164,8 @@ class HeadingController(LifecycleNode):
         self.current_grid_cell_subscription: Optional[Subscription]
         self.autonomous_mode_subscription: Optional[Subscription]
         self.current_path_subscription: Optional[Subscription]
+        self.request_tack_subscription: Optional[Subscription]
+
 
 
         self.timer: Optional[Timer]
@@ -173,7 +180,7 @@ class HeadingController(LifecycleNode):
         self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 2.0)
         self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
         self.declare_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees', 30.0)
-        self.declare_parameter('sailbot.heading_control.allow_tack', False)
+        self.declare_parameter('sailbot.heading_control.allow_tack', True)
 
 
     def get_parameters(self) -> None:
@@ -184,6 +191,7 @@ class HeadingController(LifecycleNode):
         self.leeway_correction_limit = self.get_parameter('sailbot.heading_control.leeway_correction_limit_degrees').get_parameter_value().double_value
         self.wind_restriction_replan_cutoff_degrees = self.get_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees').get_parameter_value().double_value
         self.allow_tack = self.get_parameter('sailbot.heading_control.allow_tack').get_parameter_value().bool_value
+        self.original_allow_tack = self.allow_tack
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -250,6 +258,11 @@ class HeadingController(LifecycleNode):
             10)
         self.autonomous_mode_subscription = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
 
+        self.request_tack_subscription = self.create_subscription(
+            Empty,
+            'request_tack',
+            self.request_tack_callback,
+            10)
         
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.get_logger().info("Heading controller node configured")
@@ -339,7 +352,29 @@ class HeadingController(LifecycleNode):
         return super().on_error(state)
     
     #end callbacks
+    def request_tack_callback(self, msg: Empty) -> None:
 
+        if(self.request_tack_override is False):
+            self.this_tack_start_time = time.time()
+
+        if(time.time()-self.this_tack_start_time > 20.0):
+            self.allow_tack = False
+
+        self.request_tack_override = True
+        if self.request_tack_timer is not None:
+            self.request_tack_timer.cancel()
+        self.request_tack_timer = self.create_timer(self.request_tack_timer_duration, self.request_tack_timer_callback)
+    
+    def request_tack_timer_callback(self):
+        self.allow_tack = self.original_allow_tack
+        self.request_tack_override = False
+        self.get_logger().info('Tack timer expired.')
+
+        # Cancel the timer to clean up
+        if self.request_tack_timer is not None:
+            self.request_tack_timer.cancel()
+            self.request_tack_timer = None
+    
     def current_path_callback(self, msg: GeoPath) -> None:
         if len(msg.points) == 0:
             self.path_segment = None
@@ -597,12 +632,13 @@ class HeadingController(LifecycleNode):
             target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
         
         # If the necessary track would bring us too far upwind, request a replan
-        if(self.wind_direction_deg is not None):
-            if(is_in_nogo(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))):
-                self.get_logger().warn(f"Target track is upwind, need to replan. Wind dir: {self.wind_direction_deg}, track: {target_track}")
-                self.request_replan_publisher.publish(Empty())
+        # Don't trust this, disabling modifications
+        # if(self.wind_direction_deg is not None):
+        #     if(is_in_nogo(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))):
+        #         self.get_logger().warn(f"Target track is upwind, need to replan. Wind dir: {self.wind_direction_deg}, track: {target_track}")
+        #         self.request_replan_publisher.publish(Empty())
                 # Set track to bring us along edge of nogo zone
-                target_track = closest_edge_heading(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))
+                #target_track = closest_edge_heading(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))
 
         target_track_msg = Float64()
         target_track_msg.data = target_track

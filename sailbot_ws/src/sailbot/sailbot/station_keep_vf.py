@@ -23,6 +23,7 @@ import cv2
 import re
 import numpy as np
 from pyproj import Transformer
+import pyproj
 import math
 import traceback
 import time
@@ -30,6 +31,8 @@ import time
 from geopy.distance import great_circle
 from geopy.distance import geodesic
 from geopy.point import Point as geopy_point
+from shapely.geometry import Point as shapely_point
+from shapely.geometry import Polygon, LineString
 from math import sqrt, radians, degrees
 from typing import Tuple, List
 
@@ -176,6 +179,15 @@ class PathFollower(LifecycleNode):
 
     waypoint_threat_id_map = {}
 
+    corners : List[Waypoint] = []
+
+    square_proj :pyproj.Proj = None
+
+    square: Polygon = None
+    centroid_offset_distance : float = 0.0
+    current_target: Waypoint = None
+    started_stationkeeping = False
+
     def __init__(self):
         super().__init__('path_follower')
         # Using different callback groups for subscription and service client
@@ -264,7 +276,7 @@ class PathFollower(LifecycleNode):
         self.buoy_rounding_distance_meters = self.get_parameter('sailbot.pathfinding.buoy_rounding_distance_meters').get_parameter_value().double_value
         self.buoy_threat_size_map_units = self.get_parameter('sailbot.pathfinding.buoy_threat_size_map_units').get_parameter_value().double_value
         self.buoy_threat_guassian_intensity = self.get_parameter('sailbot.pathfinding.buoy_threat_guassian_intensity').get_parameter_value().double_value
-        self.min_path_recalculation_interval_seconds = self.get_parameter('sailbot.pathfinding.min_path_recalculation_interval_seconds').get_parameter_value().double_value
+        self.min_path_recalculation_interval_seconds = 3#self.get_parameter('sailbot.pathfinding.min_path_recalculation_interval_seconds').get_parameter_value().double_value
         self.look_ahead_distance_meters = self.get_parameter('sailbot.navigation.look_ahead_distance_meters').get_parameter_value().double_value
         self.look_ahead_increase_per_knot = self.get_parameter('sailbot.navigation.look_ahead_increase_per_knot').get_parameter_value().double_value
         self.buoy_snap_distance_meters = self.get_parameter('sailbot.navigation.buoy_snap_distance_meters').get_parameter_value().double_value
@@ -385,15 +397,44 @@ class PathFollower(LifecycleNode):
 
         if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
             self.get_logger().info("Recalculating path")
+            self.exact_points = []
+            self.grid_points = []
+            self.calculate_exact_points_from_waypoint(self.current_target)
             self.recalculate_path_from_exact_points()
             self.last_recalculation_time = time.time()
-            
+        
+        if(self.square is not None and self.started_stationkeeping is False):
+            projected_point = self.latlong_to_grid_proj(msg.latitude, msg.longitude, self.bbox, self.image_width, self.image_height)
+            point = shapely_point(projected_point)
+            is_inside = self.square.contains(point)
+            if(is_inside):
+                self.get_logger().info("Entered square! starting timer.")
+                self.started_stationkeeping = True
+                self.exit_timer = self.create_timer(10, self.exit_timer_callback)
+
         self.find_current_segment()
         self.current_grid_cell = new_grid_cell
         grid_cell_msg = Point()
         grid_cell_msg.x = float(new_grid_cell[0])
         grid_cell_msg.y = float(new_grid_cell[1])
         self.current_grid_cell_publisher.publish(grid_cell_msg)
+
+    def exit_timer_callback(self):
+        self.get_logger().info("Timer elapsed! Exiting square.")
+        centroid = self.square.centroid
+        centroid_lat, centroid_lon = self.grid_to_latlong_proj(centroid.x, centroid.y, self.bbox, self.image_width, self.image_height) #pyproj.transform(self.square_proj, pyproj.Proj(proj='latlong'), centroid.x, centroid.y)
+        exit_point = geodesic(meters=self.centroid_offset_distance*5).destination((centroid_lat, centroid_lon), self.wind_angle_deg*(math.pi/180))
+
+        waypoint = Waypoint()
+        waypoint.point.latitude = exit_point.latitude
+        waypoint.point.longitude = exit_point.longitude
+        waypoint.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+        self.current_target = waypoint
+
+        self.calculate_exact_points_from_waypoint(waypoint)
+        self.recalculate_path_from_exact_points()
+        self.find_current_segment()
+
 
 
     def airmar_speed_knots_callback(self, msg: Float64) -> None:
@@ -416,8 +457,12 @@ class PathFollower(LifecycleNode):
         req.end = end_point
         req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_PRMSTAR
         
-        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.
-        wind_angle_adjusted = self.wind_angle_deg+90
+        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis. and inverted
+        wind_angle_adjusted = 360-(self.wind_angle_deg+90)
+        if(wind_angle_adjusted<0):
+            wind_angle_adjusted += 360
+        wind_angle_adjusted%=360
+        self.get_logger().info(f"wind adjusted: {wind_angle_adjusted}")
 
 
         req.wind_angle_deg = float(wind_angle_adjusted)
@@ -781,10 +826,65 @@ class PathFollower(LifecycleNode):
         This function is intended to be used as a callback for a waypoint message subscriber in a ROS2 node environment.
         """
         self.get_logger().info("Got single waypoint")
-        self.waypoints.waypoints.append(msg)
-        if msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT or msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
-            self.add_threat(msg)
-        self.calculate_exact_points_from_waypoint(msg)
+        if(len(self.corners)<4):
+            self.corners.append(msg)
+        # if msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT or msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
+        #     self.add_threat(msg)
+        if(not len(self.corners)>3):
+            return
+
+        self.get_logger().info("Got four points! Making square.")
+        
+        lat1 = self.corners[0].point.latitude
+        lon1 = self.corners[0].point.longitude
+ 
+        lat2 = self.corners[1].point.latitude
+        lon2 = self.corners[1].point.longitude
+
+        lat3 = self.corners[2].point.latitude
+        lon3 = self.corners[2].point.longitude
+
+        lat4 = self.corners[3].point.latitude
+        lon4 = self.corners[3].point.longitude
+
+        self.square_proj = pyproj.Proj(proj='aeqd', lat_0=lat1, lon_0=lon1)
+
+        lat_lon_vertices = [
+        (lat1, lon1),
+        (lat2, lon2),
+        (lat3, lon3),
+        (lat4, lon4)
+        ]
+        projected_vertices = [self.latlong_to_grid_proj(lat, lon, self.bbox, self.image_width, self.image_height) for lat, lon in lat_lon_vertices]
+        self.square = Polygon(projected_vertices)
+        
+        centroid = self.square.centroid
+
+        def point_to_segment_distance(point, segment_start, segment_end):
+            line = LineString([segment_start, segment_end])
+            distance = line.distance(shapely_point(point))
+            return distance
+
+        distances = []
+        for i in range(len(projected_vertices)):
+            start = projected_vertices[i]
+            end = projected_vertices[(i + 1) % len(projected_vertices)]
+            distance = point_to_segment_distance(centroid, start, end)
+            distances.append(distance)
+
+        self.centroid_offset_distance = (min(distances))*2
+        self.get_logger().info(f"Centroid offset meters: {self.centroid_offset_distance}")
+        
+        centroid_lat, centroid_lon = self.grid_to_latlong_proj(centroid.x, centroid.y, self.bbox, self.image_width, self.image_height) #pyproj.transform(self.square_proj, pyproj.Proj(proj='latlong'), centroid.x, centroid.y)
+        initial_point = geodesic(meters=self.centroid_offset_distance).destination((centroid_lat, centroid_lon), self.wind_angle_deg*(math.pi/180))
+
+        waypoint = Waypoint()
+        waypoint.point.latitude = initial_point.latitude
+        waypoint.point.longitude = initial_point.longitude
+        waypoint.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+        self.current_target = waypoint
+
+        self.calculate_exact_points_from_waypoint(waypoint)
         self.recalculate_path_from_exact_points()
         self.find_current_segment()
         self.get_logger().info("Ending single waypoint callback")
@@ -811,6 +911,11 @@ class PathFollower(LifecycleNode):
             return
         
         self.last_recalculation_time = time.time()
+        #Clear points
+        if(self.current_target is not None):
+            self.exact_points = []
+            self.grid_points = []
+            self.calculate_exact_points_from_waypoint(self.current_target)
         self.recalculate_path_from_exact_points()
         self.find_current_segment()
     
