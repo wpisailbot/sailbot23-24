@@ -187,6 +187,9 @@ class PathFollower(LifecycleNode):
     centroid_offset_distance : float = 0.0
     current_target: Waypoint = None
     started_stationkeeping = False
+    exited = False
+
+    made_waypoints = False
 
     def __init__(self):
         super().__init__('path_follower')
@@ -395,14 +398,14 @@ class PathFollower(LifecycleNode):
         current_time = time.time()
         #self.get_logger().info("Got new position")
 
-        if new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
+        if self.current_target is not None and new_grid_cell != self.current_grid_cell and (current_time-self.last_recalculation_time > self.min_path_recalculation_interval_seconds):
             self.get_logger().info("Recalculating path")
             self.exact_points = []
             self.grid_points = []
             self.calculate_exact_points_from_waypoint(self.current_target)
             self.recalculate_path_from_exact_points()
             self.last_recalculation_time = time.time()
-        
+
         if(self.square is not None and self.started_stationkeeping is False):
             projected_point = self.latlong_to_grid_proj(msg.latitude, msg.longitude, self.bbox, self.image_width, self.image_height)
             point = shapely_point(projected_point)
@@ -410,7 +413,11 @@ class PathFollower(LifecycleNode):
             if(is_inside):
                 self.get_logger().info("Entered square! starting timer.")
                 self.started_stationkeeping = True
-                self.exit_timer = self.create_timer(10, self.exit_timer_callback)
+                if(self.exited):
+                    pass
+                else:
+                    self.exitex = True
+                    self.exit_timer = self.create_timer(285, self.exit_timer_callback)
 
         self.find_current_segment()
         self.current_grid_cell = new_grid_cell
@@ -423,7 +430,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info("Timer elapsed! Exiting square.")
         centroid = self.square.centroid
         centroid_lat, centroid_lon = self.grid_to_latlong_proj(centroid.x, centroid.y, self.bbox, self.image_width, self.image_height) #pyproj.transform(self.square_proj, pyproj.Proj(proj='latlong'), centroid.x, centroid.y)
-        exit_point = geodesic(meters=self.centroid_offset_distance*5).destination((centroid_lat, centroid_lon), self.wind_angle_deg*(math.pi/180))
+        exit_point = geodesic(meters=50).destination((centroid_lat, centroid_lon), (self.wind_angle_deg+180)%360)
 
         waypoint = Waypoint()
         waypoint.point.latitude = exit_point.latitude
@@ -876,7 +883,7 @@ class PathFollower(LifecycleNode):
         self.get_logger().info(f"Centroid offset meters: {self.centroid_offset_distance}")
         
         centroid_lat, centroid_lon = self.grid_to_latlong_proj(centroid.x, centroid.y, self.bbox, self.image_width, self.image_height) #pyproj.transform(self.square_proj, pyproj.Proj(proj='latlong'), centroid.x, centroid.y)
-        initial_point = geodesic(meters=self.centroid_offset_distance).destination((centroid_lat, centroid_lon), self.wind_angle_deg*(math.pi/180))
+        initial_point = geodesic(meters=5).destination((centroid_lat, centroid_lon), (self.wind_angle_deg+180)%360)
 
         waypoint = Waypoint()
         waypoint.point.latitude = initial_point.latitude
@@ -892,6 +899,33 @@ class PathFollower(LifecycleNode):
 
     def true_wind_callback(self, msg: Wind) -> None:
         self.wind_angle_deg = msg.direction
+
+        if(self.made_waypoints == False):
+            self.get_logger().info("Adding waypoints!")
+            self.made_waypoints = True
+            p1 = Waypoint()
+            p1.point.latitude = 42.845847
+            p1.point.longitude = -70.977440
+            p1.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+            self.single_waypoint_callback(p1)
+
+            p2 = Waypoint()
+            p2.point.latitude = 42.845453
+            p2.point.longitude = -70.977357
+            p2.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+            self.single_waypoint_callback(p2)
+
+            p3 = Waypoint()
+            p3.point.latitude = 42.845555
+            p3.point.longitude = -70.977976
+            p3.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+            self.single_waypoint_callback(p3)
+
+            p4 = Waypoint()
+            p4.point.latitude = 42.845864
+            p4.point.longitude = -70.977925
+            p4.type = Waypoint.WAYPOINT_TYPE_INTERSECT
+            self.single_waypoint_callback(p4)
 
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg

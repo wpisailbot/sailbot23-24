@@ -404,8 +404,12 @@ class PathFollower(LifecycleNode):
         req.end = end_point
         req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_ASTAR
         
-        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.
-        wind_angle_adjusted = self.wind_angle_deg+90
+        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis. and inverted
+        wind_angle_adjusted = 360-(self.wind_angle_deg+90)
+        if(wind_angle_adjusted<0):
+            wind_angle_adjusted += 360
+        wind_angle_adjusted%=360
+        self.get_logger().info(f"wind adjusted: {wind_angle_adjusted}")
 
 
         req.wind_angle_deg = float(wind_angle_adjusted)

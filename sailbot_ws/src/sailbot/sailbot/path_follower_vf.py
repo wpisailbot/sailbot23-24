@@ -333,6 +333,8 @@ class PathFollower(LifecycleNode):
                 callback_group = self.subscription_callback_group)
             
             self.buoy_cleanup_timer = self.create_timer(1.0, self.remove_old_buoys)
+
+            self.made_waypoints = False
         
         except Exception as e:
             self.get_logger().info("Error in configure")
@@ -387,6 +389,11 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("Recalculating path")
             self.recalculate_path_from_exact_points()
             self.last_recalculation_time = time.time()
+
+        if(len(self.exact_points)>0 and abs(msg.latitude-self.exact_points[0].latitude)<0.00004 and abs(msg.longitude-self.exact_points[0].longitude)<0.00004):
+            self.get_logger().info("Removing passed exact point")
+            self.grid_points.pop(0)
+            self.exact_points.pop(0)
             
         self.find_current_segment()
         self.current_grid_cell = new_grid_cell
@@ -416,7 +423,7 @@ class PathFollower(LifecycleNode):
         req.end = end_point
         req.pathfinding_strategy = GetPath.Request.PATHFINDING_STRATEGY_PRMSTAR
         
-        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis.
+        #Pathfinder assumes 0 is along the +X axis. Airmar data is 0 along -y axis. and inverted
         wind_angle_adjusted = 360-(self.wind_angle_deg+90)
         if(wind_angle_adjusted<0):
             wind_angle_adjusted += 360
@@ -793,10 +800,32 @@ class PathFollower(LifecycleNode):
         self.find_current_segment()
         self.get_logger().info("Ending single waypoint callback")
 
-
     def true_wind_callback(self, msg: Wind) -> None:
         self.get_logger().info(f"Got wind: {msg.direction}")
         self.wind_angle_deg = msg.direction
+
+        if(self.made_waypoints == False):
+            self.made_waypoints = True
+            p1 = Waypoint()
+            p1.point.latitude = 42.845635
+            p1.point.longitude = -70.976832
+            p1.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
+            #self.single_waypoint_callback(p1)
+
+            p3 = Waypoint()
+            p3.point.latitude = 42.8461#42.845847
+            p3.point.longitude = -70.97761#-70.977440
+            p3.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
+            self.single_waypoint_callback(p3)
+
+            p4 = Waypoint()
+            p4.point.latitude = 42.84523#42.845453
+            p4.point.longitude = -70.97747#-70.977357
+            p4.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
+            self.single_waypoint_callback(p4)
+
+            p1.type = Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT
+            self.single_waypoint_callback(p1)
 
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg
@@ -840,9 +869,7 @@ class PathFollower(LifecycleNode):
         'current_grid_path', and 'exact_points' are properly initialized and available.
         """
         grid_cell_msg = Point()
-        grid_cell_msg.x = float(self.current_grid_cell[0])
-        grid_cell_msg.y = float(self.current_grid_cell[1])
-        self.current_grid_cell_publisher.publish(grid_cell_msg)
+        
 
         if len(self.current_path.points) == 0:
             #self.get_logger().info("No lookAhead point for zero-length path")
@@ -871,13 +898,14 @@ class PathFollower(LifecycleNode):
 
                 return
             else:
+                pass
                 #remove exact points if we've passed them
                 #self.get_logger().info(f"Point is: {point}")
                 # Floating point errors can cause problems here, apparently. This just checks if things are close *enough*.
-                if(abs(point.latitude-self.exact_points[0].latitude)<0.00000001 and abs(point.longitude-self.exact_points[0].longitude)<0.00000001):
-                    self.get_logger().info("Removing passed exact point")
-                    self.grid_points.pop(0)
-                    self.exact_points.pop(0)
+                # if(abs(point.latitude-self.exact_points[0].latitude)<0.00000001 and abs(point.longitude-self.exact_points[0].longitude)<0.00000001):
+                #     self.get_logger().info("Removing passed exact point")
+                #     self.grid_points.pop(0)
+                #     self.exact_points.pop(0)
 
     def vector_to_heading(self, dx, dy):
         """
