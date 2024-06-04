@@ -868,6 +868,7 @@ class PathFollower(LifecycleNode):
             else:
                 #remove exact points if we've passed them
                 #self.get_logger().info(f"Point is: {point}")
+                # Floating point errors can cause problems here, apparently. This just checks if things are close *enough*.
                 if(abs(point.latitude-self.exact_points[0].latitude)<0.00000001 and abs(point.longitude-self.exact_points[0].longitude)<0.00000001):
                     self.get_logger().info("Removing passed exact point")
                     self.grid_points.pop(0)
