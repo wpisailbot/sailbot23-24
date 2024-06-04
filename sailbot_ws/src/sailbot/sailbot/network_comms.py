@@ -878,8 +878,8 @@ class NetworkComms(LifecycleNode):
         #center = 75 degrees, full right=40, full left = 113
         response = control_pb2.ControlResponse()
         response.execution_status = control_pb2.ControlExecutionStatus.CONTROL_EXECUTION_SUCCESS
-        #rudder commands are inverted radians, map to degrees and invert
-        degrees = command.rudder_control_value*(180/math.pi)*-1
+        #rudder commands are inverted radians, map to degrees and invert, divide by 2 for manual control
+        degrees = (command.rudder_control_value*(180/math.pi)*-1)/2.0
         self.get_logger().info(f"degrees: {degrees}")
         
         msg = Int16()

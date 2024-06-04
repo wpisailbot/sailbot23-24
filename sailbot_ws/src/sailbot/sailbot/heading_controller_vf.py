@@ -138,6 +138,10 @@ class HeadingController(LifecycleNode):
 
     last_rudder_time = time.time()
 
+    rudder_adjustment_scale = 0.05
+    rudder_overshoot_bias = 50000.0
+    vector_field_path_dir_weight = 2.0
+
     def __init__(self):
         super().__init__('heading_controller')
 
@@ -162,10 +166,10 @@ class HeadingController(LifecycleNode):
         # self.target_position.longitude = -71.805049
 
     def set_parameters(self) -> None:
-        self.declare_parameter('sailbot.heading_control.rudder_adjustment_scale', 1.0)
-        self.declare_parameter('sailbot.heading_control.rudder_overshoot_bias', 10.0)
+        self.declare_parameter('sailbot.heading_control.rudder_adjustment_scale', 0.05)
+        self.declare_parameter('sailbot.heading_control.rudder_overshoot_bias', 50000.0)
         self.declare_parameter('sailbot.heading_control.vector_field_crosstrack_weight', 1.0)
-        self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 1.0)
+        self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 2.0)
         self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
         self.declare_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees', 30.0)
 

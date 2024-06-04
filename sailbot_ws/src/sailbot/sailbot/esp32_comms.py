@@ -309,38 +309,38 @@ class ESPComms(LifecycleNode):
             self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
             self.get_logger().info("Max lift starboard")
         else:
-            # Adjust behavior to not stop during a tack
-            if(self.could_be_tacking or force_tack):
-                self.get_logger().info("Tacking detected!")
-                if(self.switched_sides_this_tack is False):
-                    self.switched_sides_this_tack = True
-                    if(self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
-                        trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
-                        self.get_logger().info("Switching from starboard to port")
-                        msg = {
-                            "clear_winds": True,
-                            "state": "max_lift_port"
-                        }
-                    elif (self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
-                        self.get_logger().info("Switching from port to starboard")
-                        trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
-                        msg = {
-                            "clear_winds": True,
-                            "state": "max_lift_starboard"
-                        }
-                    else:
-                        # How did we get here?
-                        self.get_logger().warn("Went into min lift in tack mode, but previous state was not max lift. Did the wind change suddenly?")
-                        msg = {
-                            "clear_winds": True,
-                            "state": "min_lift"
-                        }
-                        trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
-            else:
-                msg = {
-                    "state": "min_lift"
-                }
-                trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
+            # # Adjust behavior to not stop during a tack
+            # if(self.could_be_tacking or force_tack):
+            #     self.get_logger().info("Tacking detected!")
+            #     if(self.switched_sides_this_tack is False):
+            #         self.switched_sides_this_tack = True
+            #         if(self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_STARBOARD):
+            #             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
+            #             self.get_logger().info("Switching from starboard to port")
+            #             msg = {
+            #                 #"clear_winds": True,
+            #                 "state": "min_lift"
+            #             }
+            #         elif (self.last_lift_state == TrimState.TRIM_STATE_MAX_LIFT_PORT):
+            #             self.get_logger().info("Switching from port to starboard")
+            #             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
+            #             msg = {
+            #                 #"clear_winds": True,
+            #                 "state": "min_lift"
+            #             }
+            #         else:
+            #             # How did we get here?
+            #             self.get_logger().warn("Went into min lift in tack mode, but previous state was not max lift. Did the wind change suddenly?")
+            #             msg = {
+            #                 #"clear_winds": True,
+            #                 "state": "min_lift"
+            #             }
+            #             trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
+            # else:
+            msg = {
+                "state": "min_lift"
+            }
+            trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
                 # Don't log min lift as last state so we never get stuck in it
 
         #if we're in full auto and have no target, don't go anywhere
@@ -444,6 +444,7 @@ class ESPComms(LifecycleNode):
             self.request_tack_timer.cancel()
             self.switched_sides_this_tack = False
             self.request_tack_timer = None
+            
 
     def request_tack_callback(self, msg: Empty) -> None:
         self.request_tack_override = True

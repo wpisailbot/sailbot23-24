@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     map_name = DeclareLaunchArgument(
         'map_name',
-        default_value="quinsigamond",
+        default_value="attitash_highres",
         description="The text before the first ':' in the map file name"
     )
     config_file_path = os.path.join(
@@ -23,13 +23,15 @@ def generate_launch_description():
         name='network_comms',
         namespace='',
         output='screen',
-        parameters=[{'map_name': LaunchConfiguration('map_name'), 'managed_nodes': ["ballast_control", "wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms"]}]
+        respawn=True,
+        parameters=[config_file_path, {'map_name': LaunchConfiguration('map_name'), 'managed_nodes': ["ballast_control", "wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms"]}]
     )
     ballast_node = LifecycleNode(
         package='sailbot', 
         executable='ballast_control', 
         name='ballast_control',
         namespace='',
+        respawn=True,
         output='screen'
     )
     airmar_node = LifecycleNode(
@@ -37,6 +39,7 @@ def generate_launch_description():
         executable='airmar_reader', 
         name='airmar_reader',
         namespace='',
+        respawn=True,
         output='screen'
     )
     cv_node = Node(
@@ -45,6 +48,8 @@ def generate_launch_description():
         name='buoy_detection',
         namespace='',
         output='screen',
+        respawn=True,
+        parameters=[config_file_path]
     )
     # pwm_node = LifecycleNode(
     #     package='sailbot', 
@@ -59,6 +64,7 @@ def generate_launch_description():
         name='esp32_comms',
         namespace='',
         output='screen',
+        respawn=True,
         parameters=[config_file_path]
     )
     heading_node = LifecycleNode(
@@ -67,14 +73,16 @@ def generate_launch_description():
         name='heading_controller',
         namespace='',
         output='screen',
+        respawn=True,
         parameters=[config_file_path]
     )
-    heading_select_node = LifecycleNode(
+    heading_select_node = Node(
         package='sailbot', 
         executable='heading_select', 
         name='heading_select',
         namespace='',
         output='screen',
+        respawn=True,
         parameters=[config_file_path]
     )
     path_follower_node = LifecycleNode(
@@ -83,6 +91,7 @@ def generate_launch_description():
         name='path_follower',
         namespace='',
         output='screen',
+        respawn=True,
         parameters=[config_file_path, {'map_name': LaunchConfiguration('map_name')}]
     )
     # managed_node_names = DeclareLaunchArgument(
@@ -96,6 +105,7 @@ def generate_launch_description():
         name='state_manager',
         namespace='',
         output='screen',
+        respawn=True,
         parameters=[{'managed_nodes': ["ballast_control", "wind_smoother", "airmar_reader", "path_follower", "heading_controller", "esp32_comms"]}]
     )
     pathfinder_node = Node(
@@ -103,6 +113,7 @@ def generate_launch_description():
         executable='pathfinder_node', 
         name='pathfinder_node',
         namespace='',
+        respawn=True,
         output='screen'
     )
 
@@ -111,9 +122,9 @@ def generate_launch_description():
         executable='wind_smoother',
         name='wind_smoother',
         namespace='',
+        respawn=True,
         output='screen'
     )
-    
     
     # Launch Description
     ld = launch.LaunchDescription()
@@ -129,6 +140,7 @@ def generate_launch_description():
     ld.add_action(esp_node)
     ld.add_action(heading_node)
     ld.add_action(heading_select_node)
+
     ld.add_action(path_follower_node)
 
     ld.add_action(state_manager_node)
