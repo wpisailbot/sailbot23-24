@@ -8,6 +8,7 @@ heading_controller:
         vector_field_path_dir_weight: 2.0
         leeway_correction_limit_degrees: 10.0
         wind_restriction_replan_cutoff_degrees: 30.0
+        allow_tack: False
 
 heading_select:
   ros__parameters:

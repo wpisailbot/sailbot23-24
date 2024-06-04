@@ -42,9 +42,9 @@ def normalRelativeAngle(angle):
 # Computes if a given bearing is inside a no-sail zone
 def is_in_nogo(bearing_rad, wind_angle_rad, nogo_angle_rad):
 
-    opposite_angle = math.fmod(bearing_rad + math.pi, 2 * math.pi)
+    #opposite_angle = math.fmod(bearing_rad + math.pi, 2 * math.pi)
 
-    difference = abs(wind_angle_rad - opposite_angle)
+    difference = abs(wind_angle_rad - bearing_rad)
     if difference > math.pi:
         difference = 2 * math.pi - difference
     
@@ -141,6 +141,8 @@ class HeadingController(LifecycleNode):
     rudder_adjustment_scale = 0.05
     rudder_overshoot_bias = 50000.0
     vector_field_path_dir_weight = 2.0
+    
+    allow_tack = False
 
     def __init__(self):
         super().__init__('heading_controller')
@@ -172,6 +174,8 @@ class HeadingController(LifecycleNode):
         self.declare_parameter('sailbot.heading_control.vector_field_path_dir_weight', 2.0)
         self.declare_parameter('sailbot.heading_control.leeway_correction_limit_degrees', 10.0)
         self.declare_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees', 30.0)
+        self.declare_parameter('sailbot.heading_control.allow_tack', False)
+
 
     def get_parameters(self) -> None:
         self.rudder_adjustment_scale = self.get_parameter('sailbot.heading_control.rudder_adjustment_scale').get_parameter_value().double_value
@@ -180,6 +184,7 @@ class HeadingController(LifecycleNode):
         self.lambda_base = self.get_parameter('sailbot.heading_control.vector_field_path_dir_weight').get_parameter_value().double_value
         self.leeway_correction_limit = self.get_parameter('sailbot.heading_control.leeway_correction_limit_degrees').get_parameter_value().double_value
         self.wind_restriction_replan_cutoff_degrees = self.get_parameter('sailbot.heading_control.wind_restriction_replan_cutoff_degrees').get_parameter_value().double_value
+        self.allow_tack = self.get_parameter('sailbot.heading_control.allow_tack').get_parameter_value().bool_value
         
     #lifecycle node callbacks
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -496,6 +501,21 @@ class HeadingController(LifecycleNode):
         lambda_param = lambda_base * (1 / (1 + dist))  # Increases as the boat approaches the line
         V = -k * e + lambda_param * d
         return V
+    
+    def direction_vector(self, p1, p2):
+        """
+        Calculate the vector from point p1 to point p2.
+
+        :param P1: Tuple (x1, y1) representing the start point of the line segment.
+        :param P2: Tuple (x2, y2) representing the end point of the line segment.
+
+        :return: A tuple representing the vector (dx, dy) from p1 to p2.
+        """
+        x1, y1 = p1
+        x2, y2 = p2
+        dx = x2 - x1
+        dy = y2 - y1
+        return (dx, dy)
 
     def vector_to_heading(self, dx, dy):
         """
@@ -560,13 +580,27 @@ class HeadingController(LifecycleNode):
         
         #self.get_logger().info(f"Current segment: {self.path_segment.start}, {self.path_segment.end}")
         
+        # Start with a vector field
         grid_direction_vector = self.adaptive_vector_field((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y), self.current_grid_cell.x, self.current_grid_cell.y, k_base=self.k_base, lambda_base=self.lambda_base)
+
         #self.get_logger().info(f"Direction vector: {grid_direction_vector}")
         target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
+        
+        # If that fails, go straight along the segment
+        if not math.isfinite(target_track):
+            self.get_logger().warn(f"Vector field failed! Falling back to straight line. p1: {(self.path_segment.start.x, self.path_segment.start.y)}, p2: {(self.path_segment.end.x,self.path_segment.end.y)}")
+            grid_direction_vector = self.direction_vector((self.path_segment.start.x, self.path_segment.start.y), (self.path_segment.end.x,self.path_segment.end.y))
+            target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
+        # If that fails, just go to segment endpoint. Could bring us upwind, but that's a later problem.
+        if not math.isfinite(target_track):
+            self.get_logger().warn(f"Straight line also failed!")
+            grid_direction_vector = self.direction_vector((self.current_grid_cell.x, self.current_grid_cell.y), (self.path_segment.end.x,self.path_segment.end.y))
+            target_track = self.vector_to_heading(grid_direction_vector[0], grid_direction_vector[1])
         
         # If the necessary track would bring us too far upwind, request a replan
         if(self.wind_direction_deg is not None):
             if(is_in_nogo(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))):
+                self.get_logger().warn(f"Target track is upwind, need to replan. Wind dir: {self.wind_direction_deg}, track: {target_track}")
                 self.request_replan_publisher.publish(Empty())
                 # Set track to bring us along edge of nogo zone
                 target_track = closest_edge_heading(math.radians(target_track), math.radians(self.wind_direction_deg), math.radians(self.wind_restriction_replan_cutoff_degrees))
@@ -598,7 +632,19 @@ class HeadingController(LifecycleNode):
 
         last_rudder_angle = self.rudder_angle
 
-        self.rudder_angle += rudder_value*self.rudder_adjustment_scale # Scale
+        is_tack = False
+        if(self.wind_direction_deg is not None):
+            if(self.needs_to_tack(self.heading, target_heading, self.wind_direction_deg)):
+                is_tack = True
+        
+        #if we'd need to tack, 
+        if is_tack:
+            if self.allow_tack:
+                self.rudder_angle += rudder_value*self.rudder_adjustment_scale
+            else:
+                self.rudder_angle -= rudder_value*self.rudder_adjustment_scale
+        else:
+            self.rudder_angle += rudder_value*self.rudder_adjustment_scale
 
         if(self.rudder_angle>30):
             self.rudder_angle = 30
@@ -607,13 +653,12 @@ class HeadingController(LifecycleNode):
 
         # If we are tacking, turn as hard as possible.
         # Trim tab controller will see this and skip over min_lift
-        if(self.wind_direction_deg is not None):
-            if(self.needs_to_tack(self.heading, target_heading, self.wind_direction_deg)):
-                if(self.rudder_angle>0):
-                    self.rudder_angle = 31
-                else:
-                    self.rudder_angle = -31
-                self.request_tack_publisher.publish(Empty())
+        if is_tack and self.allow_tack:
+            if(self.rudder_angle>0):
+                self.rudder_angle = 31
+            else:
+                self.rudder_angle = -31
+            self.request_tack_publisher.publish(Empty())
                 
 
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
