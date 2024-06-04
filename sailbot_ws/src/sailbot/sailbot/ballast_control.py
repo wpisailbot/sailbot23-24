@@ -217,7 +217,7 @@ class BallastControl(LifecycleNode):
         return  self.MOTOR_FAST_PORT + ((self.MOTOR_FAST_STARBOARD - self.MOTOR_FAST_PORT) / (self.CONTROL_FAST_STARBOARD - self.CONTROL_FAST_PORT)) * (control - self.CONTROL_FAST_PORT)
 
     def ballast_position_callback(self, msg: Float64):
-        self.get_logger().info("Received ballast setpoint: "+str(msg.data))
+        #self.get_logger().info("Received ballast setpoint: "+str(msg.data))
         self.current_target = self.ADC_FULL_PORT + ((self.ADC_FULL_STARBOARD - self.ADC_FULL_PORT) / (1.0 - -1.0)) * (msg.data - -1.0)
         self.move = True
         self.in_ramp_up = True
