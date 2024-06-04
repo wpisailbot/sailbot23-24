@@ -712,7 +712,7 @@ class PathFollower(LifecycleNode):
             else:
                 #remove exact points if we've passed them
                 #self.get_logger().info(f"Point is: {point}")
-                if(point.latitude == self.exact_points[0].latitude and point.longitude == self.exact_points[0].longitude):
+                if(abs(point.latitude-self.exact_points[0].latitude)<0.00000001 and abs(point.longitude-self.exact_points[0].longitude)<0.00000001):
                     self.get_logger().info("Removing passed exact point")
                     self.grid_points.pop(0)
                     self.exact_points.pop(0)
