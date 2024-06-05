@@ -148,6 +148,10 @@ class HeadingController(LifecycleNode):
     this_tack_start_time = time.time()
     request_tack_override = False
 
+    # Always 1 or -1, controls tack direction
+    # Set by needs_to_tack()
+    current_tack_dir = 1
+
     def __init__(self):
         super().__init__('heading_controller')
 
@@ -486,6 +490,7 @@ class HeadingController(LifecycleNode):
                 position_msg = Float64()
                 position_msg.data = -0.5
                 self.ballast_position_publisher.publish(position_msg)
+                self.current_tack_dir = 1
                 return True
         else:
             if target_heading <= wind_direction < boat_heading or \
@@ -493,6 +498,7 @@ class HeadingController(LifecycleNode):
                 position_msg = Float64()
                 position_msg.data = 0.5
                 self.ballast_position_publisher.publish(position_msg)
+                self.current_tack_dir = -1
                 return True
         
         return False
@@ -674,6 +680,7 @@ class HeadingController(LifecycleNode):
         
         #if we'd need to tack, 
         if is_tack:
+            #If we want to allow tacking, try to. Else, turn the long way around.
             if self.allow_tack:
                 self.rudder_angle += rudder_value*self.rudder_adjustment_scale
             else:
@@ -687,12 +694,13 @@ class HeadingController(LifecycleNode):
             self.rudder_angle = -30
 
         # If we are tacking, turn as hard as possible.
-        # Trim tab controller will see this and skip over min_lift
+        # Trim tab controller will see this and may modify its behavior.
         if is_tack and self.allow_tack:
-            if(self.rudder_angle>0):
-                self.rudder_angle = 31
-            else:
-                self.rudder_angle = -31
+            # if(self.rudder_angle>0):
+            #     self.rudder_angle = 31
+            # else:
+            #     self.rudder_angle = -31
+            self.rudder_angle = 31*self.current_tack_dir # current_tack_dir should never be anything but 1 or -1
             self.request_tack_publisher.publish(Empty())
                 
 

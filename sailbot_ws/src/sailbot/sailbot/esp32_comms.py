@@ -309,6 +309,8 @@ class ESPComms(LifecycleNode):
             self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_STARBOARD
             self.get_logger().info("Max lift starboard")
         else:
+            # clear_winds was crashing trimtab during competition. Didn't have time to debug.
+
             # # Adjust behavior to not stop during a tack
             # if(self.could_be_tacking or force_tack):
             #     self.get_logger().info("Tacking detected!")
@@ -341,7 +343,6 @@ class ESPComms(LifecycleNode):
                 "state": "min_lift"
             }
             trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
-                # Don't log min lift as last state so we never get stuck in it
 
         #if we're in full auto and have no target, don't go anywhere
         if self.force_neutral_position and self.autonomous_mode == AutonomousMode.AUTONOMOUS_MODE_FULL:
