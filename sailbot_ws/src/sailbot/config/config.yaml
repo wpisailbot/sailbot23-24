@@ -34,6 +34,7 @@ path_follower:
         look_ahead_distance_meters: 3.0
         look_ahead_increase_per_knot: 1.0
         buoy_snap_distance_meters: 10.0
+        loop_path: True
 
 wind_smoother:
   ros__parameters:

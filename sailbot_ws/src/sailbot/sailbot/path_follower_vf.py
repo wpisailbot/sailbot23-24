@@ -147,7 +147,7 @@ class PathFollower(LifecycleNode):
     heading = 0
     # latitude = 42.273822
     # longitude = -71.805967
-    latitude, longitude = 42.0396766107111, -71.84585650616927
+    latitude, longitude = 42.84456, -70.97622
     speed_knots = 0
     waypoints = WaypointPath()
     current_path = GeoPath()
@@ -175,6 +175,8 @@ class PathFollower(LifecycleNode):
     last_waypoint_was_rounding_type = False
 
     waypoint_threat_id_map = {}
+
+    loop_path = True
 
     def __init__(self):
         super().__init__('path_follower')
@@ -256,8 +258,7 @@ class PathFollower(LifecycleNode):
         self.declare_parameter('sailbot.navigation.look_ahead_distance_meters', 5.0)
         self.declare_parameter('sailbot.navigation.look_ahead_increase_per_knot', 1.0)
         self.declare_parameter('sailbot.navigation.buoy_snap_distance_meters', 10.0)
-
-
+        self.declare_parameter('sailbot.navigation.loop_path', True)
         self.declare_parameter('map_name', 'quinsigamond')
 
     def get_parameters(self) -> None:
@@ -268,6 +269,7 @@ class PathFollower(LifecycleNode):
         self.look_ahead_distance_meters = self.get_parameter('sailbot.navigation.look_ahead_distance_meters').get_parameter_value().double_value
         self.look_ahead_increase_per_knot = self.get_parameter('sailbot.navigation.look_ahead_increase_per_knot').get_parameter_value().double_value
         self.buoy_snap_distance_meters = self.get_parameter('sailbot.navigation.buoy_snap_distance_meters').get_parameter_value().double_value
+        self.loop_path = self.get_parameter('sailbot.navigation.loop_path').get_parameter_value().bool_value
         self.map_name = self.get_parameter('map_name').get_parameter_value().string_value
 
     #lifecycle node callbacks
@@ -333,6 +335,7 @@ class PathFollower(LifecycleNode):
                 callback_group = self.subscription_callback_group)
             
             self.buoy_cleanup_timer = self.create_timer(1.0, self.remove_old_buoys)
+            #self.tempt_test_timer = self.create_timer(6.0, self.set_waypoints)
 
             self.made_waypoints = False
         
@@ -394,6 +397,13 @@ class PathFollower(LifecycleNode):
             self.get_logger().info("Removing passed exact point")
             self.grid_points.pop(0)
             self.exact_points.pop(0)
+            # If we've completed the path and want to loop, do so
+            if(len(self.exact_points)==0 and self.loop_path):
+                self.exact_points = self.last_exact_points.copy()
+                self.grid_points = self.last_grid_points.copy()
+                self.recalculate_path_from_exact_points()
+                self.find_current_segment()
+
             
         self.find_current_segment()
         self.current_grid_cell = new_grid_cell
@@ -796,14 +806,14 @@ class PathFollower(LifecycleNode):
         if msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT or msg.type == Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT:
             self.add_threat(msg)
         self.calculate_exact_points_from_waypoint(msg)
+        self.last_exact_points = self.exact_points.copy()
+        self.last_grid_points = self.grid_points.copy()
         self.recalculate_path_from_exact_points()
         self.find_current_segment()
         self.get_logger().info("Ending single waypoint callback")
 
-    def true_wind_callback(self, msg: Wind) -> None:
-        self.get_logger().info(f"Got wind: {msg.direction}")
-        self.wind_angle_deg = msg.direction
-
+    def set_waypoints(self):
+        #self.tempt_test_timer.cancel()
         if(self.made_waypoints == False):
             self.made_waypoints = True
             p1 = Waypoint()
@@ -826,6 +836,11 @@ class PathFollower(LifecycleNode):
 
             p1.type = Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT
             self.single_waypoint_callback(p1)
+
+    def true_wind_callback(self, msg: Wind) -> None:
+        #self.get_logger().info(f"Got wind: {msg.direction}")
+        self.wind_angle_deg = msg.direction
+        self.set_waypoints()
 
     def buoy_position_callback(self, msg: BuoyDetectionStamped) -> None:
         self.current_buoy_positions[msg.id] = msg

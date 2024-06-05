@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     map_name = DeclareLaunchArgument(
         'map_name',
-        default_value="webster_medres",
+        default_value="attitash_highres",
         description="The text before the first ':' in the map file name"
     )
     config_file_path = os.path.join(

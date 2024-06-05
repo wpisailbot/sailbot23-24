@@ -184,7 +184,7 @@ class BuoyDetection(Node):
     """
     current_x_scaling_factor = 1.0
     current_y_scaling_factor = 1.0
-    latitude, longitude = 42.0396766107111, -71.84585650616927
+    latitude, longitude = 42.84456, -70.97622
     heading = 0
     tracks: List[Track] = []
     buoy_types: List[BuoyTypeInfo] = []

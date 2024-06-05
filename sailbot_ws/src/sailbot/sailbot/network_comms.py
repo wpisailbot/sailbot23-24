@@ -412,8 +412,9 @@ class NetworkComms(LifecycleNode):
         # self.current_boat_state.longitude = -71.805967
         # self.current_boat_state.latitude = 42.276842
         # self.current_boat_state.longitude = -71.756035
-        self.current_boat_state.latitude = 42.0396766107111
-        self.current_boat_state.longitude = -71.84585650616927
+        self.current_boat_state.latitude = 42.84456
+        self.current_boat_state.longitude = -70.97622
+
         self.current_boat_state.current_heading = 0
         self.current_boat_state.track_degrees_true = 0
         self.current_boat_state.track_degrees_magnetic = 0
@@ -1078,7 +1079,7 @@ class NetworkComms(LifecycleNode):
     
     #gRPC function, do not rename unless you change proto defs and recompile gRPC files
     def StreamBoatState(self, command: boat_state_pb2.BoatStateRequest, context):
-        rate = self.create_rate(10)
+        rate = self.create_rate(5)
         try:
             while context.is_active():
                 yield self.current_boat_state
