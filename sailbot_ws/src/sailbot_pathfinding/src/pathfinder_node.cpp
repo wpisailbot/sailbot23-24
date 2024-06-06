@@ -191,10 +191,14 @@ public:
 
 
         double wind_angle_rad = wind_angle_deg * (M_PI / 180);
+        double wind_angle_inverse = std::fmod((wind_angle_rad+M_PI),(M_PI*2));
         double nogo_angle_rad = NOGO_ANGLE_DEGREES * (M_PI / 180);
+        double downwind_nogo_angle_rad = DOWNWIND_NOGO_ANGLE_DEGREES * (M_PI / 180);
         bool wind_blocked = false;
+        bool blockedUp = is_in_nogo(start_node, goal_node, wind_angle_rad, nogo_angle_rad);
+        bool blockedDown = is_in_nogo(start_node, goal_node, wind_angle_inverse, downwind_nogo_angle_rad);
         // start with linear solver
-        if (!is_in_nogo(start_node, goal_node, wind_angle_rad, nogo_angle_rad))
+        if (!(blockedUp || blockedDown))
         {
             LinearRaycastPathfindingStrategy linearSolver;
             RCLCPP_INFO(this->get_logger(), "Trying linear raycast");
@@ -211,7 +215,7 @@ public:
         }
         else
         {
-            RCLCPP_INFO(this->get_logger(), "Path is upwind");
+            RCLCPP_INFO(this->get_logger(), "Path is upwind or downwind");
             wind_blocked = true;
         }
         // if that fails, try one tack
@@ -222,7 +226,12 @@ public:
             MapNode dummyStart = MapNode(start.first, start.second);
             MapNode dummyGoal = MapNode(goal.first, goal.second);
 
-            auto path = oneTackSolver.solve(map, &dummyStart, &dummyGoal, wind_angle_rad, nogo_angle_rad);
+            std::vector<std::pair<double, double>> path;
+            if(blockedUp){
+                path = oneTackSolver.solve(map, &dummyStart, &dummyGoal, wind_angle_rad, nogo_angle_rad);
+            } else if (blockedDown){
+                path = oneTackSolver.solve(map, &dummyStart, &dummyGoal, wind_angle_inverse, downwind_nogo_angle_rad);
+            }
             if (path.size() > 0)
             {
                 return path;
