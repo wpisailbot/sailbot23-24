@@ -156,6 +156,10 @@ class HeadingController(LifecycleNode):
     current_tack_dir = 1
     current_jibe_dir = 1
 
+    collision_avoidance_timer: Timer = None
+    collision_avoidance_timer_duration = 1.0
+    collision_avoidance_override = False
+
     def __init__(self):
         super().__init__('heading_controller')
 
@@ -279,6 +283,8 @@ class HeadingController(LifecycleNode):
             'airmar_data/speed_knots',
             self.speed_knots_callback,
             10)
+
+        self.collision_avoidance_subscription = self.create_subscription(Empty, 'collision_avoidance_trigger', self.collision_avoidance_callback, 10)
         
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.get_logger().info("Heading controller node configured")
@@ -368,6 +374,22 @@ class HeadingController(LifecycleNode):
         return super().on_error(state)
     
     #end callbacks
+
+    def collision_avoidance_callback(self, msg: Empty) -> None:
+        self.collision_avoidance_override = True
+        if self.collision_avoidance_timer is not None:
+            self.collision_avoidance_timer.cancel()
+        self.collision_avoidance_timer = self.create_timer(self.collision_avoidance_timer_duration, self.collision_avoidance_timer_callback)
+
+    def collision_avoidance_timer_callback(self):
+        self.collision_avoidance_override = False
+        self.get_logger().info('collision timer expired.')
+
+        # Cancel the timer to clean up
+        if self.collision_avoidance_timer is not None:
+            self.collision_avoidance_timer.cancel()
+            self.collision_avoidance_timer = None
+
     def request_tack_callback(self, msg: Empty) -> None:
 
         if(self.request_tack_override is False):
@@ -777,7 +799,10 @@ class HeadingController(LifecycleNode):
             #     self.rudder_angle = -31
             self.rudder_angle = 31*self.current_tack_dir # current_tack_dir should never be anything but 1 or -1
             self.request_tack_publisher.publish(Empty())
-                
+        
+        # Ignore everything else for collision avoidance task
+        if self.collision_avoidance_override:
+            self.rudder_angle = 30
 
         #self.get_logger().info(f"Computed rudder angle: {rudder_angle}")
         msg = Int16()

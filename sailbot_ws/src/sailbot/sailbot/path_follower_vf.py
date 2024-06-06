@@ -167,6 +167,8 @@ class PathFollower(LifecycleNode):
 
     grid_points = []
     exact_points = []
+    last_exact_points = []
+    last_grid_points = []
 
     last_recalculation_time = time.time()
 
