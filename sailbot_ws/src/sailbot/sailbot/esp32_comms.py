@@ -10,7 +10,7 @@ from rclpy.timer import Timer
 from rclpy.subscription import Subscription
 from time import time as get_time
 
-from std_msgs.msg import Int8, Int16, Empty, Float64, String
+from std_msgs.msg import Int8, Int16, Empty, Float32, Float64, String
 from sailbot_msgs.msg import Wind, AutonomousMode, GeoPath, TrimState
 
 import serial
@@ -67,8 +67,14 @@ class ESPComms(LifecycleNode):
 
     request_tack_timer_duration = 3.0  # seconds
     request_tack_timer: Timer = None
+
+    request_jibe_timer_duration = 5.0  # seconds
+    request_jibe_timer: Timer = None
+
     request_tack_override = False
     sent_clear_winds_this_tack = False
+
+    request_jibe_override = False
 
     def __init__(self):
         super(ESPComms, self).__init__('esp32_comms')
@@ -138,6 +144,7 @@ class ESPComms(LifecycleNode):
         self.apparent_wind_subscriber = self.create_subscription(Wind, 'apparent_wind_smoothed', self.apparent_wind_callback, 10)
 
         self.autonomous_mode_subscriber = self.create_subscription(AutonomousMode, 'autonomous_mode', self.autonomous_mode_callback, 10)
+
         self.current_path_subscription = self.create_subscription(
             GeoPath,
             'current_path',
@@ -155,6 +162,9 @@ class ESPComms(LifecycleNode):
             'request_tack',
             self.request_tack_callback,
             10)
+        
+        self.request_jibe_subscription = self.create_subscription(Float32, 'request_jibe', self.request_jibe_callback, 10)
+
         
 
         self.timer_pub = self.create_lifecycle_publisher(Empty, '/heartbeat/trim_tab_comms', 1)
@@ -270,7 +280,7 @@ class ESPComms(LifecycleNode):
         force_tack = False
         if(self.request_tack_override):
             # Only tack if we're going upwind
-            if (25.0 <= relative_wind < 100) or (260 <= relative_wind < 335):
+            if (0 <= relative_wind < 100) or (260 <= relative_wind < 365):
                 force_tack = True
             else:
                 self.get_logger().warn("Tack requested, but we're going downwind...")
@@ -283,7 +293,7 @@ class ESPComms(LifecycleNode):
             trim_state_msg.state = TrimState.TRIM_STATE_MAX_LIFT_PORT
             self.last_lift_state = TrimState.TRIM_STATE_MAX_LIFT_PORT
             #self.get_logger().info("Max lift port")
-        elif 100 <= relative_wind < 180:
+        elif 100 <= relative_wind < 180 and self.request_jibe_override is False:
             # Max drag port
             msg = {
                 "state": "max_drag_starboard" # switched for testing, need to swap in trim_tab_client
@@ -292,7 +302,7 @@ class ESPComms(LifecycleNode):
             #self.last_state = TrimState.TRIM_STATE_MAX_DRAG_PORT
             #self.get_logger().info("Max drag port")
 
-        elif 180 <= relative_wind < 260:
+        elif 180 <= relative_wind < 260 and self.request_jibe_override is False:
             # Max drag starboard
             msg = {
                 "state": "max_drag_port"
@@ -445,6 +455,15 @@ class ESPComms(LifecycleNode):
             self.request_tack_timer.cancel()
             self.switched_sides_this_tack = False
             self.request_tack_timer = None
+
+    def request_jibe_timer_callback(self):
+        self.request_jibe_override = False
+        self.get_logger().info('Jibe timer expired.')
+
+        # Cancel the timer to clean up
+        if self.request_jibe_timer is not None:
+            self.request_jibe_timer.cancel()
+            self.request_jibe_timer = None
             
 
     def request_tack_callback(self, msg: Empty) -> None:
@@ -452,6 +471,39 @@ class ESPComms(LifecycleNode):
         if self.request_tack_timer is not None:
             self.request_tack_timer.cancel()
         self.request_tack_timer = self.create_timer(self.request_tack_timer_duration, self.request_tack_timer_callback)
+
+    def request_jibe_callback(self, msg: Float64) -> None:
+        self.request_jibe_override = True
+        if self.request_jibe_timer is not None:
+            self.request_jibe_timer.cancel()
+        self.request_jibe_timer = self.create_timer(self.request_jibe_timer_duration, self.request_jibe_timer_callback)
+
+        trim_state_msg = TrimState()
+        if(msg.data>0):
+            msg = {
+                "state": "max_drag_port" # Also switched due to mistake somewhere else. Fix?
+            }
+            trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_STARBOARD
+        else:
+            msg = {
+                "state": "max_drag_starboard"
+            }
+            trim_state_msg.state = TrimState.TRIM_STATE_MAX_DRAG_PORT
+            
+        if self.force_neutral_position and self.autonomous_mode == AutonomousMode.AUTONOMOUS_MODE_FULL:
+            msg = {
+                "state": "min_lift"
+            }
+            trim_state_msg.state = TrimState.TRIM_STATE_MIN_LIFT
+            self.get_logger().info("Force neutral")
+        
+        if(msg is not None):
+            self.trim_state_debug_publisher.publish(trim_state_msg)
+            message_string = json.dumps(msg)+'\n'
+            self.ser.write(message_string.encode())
+        else:
+            self.get_logger().info("Trim message is None, taking no action")
+        
 
     def ballast_timer_callback(self) -> None:
         """

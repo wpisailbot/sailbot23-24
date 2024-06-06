@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
-from std_msgs.msg import String, Float64, Int16, Empty
+from std_msgs.msg import String, Float64, Float32, Int16, Empty
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Point
 # import json
@@ -143,15 +143,18 @@ class HeadingController(LifecycleNode):
     
     allow_tack = True
     too_slow_to_tack = True
+    current_rudder_limit = 15
 
     request_tack_timer_duration = 3.0  # seconds
     request_tack_timer: Timer = None
     this_tack_start_time = time.time()
     request_tack_override = False
+    is_downwind = False
 
     # Always 1 or -1, controls tack direction
     # Set by needs_to_tack()
     current_tack_dir = 1
+    current_jibe_dir = 1
 
     def __init__(self):
         super().__init__('heading_controller')
@@ -213,6 +216,8 @@ class HeadingController(LifecycleNode):
         self.request_replan_publisher = self.create_lifecycle_publisher(Empty, 'request_replan', 10)
 
         self.request_tack_publisher = self.create_lifecycle_publisher(Empty, 'request_tack', 10)
+
+        self.request_jibe_publisher = self.create_lifecycle_publisher(Float32, 'request_jibe', 10)
 
         self.error_publisher = self.create_lifecycle_publisher(String, f'{self.get_name()}/error', 10)
 
@@ -349,7 +354,7 @@ class HeadingController(LifecycleNode):
         self.destroy_lifecycle_publisher(self.rudder_angle_publisher)
         self.destroy_subscription(self.airmar_heading_subscription)
         self.destroy_subscription(self.path_segment_subscription)
-        self.destroy_subscription(self.airmar_position_subscription)
+        #self.destroy_subscription(self.airmar_position_subscription)
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -377,10 +382,15 @@ class HeadingController(LifecycleNode):
         self.request_tack_timer = self.create_timer(self.request_tack_timer_duration, self.request_tack_timer_callback)
     
     def speed_knots_callback(self, msg: Float64):
-        if(msg.data<2.0):
+        if msg.data<2.0:
             self.too_slow_to_tack = True
+            self.current_rudder_limit = 15
+        elif msg.data<4:
+            self.too_slow_to_tack = False
+            self.current_rudder_limit = 23
         else:
             self.too_slow_to_tack = False
+            self.current_rudder_limit = 30
 
     def request_tack_timer_callback(self):
         self.allow_tack = self.original_allow_tack
@@ -459,6 +469,10 @@ class HeadingController(LifecycleNode):
     def true_wind_callback(self, msg: Wind) -> None:
         self.wind_direction_deg = msg.direction
 
+    def relative_wind_callback(self, msg: Wind) -> None:
+        if 165 <= msg.data < 195:
+            self.is_downwind = True
+
     def forward_magnitude_callback(self, msg: Float64) -> None:
         self.lambda_base = msg.data
 
@@ -512,6 +526,48 @@ class HeadingController(LifecycleNode):
                 position_msg.data = 0.5
                 self.ballast_position_publisher.publish(position_msg)
                 self.current_tack_dir = 1
+                return True
+        
+        return False
+
+    def needs_to_jibe(self, boat_heading, target_heading, wind_direction) -> bool:
+        """
+        Determines whether a jibing maneuver is required based on the current boat heading, target heading, and the direction
+        of the wind. jibing is necessary when the desired heading would cause the boat to turn through the wind vector. 
+        This is only relevant for the sail controller, which will direct the sail to switch sides as the boat turns.
+
+        :param boat_heading: The current heading of the boat in degrees.
+        :param target_heading: The desired heading of the boat in degrees.
+        :param wind_direction: The current wind direction in degrees.
+
+        :return: A boolean value. Returns True if tacking is necessary to reach the target heading; otherwise, False.
+
+        Function behavior includes:
+        - Normalizing all heading and direction values to ensure they fall within a 0-360 degree range.
+        - Calculating whether the shortest path from the current to the target heading is clockwise or counterclockwise.
+        - Checking if the wind direction lies within the arc between the current and target headings in the chosen direction.
+        - Publishing a position adjustment to the ballast to aid in tacking, if necessary.
+        - Returning True if a tacking maneuver is needed based on the relative positions of the boat heading, target heading, and wind.
+
+        This function also manages the ballast position by publishing to 'ballast_position_publisher' to optimize the boat's
+        balance and performance during potential tacking maneuvers.
+        """
+        # Normalize angles
+        boat_heading %= 360
+        target_heading %= 360
+        wind_direction %= 360
+        
+        clockwise = ((target_heading - boat_heading + 360) % 360) < 180
+        
+        if clockwise:
+            if boat_heading <= wind_direction < target_heading or \
+            (target_heading < boat_heading and (wind_direction > boat_heading or wind_direction < target_heading)):
+                self.current_jibe_dir = -1
+                return True
+        else:
+            if target_heading <= wind_direction < boat_heading or \
+            (boat_heading < target_heading and (wind_direction < boat_heading or wind_direction > target_heading)):
+                self.current_jibe_dir = 1
                 return True
         
         return False
@@ -690,7 +746,10 @@ class HeadingController(LifecycleNode):
         if(self.wind_direction_deg is not None):
             if(self.needs_to_tack(self.heading, target_heading, self.wind_direction_deg)):
                 is_tack = True
-        
+        elif(self.needs_to_jibe(self.heading, target_heading, (self.wind_direction_deg+180)%360)): # This checks if we're jibing
+            self.request_jibe_publisher(Float32(self.current_jibe_dir))
+            
+
         #if we'd need to tack, 
         if is_tack:
             #If we want to allow tacking, try to. Else, turn the long way around.
@@ -698,13 +757,16 @@ class HeadingController(LifecycleNode):
                 self.rudder_angle += rudder_value*self.rudder_adjustment_scale
             else:
                 self.rudder_angle -= rudder_value*self.rudder_adjustment_scale
+                if(self.is_downwind): # This should only happen if we decide to jibe instead of tack, and still get stuck.
+                    self.request_jibe_publisher(Float32(self.current_tack_dir*-1.0))
+
         else:
             self.rudder_angle += rudder_value*self.rudder_adjustment_scale
 
-        if(self.rudder_angle>30):
-            self.rudder_angle = 30
-        elif self.rudder_angle<-30:
-            self.rudder_angle = -30
+        if(self.rudder_angle>self.current_rudder_limit):
+            self.rudder_angle = self.current_rudder_limit
+        elif self.rudder_angle<-self.current_rudder_limit:
+            self.rudder_angle = -self.current_rudder_limit
 
         # If we are tacking, turn as hard as possible.
         # Trim tab controller will see this and may modify its behavior.
