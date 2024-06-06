@@ -817,25 +817,28 @@ class PathFollower(LifecycleNode):
         if(self.made_waypoints == False):
             self.made_waypoints = True
             p1 = Waypoint()
-            p1.point.latitude = 42.845635
-            p1.point.longitude = -70.976832
+            p1.point.latitude = 42.846733
+            p1.point.longitude = -70.974783
             p1.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
-            #self.single_waypoint_callback(p1)
+            self.single_waypoint_callback(p1)
+
+            p2 = Waypoint()
+            p2.point.latitude = 42.848148
+            p2.point.longitude = -70.976775
+            p2.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
+            self.single_waypoint_callback(p2)
 
             p3 = Waypoint()
-            p3.point.latitude = 42.8461#42.845847
-            p3.point.longitude = -70.97761#-70.977440
+            p3.point.latitude = 42.846820
+            p3.point.longitude = -70.978182
             p3.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
             self.single_waypoint_callback(p3)
 
             p4 = Waypoint()
-            p4.point.latitude = 42.84523#42.845453
-            p4.point.longitude = -70.97747#-70.977357
+            p4.point.latitude = 42.845033
+            p4.point.longitude = -70.977105
             p4.type = Waypoint.WAYPOINT_TYPE_CIRCLE_LEFT
             self.single_waypoint_callback(p4)
-
-            p1.type = Waypoint.WAYPOINT_TYPE_CIRCLE_RIGHT
-            self.single_waypoint_callback(p1)
 
     def true_wind_callback(self, msg: Wind) -> None:
         #self.get_logger().info(f"Got wind: {msg.direction}")

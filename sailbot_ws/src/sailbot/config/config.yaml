@@ -8,7 +8,7 @@ heading_controller:
         vector_field_path_dir_weight: 2.0
         leeway_correction_limit_degrees: 10.0
         wind_restriction_replan_cutoff_degrees: 30.0
-        allow_tack: True
+        allow_tack: False
 
 heading_select:
   ros__parameters:
@@ -29,7 +29,7 @@ path_follower:
         buoy_rounding_distance_meters: 5.0
         buoy_threat_size_map_units: 1.0
         buoy_threat_guassian_intensity: 0.8
-        min_path_recalculation_interval_seconds: 5.0
+        min_path_recalculation_interval_seconds: 30.0
       navigation:
         look_ahead_distance_meters: 3.0
         look_ahead_increase_per_knot: 1.0

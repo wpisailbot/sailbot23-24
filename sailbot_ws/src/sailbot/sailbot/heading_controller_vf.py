@@ -142,6 +142,7 @@ class HeadingController(LifecycleNode):
     vector_field_path_dir_weight = 2.0
     
     allow_tack = True
+    too_slow_to_tack = True
 
     request_tack_timer_duration = 3.0  # seconds
     request_tack_timer: Timer = None
@@ -267,6 +268,12 @@ class HeadingController(LifecycleNode):
             'request_tack',
             self.request_tack_callback,
             10)
+
+        self.speed_knots_subscription = self.create_subscription(
+            Float64,
+            'airmar_data/speed_knots',
+            self.speed_knots_callback,
+            10)
         
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.get_logger().info("Heading controller node configured")
@@ -361,7 +368,7 @@ class HeadingController(LifecycleNode):
         if(self.request_tack_override is False):
             self.this_tack_start_time = time.time()
 
-        if(time.time()-self.this_tack_start_time > 20.0):
+        if(time.time()-self.this_tack_start_time > 10.0):
             self.allow_tack = False
 
         self.request_tack_override = True
@@ -369,6 +376,12 @@ class HeadingController(LifecycleNode):
             self.request_tack_timer.cancel()
         self.request_tack_timer = self.create_timer(self.request_tack_timer_duration, self.request_tack_timer_callback)
     
+    def speed_knots_callback(self, msg: Float64):
+        if(msg.data<2.0):
+            self.too_slow_to_tack = True
+        else:
+            self.too_slow_to_tack = False
+
     def request_tack_timer_callback(self):
         self.allow_tack = self.original_allow_tack
         self.request_tack_override = False
@@ -490,7 +503,7 @@ class HeadingController(LifecycleNode):
                 position_msg = Float64()
                 position_msg.data = -0.5
                 self.ballast_position_publisher.publish(position_msg)
-                self.current_tack_dir = 1
+                self.current_tack_dir = -1
                 return True
         else:
             if target_heading <= wind_direction < boat_heading or \
@@ -498,7 +511,7 @@ class HeadingController(LifecycleNode):
                 position_msg = Float64()
                 position_msg.data = 0.5
                 self.ballast_position_publisher.publish(position_msg)
-                self.current_tack_dir = -1
+                self.current_tack_dir = 1
                 return True
         
         return False
@@ -681,7 +694,7 @@ class HeadingController(LifecycleNode):
         #if we'd need to tack, 
         if is_tack:
             #If we want to allow tacking, try to. Else, turn the long way around.
-            if self.allow_tack:
+            if self.allow_tack and not self.too_slow_to_tack:
                 self.rudder_angle += rudder_value*self.rudder_adjustment_scale
             else:
                 self.rudder_angle -= rudder_value*self.rudder_adjustment_scale
